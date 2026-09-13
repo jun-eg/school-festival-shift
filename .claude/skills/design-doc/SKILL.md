@@ -60,7 +60,9 @@ description: HMW で決めたソリューションを Overview / What we provide
 
 - **2. What we provide** — HMW の採用ソリューションを、価値の言葉に言い換える
 - **3. BackGround** — どの改善機会を拾い、どの HMW の問いに変換したのかを辿れるように書く
-- **4. User Story** — ジャーニーマップのペルソナをそのまま使う。Before → After の状態変化を書く
+- **4. User Story** — ジャーニーマップのペルソナをそのまま使う。Before → After の状態変化を書く。
+  書いていて「ここは想像で埋めた」と気づいたら、**その場で `interview-questions` skill を呼んで質問を起こす**。
+  質問の発生源はジャーニーマップだけではなく、**Design Doc を書く過程も含む**
 - **5. Alternatives Considered** — HMW の却下候補を表に移す。**却下理由を落とさない**
 
 ### 4. 6. Functional Requirements を書く
@@ -94,6 +96,9 @@ BackGround / User Story で機能の話が始まっていたら**差し戻す**�
 ### 3. 妄想の課題を作らない
 
 実在しない困りごとを前提にしていないか。ジャーニーマップ／ユーザーインタビューで裏が取れているか。取れていない箇所は、そう明記するか、聞きに行く。
+
+**聞きに行くと決めたら `interview-questions` skill を呼ぶ**（`/interview-questions`）。
+「何を何問聞くか」は目的 3 要素 → 仮説 → 質問の順で降ろす。裏付けが足りない箇所がそのまま仮説の入力になる。
 
 ### 4. 1 回で完璧にしない
 
