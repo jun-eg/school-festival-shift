@@ -52,7 +52,11 @@
 
 ## 解像度が荒い部分（インタビューで聞く）
 
-△ を付けた箇所が対象。`.claude/skills/user-journey-map/references/interview.md` の質問リストに沿って、
+△ を付けた箇所が対象。**この節がそのまま Interview List**（聞きたいことの溜め場）として機能する。
+
+聞きに行く前に `interview-questions` skill（`/interview-questions`）を呼び、この節を入力として
+相手 1 人分のインタビューガイドを `docs/interviews/` に出す。
+聞き方は `.claude/skills/interview-questions/references/interview.md` に従い、
 **意見ではなく直近の実際の行動**を聞く。
 
 ### 1. 背景・状況

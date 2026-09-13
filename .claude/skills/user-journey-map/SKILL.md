@@ -65,8 +65,12 @@ description: ユーザーが特定のゴールを達成するまでの一連の�
 ### 5. 解像度が荒い部分を洗い出す
 
 書いていて「分からなかった」「想像で埋めた」部分を、そのままインタビュー項目として書き留める。
+**ここと「未検証（△）」節が Interview List を兼ねる**ので、専用の置き場所は作らない。
 
-→ `references/interview.md` を使う（質問リスト・深掘りのコツ・避けること）
+→ **聞きに行く前に `interview-questions` skill を呼ぶ**（`/interview-questions`）。
+この節と △ / ○ を入力として、相手 1 人分のインタビューガイドを `docs/interviews/` に出す。
+「どう聞くか」（深掘り・誘導質問の回避・避けること）は
+`.claude/skills/interview-questions/references/interview.md` が持つ。
 
 ### 6. インタビュー後に肉付けする
 
@@ -108,5 +112,5 @@ description: ユーザーが特定のゴールを達成するまでの一連の�
 - [ ] TASK LIST に「頭の中の作業」も含めて**すべて**書かれている
 - [ ] FEELING ADJECTIVE が**形容詞**で書かれている
 - [ ] IMPROVEMENT OPPORTUNITIES が解決策ではなく**機会**として書かれている
-- [ ] 解像度が荒い部分がインタビュー項目として残っている
+- [ ] 解像度が荒い部分がインタビュー項目として残っている（`interview-questions` skill の入力になる）
 - [ ] 改善機会が箇条書きで抽出されている（**空にしない**）
