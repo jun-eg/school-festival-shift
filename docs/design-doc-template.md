@@ -28,8 +28,8 @@
 | --- | --- | --- |
 | 1 | Overview | — |
 | 2 | What we provide | `docs/hmw.md` の**採用したソリューション** |
-| 3 | BackGround | `docs/user-journey-map.md`（ジャーニーマップ・改善機会） ＋ `docs/hmw.md` の HMW の問い |
-| 4 | User Story | `docs/user-journey-map.md` の**ペルソナ** ＋ ユーザーインタビュー結果 |
+| 3 | BackGround | `docs/journey/<立場>.md`（ジャーニーマップ・改善機会。立場ごとに 1 本） ＋ `docs/hmw.md` の HMW の問い |
+| 4 | User Story | `docs/journey/<立場>.md` の**ペルソナ** ＋ ユーザーインタビュー結果 |
 | 5 | Alternatives Considered | `docs/hmw.md` の**採らなかった候補と却下理由** |
 | 6 | Functional Requirements | — |
 | 7 | Mile Stone | — |
@@ -55,7 +55,7 @@
 
 > **書く内容**: なぜやると決めたのか。どんな考察が意思決定を促したのか。
 >
-> **入力元**: `docs/user-journey-map.md` のジャーニーマップと改善機会、`docs/hmw.md` の HMW の問い。
+> **入力元**: `docs/journey/<立場>.md` のジャーニーマップと改善機会（立場ごとに 1 本ある）、`docs/hmw.md` の HMW の問い。
 >
 > - 実在する困りごとから書く。裏が取れていない課題（＝妄想の課題）を前提にしない
 > - どの改善機会を拾い、どの HMW の問いに変換したのかを辿れるようにする
@@ -65,7 +65,7 @@
 
 > **書く内容**: 届ける相手の心境・動機。その動機がどう満たされ、結果どんな状態になるのか。
 >
-> **入力元**: `docs/user-journey-map.md` のペルソナ ＋ ユーザーインタビュー結果。
+> **入力元**: `docs/journey/<立場>.md` のペルソナ ＋ ユーザーインタビュー結果。ソリューションが影響する立場が複数あるなら、立場ごとに書く。
 >
 > - 「ユーザー」ではなく**具体的な個人**として書く（ジャーニーマップで確定させたペルソナを使う）
 > - 想像で埋めた部分と、インタビューで裏が取れた部分を区別できるようにする
