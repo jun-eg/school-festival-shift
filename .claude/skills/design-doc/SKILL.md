@@ -13,7 +13,7 @@ description: HMW で決めたソリューションを Overview / What we provide
 ユーザージャーニーマップ  →  HMW  →  【Design Doc】
 ```
 
-- **入力**: `docs/user-journey-map.md`（ジャーニーマップ・ペルソナ・改善機会）、`docs/hmw.md`（採用ソリューション・却下候補）
+- **入力**: `docs/journey/<立場>.md` **全本**（ジャーニーマップ・ペルソナ・改善機会。立場ごとに 1 本ある）、`docs/hmw.md`（採用ソリューション・却下候補）
 - **出力**: `docs/design-doc.md` — 作るものが確定した Design Doc
 - **雛形**: `docs/design-doc-template.md` をコピーして書き始める
 
@@ -47,8 +47,8 @@ description: HMW で決めたソリューションを Overview / What we provide
 
 書き始める前に手元に置く。無いまま埋めにいかない。
 
-- `docs/user-journey-map.md` — ペルソナ、ジャーニーマップ、改善機会リスト
-- `docs/hmw.md` — 採用したソリューション、**採らなかった候補と却下理由**
+- `docs/journey/<立場>.md` — ペルソナ、ジャーニーマップ、改善機会リスト。**立場ごとに 1 本あるので全部揃える**
+- `docs/hmw.md` — 採用したソリューション、**採らなかった候補と却下理由**（どの立場のマップの改善機会から選んだかが書いてある）
 
 ### 2. テンプレートをコピーする
 
@@ -61,6 +61,9 @@ description: HMW で決めたソリューションを Overview / What we provide
 - **2. What we provide** — HMW の採用ソリューションを、価値の言葉に言い換える
 - **3. BackGround** — どの改善機会を拾い、どの HMW の問いに変換したのかを辿れるように書く
 - **4. User Story** — ジャーニーマップのペルソナをそのまま使う。Before → After の状態変化を書く。
+  **主役は、HMW で選んだ改善機会の立場のペルソナ。** 採用ソリューションが他の立場の体験も変えるなら、
+  **その立場のペルソナでも User Story を書く**（新しいペルソナを Design Doc 側で発明しない。
+  `docs/journey/<立場>.md` にあるものを使う）。
   書いていて「ここは想像で埋めた」と気づいたら、**その場で `interview-questions` skill を呼んで質問を起こす**。
   質問の発生源はジャーニーマップだけではなく、**Design Doc を書く過程も含む**
 - **5. Alternatives Considered** — HMW の却下候補を表に移す。**却下理由を落とさない**
@@ -133,7 +136,8 @@ BackGround / User Story で機能の話が始まっていたら**差し戻す**�
 - [ ] 7 セクションがすべて埋まっている（空のセクションを残さない）
 - [ ] 2. What we provide が HMW の採用ソリューションと対応している
 - [ ] 3. BackGround がジャーニーマップの改善機会と HMW の問いから書かれている
-- [ ] 4. User Story のペルソナがジャーニーマップのペルソナと一致している
+- [ ] 4. User Story のペルソナが `docs/journey/<立場>.md` のペルソナと一致している（Design Doc 側で新しく作っていない）
+- [ ] ソリューションが影響する立場が複数あるなら、**各立場の User Story が書かれている**
 - [ ] 5. Alternatives Considered に HMW の却下候補と**却下理由**が入っている
 - [ ] **6 より前のセクションに機能の詳細が書かれていない**
 - [ ] 2 が「モノ」ではなく「価値」の言葉で書かれている
