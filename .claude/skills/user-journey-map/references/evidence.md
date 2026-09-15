@@ -74,10 +74,11 @@
 **判定は grep 1 本。**
 
 ```sh
-awk '{n=gsub(/\*\*/,"**"); if(n>=4) print FILENAME":"FNR}' docs/journey/*.md
+awk '!/^[[:space:]]*>/ {n=gsub(/\*\*/,"**"); if(n>=4) print FILENAME":"FNR}' docs/journey/*.md
 ```
 
 **0 行**が正しい状態（`**` が 4 つ以上＝太字 2 箇所以上）。
+`>` で始まるガイドブロックは数えない — **雛形の書き方の説明**であって、マップの中身ではないため。
 
 ## issue 番号は本文に残さない
 

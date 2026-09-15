@@ -371,7 +371,7 @@ ACTION / 改善機会番号を併記する**（`interview-questions` skill 側�
 - [ ] 節構成が [`docs/journey/_template.md`](../../../docs/journey/_template.md) と一致していて、
       **空の任意節が残っていない**
 - [ ] **1 行（表なら 1 セル）に太字が 1 箇所まで** —
-      `awk '{n=gsub(/\*\*/,"**"); if(n>=4) print FILENAME":"FNR}' docs/journey/*.md` が **0 行**
+      `awk '!/^[[:space:]]*>/ {n=gsub(/\*\*/,"**"); if(n>=4) print FILENAME":"FNR}' docs/journey/*.md` が **0 行**
 - [ ] **裸の issue 番号が 0 箇所** — リンクか「何の話か分かる 1 行」のどちらかになっている
 - [ ] 「次のアクション」節が**無い**。次にやることは「未検証（△）」節（宿題）と issue（作業）が持つ
 - [ ] 「未検証（△）」節に、**記録で埋まる宿題**も同じ形で入っている（インタビューだけの節にしない）
