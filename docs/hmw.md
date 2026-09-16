@@ -165,9 +165,7 @@
 ## 更新ログ
 
 **採用案が覆った・却下理由が変わったら、ここに 1 行足す。** 理由・経緯はここに書かず ADR 側に書く
-（規約は [`docs/ADR/README.md`](ADR/README.md)）。置き場所は `docs/ADR/hmw/`。
-**フォルダを作ったら [`docs/ADR/README.md`](ADR/README.md) の「第 1 階層は対象」の表にも 1 行足す。**
+（置き場所・フォルダを作るタイミングを含め、規約は [`docs/ADR/README.md`](ADR/README.md)）。
 
 | 日付 | 動いたもの | ADR |
 | --- | --- | --- |
-| — | （まだ無い） | — |
