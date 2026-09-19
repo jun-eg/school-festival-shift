@@ -29,6 +29,10 @@ description: HMW で決めたソリューションを Overview / What we provide
 2. **Align** — ステークホルダー間の合意を形成する
 3. **リファレンス** — いつ何をどう決めたかを後から思い返せるようにする
 
+**その Tech Doc の器はこの repo にある** — `tech-requirements` skill（出力は `docs/tech-requirements.md`、
+雛形は [`docs/tech-requirements-template.md`](../../../docs/tech-requirements-template.md)）。
+**何がそちらへ行き、何が Design Doc に残るかは、そちらの「Design Doc との境界」節が持つ。ここに書き写さない。**
+
 ## 7 セクションと入力元
 
 | # | セクション | 書く内容 | 入力元 |
