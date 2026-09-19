@@ -26,7 +26,9 @@ docs/ADR/
 │   └── 作る側-0001-<slug>.md
 ├── hmw/                         ← HMW の判定が動いた記録
 │   └── 0001-<slug>.md
-└── design-doc/                  ← Design Doc の判定が動いた記録
+├── design-doc/                  ← Design Doc の判定が動いた記録
+│   └── 0001-<slug>.md
+└── tech-requirements/           ← 技術の要件定義の判定が動いた記録
     └── 0001-<slug>.md
 ```
 
@@ -37,6 +39,7 @@ docs/ADR/
 | `user-journey-map/` | `docs/journey/<立場>.md` の**判定が動いた記録**。記号（◎ / ○ / △）が変わった・(n/m) の読みが変わった・当初の想定が否定された・取り消された |
 | `hmw/` | [`docs/hmw.md`](../hmw.md) の**判定が動いた記録**。選んだ改善機会が替わった・採用ソリューションが覆った・却下理由が変わった・候補の束ね方が誤っていた |
 | `design-doc/` | [`docs/design-doc.md`](../design-doc.md) の**判定が動いた記録**。7 セクションのどれかの結論が変わった・スコープの内外が入れ替わった・要件の前提が崩れた・△ が増減した |
+| `tech-requirements/` | [`docs/tech-requirements.md`](../tech-requirements.md) の**判定が動いた記録**。技術選定が覆った・仕様が変わった・**完了の測り方が変わった**・△ が増減した |
 
 今後 `interview-questions/` が増えても、**同じ形で第 1 階層に足す**。
 **フォルダを足したら、この表にも 1 行足す。** ここが薄いと「なんの ADR か分からない」に戻る。
