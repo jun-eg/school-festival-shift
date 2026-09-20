@@ -124,7 +124,7 @@ for (const シート of シートの構成) {
 
 const csvの見出し = fs
   .readFileSync(path.join(根, 'data/前回の希望データ-モック.csv'), 'utf8')
-  .replace(/^﻿/, '')
+  .replace(/^\uFEFF/, '')
   .split('\n')[0]
   .trim()
   .split(',')
