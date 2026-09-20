@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// シート構成の検査 — src/シート構成.js の定義が、決めた形どおりかを突き合わせる。
+// シート構成の検査 — src/sheet-layout.js の定義が、決めた形どおりかを突き合わせる。
 //
-//   使い方: node src/シート構成.test.mjs
+//   使い方: node src/sheet-layout.test.mjs
 //
 // 見るものは 2 つある。
 //   ① docs/tech-requirements.md と issue #135 が決めた形（5 枚・担当者が書く側・保護する側・列）
@@ -20,7 +20,7 @@ const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const require = createRequire(import.meta.url)
 
-const { シートの構成, 検証の種別 } = require('./シート構成.js')
+const { シートの構成, 検証の種別 } = require('./sheet-layout.js')
 
 const 落ちた = []
 const 通った = []
@@ -137,7 +137,7 @@ const csvの見出し = fs
 
 // ---- 結果 ------------------------------------------------------------------
 
-console.log('シート構成の検査（src/シート構成.js）')
+console.log('シート構成の検査（src/sheet-layout.js）')
 console.log('')
 for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
 for (const { 見出し, 実測, 期待 } of 落ちた) {

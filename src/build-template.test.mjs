@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// 組み立ての検査 — src/テンプレートを組み立てる.js を、偽のスプレッドシートの上で走らせる。
+// 組み立ての検査 — src/build-template.js を、偽のスプレッドシートの上で走らせる。
 //
-//   使い方: node src/テンプレートを組み立てる.test.mjs
+//   使い方: node src/build-template.test.mjs
 //
 // 見るものは 4 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
@@ -102,7 +102,7 @@ const 文脈 = vm.createContext({
   SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' } },
   console: { log() {} },
 })
-for (const 名 of ['シート構成.js', 'テンプレートを組み立てる.js']) {
+for (const 名 of ['sheet-layout.js', 'build-template.js']) {
   vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -192,7 +192,7 @@ try {
 
 // ---- 結果 -------------------------------------------------------------------
 
-console.log('組み立ての検査（src/テンプレートを組み立てる.js／偽のスプレッドシートの上）')
+console.log('組み立ての検査（src/build-template.js／偽のスプレッドシートの上）')
 console.log('')
 for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
 for (const { 見出し, 実測, 期待 } of 落ちた) {

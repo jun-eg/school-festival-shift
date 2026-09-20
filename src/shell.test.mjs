@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// 殻の検査 — src/殻.js を、偽のスプレッドシートの上で走らせる。
+// 殻の検査 — src/shell.js を、偽のスプレッドシートの上で走らせる。
 //
-//   使い方: node src/殻.test.mjs
+//   使い方: node src/shell.test.mjs
 //
 // 見るものは 5 つある。
 //   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
@@ -11,7 +11,7 @@
 //   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
 //
 // これは契約であって実装ではない。何も書き換えない。
-// 本物のスプレッドシートで Date がどう返ってくるかはここでは分からない（→ src/実機で確かめた記録.md）。
+// 本物のスプレッドシートで Date がどう返ってくるかはここでは分からない（→ src/real-device-log.md）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -75,7 +75,7 @@ class 偽のスプレッドシート {
 // ---- 読み込む ---------------------------------------------------------------
 
 const 文脈 = vm.createContext({})
-for (const 名 of ['シート構成.js', 'コア.js', '殻.js']) {
+for (const 名 of ['sheet-layout.js', 'core.js', 'shell.js']) {
   vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
 }
 const { 入力を読む, 走らせる, 表現を揃える, 表現を確かめる, シートの列 } = 文脈
@@ -326,7 +326,7 @@ const 欠けた帳面 = 空のテンプレート()
 
 // ---- 結果 ------------------------------------------------------------------
 
-console.log('殻の検査（src/殻.js／偽のスプレッドシートの上）')
+console.log('殻の検査（src/shell.js／偽のスプレッドシートの上）')
 console.log('')
 for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
 for (const { 見出し, 実測, 期待 } of 落ちた) {
