@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """ガードが止める形・通す形を 1 本ずつ確かめる。
 
-    python3 .claude/hooks/guard-bash.test.py                          # 既定（python3 版）
-    python3 .claude/hooks/guard-bash.test.py .claude/hooks/guard-bash.sh   # jq + grep 版
+    python3 .claude/hooks/guard-bash.test.py              # 既定（guard-bash.py）
+    python3 .claude/hooks/guard-bash.test.py 別の実装のパス   # 実装を入れ替えるとき
 
-**この 34 件が契約である。** 実装が python3 でも jq + grep でも、同じここを通る。
+**この 37 件が契約であって、実装ではない。** 実装を書き直しても、通るべきはここである。
 依存はゼロである（Python の標準だけを使う）。何も書き換えない。
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
 """
