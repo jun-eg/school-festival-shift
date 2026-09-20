@@ -92,7 +92,7 @@ const 空の列名 = []
 const 重複した列名 = []
 for (const シート of シートの構成) {
   for (const 区画 of シート.区画) {
-    if (区画.列.some((名 ) => String(名).trim() === '')) 空の列名.push(シート.名前)
+    if (区画.列.some((名) => String(名).trim() === '')) 空の列名.push(シート.名前)
     if (new Set(区画.列).size !== 区画.列.length) 重複した列名.push(`${シート.名前}: ${区画.見出し}`)
   }
 }
