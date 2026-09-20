@@ -1,26 +1,20 @@
 #!/usr/bin/env node
-// Checks on the shell — running src/shell.js on top of a fake spreadsheet.
+// 殻の検査 — src/shell.js を、偽のスプレッドシートの上で走らせる。
 //
-//   How to run it: node src/shell.test.mjs
+//   使い方: node src/shell.test.mjs
 //
-// There are 6 things it looks at.
-//   ① the value representations line up (Date, booleans, whitespace and empty cells all become
-//      a string or a number → 6 の #8 の理由 ③)
-//   ② the inputs it read go through the door of the core (checkRepresentation) as they are
-//   ③ it does not read the heading rows. The 5 sections lying side by side are cut apart and
-//      read per section (→ src/README.md)
-//   ④ reading and writing is once per range, never back and forth cell by cell
-//      (→ 6 の #2 の実装上の注意)
-//   ⑤ if even one step is not in, not a single sheet is written (the hand edits never silently
-//      disappear → 5-3)
-//   ⑥ if the structure is broken, it stops without reading a single row or writing a single sheet
-//      (→ verify-structure.js・issue #138)
+// 見るものは 6 つある。
+//   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
+//   ② 読んだ入力が、そのままコアの入口（checkRepresentation）を通る
+//   ③ 見出しの行を読まない。横に並んだ 5 区画を、区画ごとに切って読む（→ src/README.md）
+//   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
+//   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
+//   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
 //
-// How the breakages themselves get named is src/verify-structure.test.mjs's to look at.
-// Here, all that is looked at is that it does not run.
+// 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
-// This is a contract, not an implementation. It rewrites nothing.
-// How a Date comes back on a real spreadsheet cannot be seen from here (→ src/real-device-log.md).
+// これは契約であって実装ではない。何も書き換えない。
+// 本物のスプレッドシートで Date がどう返ってくるかはここでは分からない（→ src/real-device-log.md）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -29,11 +23,9 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- the fake spreadsheet ---------------------------------------------------
-// All the shell uses is getSheetByName / getLastRow / getRange, plus getValues, setValues and
-// clearContent on a range.
-// Checking the structure before running (→ verify-structure.js) adds getMaxRows / getMaxColumns /
-// getLastColumn to that.
+// ---- 偽のスプレッドシート ---------------------------------------------------
+// 殻 が使うのは getSheetByName / getLastRow / getRange と、範囲の getValues・setValues・clearContent だけである。
+// 走る前の構造の検証（→ verify-structure.js）が、これに getMaxRows / getMaxColumns / getLastColumn を足す。
 
 const roundTrips = { reads: 0, writes: 0 }
 
@@ -81,9 +73,8 @@ class FakeSheet {
       .filter(([, value]) => value !== '')
       .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
   }
-  // 1000 rows by 26 columns is the default size of a new spreadsheet
-  // (checking the structure looks at this to keep the range it reads inside the sheet
-  //  → verify-structure.js)
+  // 1000 行 26 列は新しいスプレッドシートの既定の大きさである
+  // （構造の検証が、読む範囲をシートの外に出さないために見る → verify-structure.js）
   getMaxRows() { return Math.max(1000, this.getLastRow()) }
   getMaxColumns() { return Math.max(26, this.getLastColumn()) }
   put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
@@ -94,7 +85,7 @@ class FakeSpreadsheet {
   getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
 }
 
-// ---- loading ----------------------------------------------------------------
+// ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
@@ -123,7 +114,7 @@ function whyItStopped(work) {
   }
 }
 
-/** Make the 5 empty sheets, with the headings put in as sheetLayout has them. */
+/** sheetLayout どおりに見出しを置いた、空の 5 枚を作る。 */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
     const sheet = new FakeSheet(layout.name)
@@ -137,22 +128,21 @@ function emptyTemplate() {
   return new FakeSpreadsheet(sheets)
 }
 
-/** One book with the conditions, the answers and the previous round's hand edits in it. The time cells deliberately hold Dates. */
+/** 条件・回答・前の周の手直しを入れた 1 冊。時刻のセルにはわざと Date を置く。 */
 function filledBook() {
   const book = emptyTemplate()
   const conditions = book.getSheetByName('条件入力')
 
-  // 日ごとの営業 4 時刻 (A〜E) — 2 days. A time-only cell comes back as a Date
+  // 日ごとの営業 4 時刻（A〜E）— 2 日ぶん。時刻だけのセルは Date で返ってくる
   ;[[1, 8, 10, 20, 20], [2, 8, 10, 20, 20]].forEach((row, i) => {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
     row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
   })
-  // 役割と必要人数 (G〜K) — one row only. A row with the day and the time span left empty applies
-  // to every slot (→ 5-1 の #2)
+  // 役割と必要人数（G〜K）— 1 行だけ。日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）
   ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 7 + j, value))
-  // 調理責任者の学年 (M) — 2 rows
+  // 調理責任者の学年（M）— 2 行
   conditions.put(3, 13, '3年生').put(4, 13, ' 4年生 ')
-  // 準備・片付けのルール (U〜V) — one row
+  // 準備・片付けのルール（U〜V）— 1 行
   conditions.put(3, 21, '午前と午後の境目').put(3, 22, new Date(1899, 11, 30, 12, 0, 0))
 
   const answers = book.getSheetByName('回答')
@@ -166,12 +156,12 @@ function filledBook() {
   ;['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']
     .forEach((value, j) => assignments.put(2, 1 + j, value))
 
-  // Leftovers from the previous round. They go when a step is in, and are left alone when it is not
+  // 前の周の残りかす。段が入っていれば消える、入っていなければ触らない
   book.getSheetByName('指標').put(2, 1, '古い行')
   return book
 }
 
-// ---- ① the value representations line up ------------------------------------
+// ---- ① 値の表現が揃う -------------------------------------------------------
 
 check(
   '① 時刻だけのセル（1899-12-30 を土台にした Date）が HH:MM になる',
@@ -203,7 +193,7 @@ check(
   ['YYYY-MM-DD', 'HH:MM', 'YYYY-MM-DD HH:MM:SS'],
 )
 
-// ---- ②③ reading ------------------------------------------------------------
+// ---- ②③ 読む ---------------------------------------------------------------
 
 const inputs = readInputs(filledBook())
 
@@ -246,7 +236,7 @@ check(
   sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 2,
 )
 
-// ---- ④⑤ writing -------------------------------------------------------------
+// ---- ④⑤ 書く ---------------------------------------------------------------
 
 const checkResultColumns = sheetColumns('検証結果')
 
@@ -280,8 +270,7 @@ check(
   coreSteps.map((step) => `${step.name}#${step.issue}`),
 )
 
-// If even one step is missing, nothing is written however many of the rest are in (what comes
-// after the missing step comes back empty)
+// 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）
 const partialBook = filledBook()
 roundTrips.writes = 0
 run(partialBook, {
@@ -305,7 +294,7 @@ const fullNotBuilt = run(fullBook, {
   '未充足を名指しする': () => [checkResultRow(checkKind.unmet, 'あと 1 人')],
   '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
 })
-// The checks below call getValues, so the round trips that were counted are copied off here
+// 下の check が getValues を呼ぶので、数えた往復はここで写し取る
 const fullRoundTrips = { reads: roundTrips.reads, writes: roundTrips.writes }
 
 check('④ 全部そろえば、未了は 1 つも無い', fullNotBuilt, [])
@@ -330,16 +319,15 @@ check(
   [''],
 )
 
-// Reading is: checking the structure before running, once per sheet (5 of them), plus the inputs,
-// once per section.
-// Writing is at most twice per generated sheet —「clear」and「put」
+// 読むのは、走る前の構造の検証がシートごとに 1 回（5 枚）＋ 入力が区画ごとに 1 回である。
+// 書くのは生成シートごとに「消す」と「置く」の 2 回までである
 check(
   '④ 読み書きはどちらも範囲ごとに 1 回で、セル単位で往復していない（→ 6 の #2）',
   [fullRoundTrips.reads, fullRoundTrips.writes <= vm.runInContext('outputNames.length', context) * 2],
   [sheetLayout.length + Object.keys(inputs).length, true],
 )
 
-// ---- when a sheet is missing ------------------------------------------------
+// ---- シートが無いとき -------------------------------------------------------
 
 const bookMissingASheet = emptyTemplate()
 bookMissingASheet.sheets = bookMissingASheet.sheets.filter((s) => s.getName() !== '回答')
@@ -350,10 +338,9 @@ check(
   true,
 )
 
-// ---- ⑥ when the structure is broken -----------------------------------------
-// run calls checkStructure before reading (→ verify-structure.js).
-// Run it while it is broken and the staff's hand edits (→ 5-3) silently disappear, or the rows
-// get written with the columns still slid over.
+// ---- ⑥ 構造が崩れているとき -------------------------------------------------
+// run は、読む前に checkStructure を呼ぶ（→ verify-structure.js）。
+// 崩れたまま走ると、担当者の手直し（→ 5-3）が黙って消えるか、列がずれたまま書かれる。
 
 const brokenBook = filledBook()
 brokenBook.getSheetByName('検証結果').put(1, 1, '区分')
@@ -392,7 +379,7 @@ check(
   brokenBookCopy,
 )
 
-// ---- results ----------------------------------------------------------------
+// ---- 結果 ------------------------------------------------------------------
 
 console.log('殻の検査（src/shell.js／偽のスプレッドシートの上）')
 console.log('')

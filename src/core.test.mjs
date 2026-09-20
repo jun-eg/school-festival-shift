@@ -1,21 +1,17 @@
 #!/usr/bin/env node
-// Checks on the core — running src/core.js without making a single spreadsheet.
+// コアの検査 — src/core.js を、スプレッドシートを 1 つも作らずに走らせる。
 //
-//   How to run it: node src/core.test.mjs
+//   使い方: node src/core.test.mjs
 //
-// There are 5 things it looks at.
-//   ① SpreadsheetApp never appears in the files on the core side (→ 6 の #8)
-//   ② hand it arrays and arrays come back — not even a fake spreadsheet is needed
-//      (→ issue #137 の受け入れ条件)
-//   ③ a step whose contents are not in returns an empty array and carries its name back
-//      (it never runs silently)
-//   ④ swap the steps and one step alone can be run first (8 の 3 comes before 8 の 8)
-//   ⑤ a wobbling representation, a differing column count, a kind that was never decided —
-//      each one stops and gets named instead of being silently fixed
+// 見るものは 5 つある。
+//   ① コアの側のファイルに SpreadsheetApp が 1 度も出てこない（→ 6 の #8）
+//   ② 配列を渡すと配列が返る。偽のスプレッドシートすら要らない（→ issue #137 の受け入れ条件）
+//   ③ 中身の入っていない段は、空の配列を返して名指しで持ち帰る（黙って走らない）
+//   ④ 段を差し替えると、その段だけを先に回せる（8 の 3 が 8 の 8 より先にある）
+//   ⑤ 表現の揺れ・列数の違い・決めていない種別は、黙って直さずに名指しで止まる
 //
-// This is a contract, not an implementation. It rewrites nothing.
-// The checks on the side that lines the value representations up (the shell) are
-// src/shell.test.mjs's to hold.
+// これは契約であって実装ではない。何も書き換えない。
+// 値の表現を揃える側（殻）の検査は src/shell.test.mjs が持つ。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -24,15 +20,14 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- loading ----------------------------------------------------------------
-// SpreadsheetApp is not put into the context. That it passes without it is this check itself.
+// ---- 読み込む ---------------------------------------------------------------
+// SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'core.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-// const does not become a property of the context, so it is taken out with an expression
-// (function does show up on the context)
+// const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { build, inputNames, conditionNames, sheetColumns } = context
 const { coreSteps, outputNames, sheetLayout, checkKind } = vm.runInContext(
   '({ coreSteps, outputNames, sheetLayout, checkKind })',
@@ -47,7 +42,7 @@ function check(title, actual, expected) {
   else failed.push({ title, actual, expected })
 }
 
-/** Look at it stopping. If it does not stop, null comes back. */
+/** 止まることを見る。止まらなければ null が返る。 */
 function whyItStopped(work) {
   try {
     work()
@@ -57,7 +52,7 @@ function whyItStopped(work) {
   }
 }
 
-/** Just enough input to run the skeleton. The values are in the same representation as what data/ was copied from. */
+/** 骨組みを回すのに足りるだけの入力。値は data/ の転記元と同じ表現で置く。 */
 function skeletonInputs(overrides) {
   const inputs = {
     '日ごとの営業 4 時刻': [['2025-11-01', '08:00', '10:00', '20:00', '20:00']],
@@ -75,10 +70,9 @@ function skeletonInputs(overrides) {
   return inputs
 }
 
-// ---- ① does the boundary stand up in the code itself? -----------------------
+// ---- ① 境目がコードの上に立っているか ---------------------------------------
 
-// Writing「it never touches this」in a comment does not count as touching it, so the comments
-// are stripped before looking.
+// 「掴まない」とコメントに書いてあるのは掴んだうちに入らないので、コメントを落としてから見る。
 function stripComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
@@ -101,7 +95,7 @@ check(
   'function',
 )
 
-// ---- ② hand it arrays, take arrays back -------------------------------------
+// ---- ② 配列を渡し、配列を受け取る -------------------------------------------
 
 const checkResultColumns = sheetColumns('検証結果')
 const kindColumn = checkResultColumns.indexOf('種別')
@@ -150,7 +144,7 @@ check(
   JSON.stringify(fullOutput),
 )
 
-// ---- ③ running it as the bare skeleton --------------------------------------
+// ---- ③ 骨組みのまま回す -----------------------------------------------------
 
 const skeletonOutput = build(skeletonInputs())
 
@@ -172,7 +166,7 @@ check(
   coreSteps.map((step) => step.writesTo),
 )
 
-// ---- ④ swapping a step in and running it first ------------------------------
+// ---- ④ 段を差し替えて、先に回す ---------------------------------------------
 
 const countingSideOnly = build(skeletonInputs(), {
   '未充足を名指しする': () => [checkResultRow(checkKind.unmet, '調理 が あと 1 人')],
@@ -190,7 +184,7 @@ check(
   coreSteps.map((step) => step.name).filter((name) => name !== '未充足を名指しする'),
 )
 
-// ---- ④-2 the friend column never reaches the generating side (→ 5-2) --------
+// ---- ④-2 友達欄は生成の側へ渡らない（→ 5-2） --------------------------------
 
 const receivedArgs = {}
 build(skeletonInputs(), {
@@ -219,7 +213,7 @@ check(
   skeletonInputs()['割り当て'],
 )
 
-// ---- ⑤ stopping instead of silently fixing ----------------------------------
+// ---- ⑤ 黙って直さずに止まる -------------------------------------------------
 
 const stillWobbling = whyItStopped(() => build(skeletonInputs({
   '日ごとの営業 4 時刻': [['2025-11-01', new Date(1899, 11, 30, 8, 0), '10:00', '20:00', '20:00']],
@@ -280,7 +274,7 @@ check(
   [true, true],
 )
 
-// ---- are the input names pulled from sheet-layout.js? -----------------------
+// ---- 入力の名前が sheet-layout.js から引かれているか ------------------------
 
 check(
   '入力の名前は、条件入力の 5 区画 ＋ 回答 ＋ 割り当てである（検証結果と指標は入らない）',
@@ -294,7 +288,7 @@ check(
   [],
 )
 
-// ---- results ----------------------------------------------------------------
+// ---- 結果 ------------------------------------------------------------------
 
 console.log('コアの検査（src/core.js／スプレッドシート無し）')
 console.log('')

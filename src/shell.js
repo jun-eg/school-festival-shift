@@ -1,32 +1,29 @@
 /**
- * The shell — the only place that touches SpreadsheetApp (docs/tech-requirements.md 6 の #8).
+ * 殻 — SpreadsheetApp に触る唯一の場所（docs/tech-requirements.md 6 の #8）。
  *
- * It does 3 things and no more.
- *   ① read the sheets, line the value representations up, and hand them to the core
- *   ② call the core (build in core.js)
- *   ③ write the rows that come back into the generated sheets
+ * やることは 3 つだけである。
+ *   ① シートを読んで、値の表現を揃えてコアに渡す
+ *   ② コア（core.js の build）を呼ぶ
+ *   ③ 返ってきた行を生成シートに書く
  *
- * Checking the structure before running (sheets present, headings, column counts) is
- * verify-structure.js's to hold. run calls it first — if the structure is broken, it names
- * what is broken and stops before reading anything.
+ * 走る前の構造の検証（シートの有無・見出し・列数）は verify-structure.js が持つ。
+ * run が最初に呼ぶ — 崩れていれば、読む前に名指しして止まる。
  *
- * No assignment rule gets written here. The rules are the core's to hold.
- * The other way round, SpreadsheetApp never gets carried into the core — carry it in and the
- * way out of 6-1 の #2 disappears.
+ * ここに割り当ての規則を書かない。規則はコアが持つ。
+ * 逆に、コアに SpreadsheetApp を持ち込まない — 持ち込むと 6-1 の #2 の逃げ道が消える。
  *
- * Reading and writing is done once per range. Never go back and forth cell by cell
- * (→ 6 の #2 の実装上の注意). What costs time is the round trips to SpreadsheetApp,
- * not the computation.
+ * 読み書きは範囲ごとに 1 回で済ませる。セル単位で往復しない（→ 6 の #2 の実装上の注意）。
+ * 時間を食うのは計算ではなく SpreadsheetApp の往復のほうである。
  *
- * Never use a value from another file at the top level of this file (→ the same note in core.js).
+ * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
 /**
- * The value representations the shell hands to the core. The core takes only strings in these
- * shapes, and numbers (→ checkRepresentation in core.js).
+ * 殻がコアに渡す値の表現。コアはこの形の文字列と、数値しか受け取らない
+ * （→ core.js の checkRepresentation）。
  *
- * That times are HH:MM is settled by the notes in sheet-layout.js (条件入力's「日ごとの営業 4 時刻」).
- * That dates are YYYY-MM-DD is the shape of what data/前回の確定シフト-モック-0N.json was copied from.
+ * 時刻が HH:MM であることは sheet-layout.js の注記が決めている（条件入力の「日ごとの営業 4 時刻」）。
+ * 日付が YYYY-MM-DD であることは data/前回の確定シフト-モック-0N.json の転記元の形である。
  */
 const valueRepresentation = {
   date: 'YYYY-MM-DD',
@@ -34,21 +31,21 @@ const valueRepresentation = {
   dateTime: 'YYYY-MM-DD HH:MM:SS',
 }
 
-/** The sheets the shell reads. The 2 that only generation writes are not read (→ sheetsNotRead in core.js). */
+/** 殻が読むシート。生成しか書かない 2 枚は読まない（→ core.js の sheetsNotRead）。 */
 function sheetsToRead() {
   return sheetLayout
     .filter((layout) => sheetsNotRead.indexOf(layout.name) === -1)
     .map((layout) => layout.name)
 }
 
-/** A sheet that carries section headings has 2 heading rows; one that does not has 1 (→ build-template.js). */
+/** 区画の見出しを置くシートは 2 行、置かないシートは 1 行が見出しである（→ build-template.js）。 */
 function headerRowCount(layout) {
   return layout.hasSectionHeadings ? 2 : 1
 }
 
 /**
- * Read the inputs to hand to the core. The names come in the same order as inputNames in core.js.
- * Every value is an array of rows whose representations have been lined up.
+ * コアに渡す入力を読む。名前は core.js の inputNames と同じ順で並ぶ。
+ * 値はどれも、表現を揃えたあとの行の配列である。
  */
 function readInputs(spreadsheet) {
   const inputs = {}
@@ -63,11 +60,10 @@ function readInputs(spreadsheet) {
 }
 
 /**
- * Read the rows of one section.
+ * 区画 1 つぶんの行を読む。
  *
- * Empty rows are dropped because the 5 sections of 条件入力 sit side by side (→ src/README.md).
- * Sections with different row counts are all read down to the same last row, so below the
- * shorter ones there are empty rows.
+ * 空の行を落とすのは、条件入力の 5 区画を横に並べてある（→ src/README.md）からである。
+ * 行数の違う区画が同じ最終行まで読まれるので、短いほうの下は空の行で埋まる。
  */
 function readSection(sheet, layout, section) {
   const headerRows = headerRowCount(layout)
@@ -82,13 +78,12 @@ function readSection(sheet, layout, section) {
 }
 
 /**
- * Write back into the generated sheets.
+ * 生成シートに書き戻す。
  *
- * If even one step is not in, not a single sheet gets written.
- * The steps are chained, so running only the later ones while an earlier one is missing puts
- * out nothing but emptiness. Overwriting with an empty array silently wipes the hand edits the
- * staff put into the 割り当て sheet (→ 5-3).
- * What is not in is named in notBuilt (→ coreSteps in core.js).
+ * 段が 1 つでも入っていなければ、1 枚も書かない。
+ * 段はつながっているので、前の段が欠けたまま後ろの段だけ走らせても、出てくるのは空である。
+ * 空の配列で上書きすると、担当者が割り当てシートに入れた手直し（→ 5-3）が黙って消える。
+ * 何が入っていないかは notBuilt が名指しで持っている（→ core.js の coreSteps）。
  */
 function writeOutputs(spreadsheet, output) {
   if ((output.notBuilt || []).length > 0) return
@@ -109,25 +104,22 @@ function writeOutputs(spreadsheet, output) {
 }
 
 /**
- * The door Apps Script calls in through. This one line of this one file is the only place
- * SpreadsheetApp is named. Calling it from the menu is issue #151 (生成), and the steps are
- * handed in there.
+ * Apps Script から呼ぶ入口。SpreadsheetApp を名指しするのは、このファイルのこの 1 行だけである。
+ * メニューから呼ぶのは issue #151（生成）で、そこで steps を渡す。
  */
 function runOnActiveSpreadsheet(steps) {
   return run(SpreadsheetApp.getActive(), steps)
 }
 
 /**
- * Check the structure → read → call the core → write. This is the one line of the shell side.
- * The spreadsheet comes in as an argument — so that the checks here can hand in a fake one.
- * steps are the steps of the core (→ coreSteps in core.js), and only the ones that are in get handed in.
- * What it returns is notBuilt — what to say to the staff is for the caller from the menu
- * (issue #151) to decide.
+ * 構造を確かめる → 読む → コアを呼ぶ → 書く。殻の側の 1 本である。
+ * スプレッドシートは引数で受ける — 手元の検査で偽のスプレッドシートを渡せるようにするためである。
+ * steps はコアの段（→ core.js の coreSteps）で、入っている段だけを渡す。
+ * 返すのは notBuilt — 担当者に何と言うかは、メニューから呼ぶ側（issue #151）が決める。
  *
- * If the structure is broken, it names what is broken and stops without reading a single row
- * (→ verify-structure.js).
- * Unlike notBuilt, that is not carried back in the return value — what is broken is the staff's
- * sheet, and what to fix is the same however the menu turns out.
+ * 構造が崩れていれば、1 行も読まずに名指しして止まる（→ verify-structure.js）。
+ * notBuilt と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、
+ * 何を直すかはメニューの出方に関わらず同じである。
  */
 function run(spreadsheet, steps) {
   checkStructure(spreadsheet)
@@ -137,27 +129,25 @@ function run(spreadsheet, steps) {
 }
 
 /**
- * Line up the representation of one cell. This is the gate that keeps the wobble out of the core.
+ * セル 1 つの表現を揃える。ここが、コアに表現の揺れを入れないための関門である。
  *
- * It is a pure function that never touches SpreadsheetApp, so that it can be run and checked
- * here. It never silently reinterprets anything — a string only loses the whitespace at both
- * ends, and what is inside is left alone.
+ * SpreadsheetApp を掴まない純粋な関数にしてあるのは、手元で回して確かめられるようにするためである。
+ * 黙って解釈し直さない — 文字列は両端の空白を落とすだけで、中身には手を入れない。
  */
 function normalizeValue(value) {
   if (value === null || value === undefined) return ''
   if (typeof value === 'number') return value
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
-  // No instanceof. Across a vm or a dialog, Date is a different thing
+  // instanceof を使わない。vm やダイアログを跨ぐと Date が別物になる
   if (Object.prototype.toString.call(value) === '[object Date]') return formatDateTime(value)
   return String(value).trim()
 }
 
 /**
- * Turn a Date into one of the 3 in valueRepresentation.
+ * Date を valueRepresentation の 3 つのどれかにする。
  *
- * A time-only cell comes back as a Date built on 1899-12-30, so it is told apart by the year.
- * A date-time of exactly 00:00:00 becomes a date — same as what the cell shows, and there is
- * nothing here to tell the two apart by.
+ * 時刻だけのセルは 1899-12-30 を土台にした Date で返ってくるので、年で見分ける。
+ * ちょうど 00:00:00 の日時は日付になる — セルの表示と同じで、ここで作り分けられる情報が無い。
  */
 function formatDateTime(dateTime) {
   const year = dateTime.getFullYear()
@@ -174,7 +164,7 @@ function twoDigits(number) {
   return String(number).length < 2 ? `0${number}` : String(number)
 }
 
-/** Look one sheet up in sheetLayout. If it is not there, it stops and names it. */
+/** sheetLayout から 1 枚を引く。無ければ名指しで止まる。 */
 function findLayout(name) {
   const layout = sheetLayout.filter((c) => c.name === name)[0]
   if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
@@ -182,10 +172,9 @@ function findLayout(name) {
 }
 
 /**
- * Look one sheet up in the spreadsheet. If it is not there, it stops and names it (it never
- * silently creates one).
- * checkStructure has passed before anything gets here, so coming through run it cannot be missing.
- * It is looked at anyway because readInputs is left callable on its own (→ verify-structure.js).
+ * スプレッドシートから 1 枚を引く。無ければ名指しで止まる（黙って作らない）。
+ * ここに来る前に checkStructure が通っているので、run 経由なら無いことは起きない。
+ * それでも見るのは、readInputs を単体で呼べる形にしてあるからである（→ verify-structure.js）。
  */
 function findSheet(spreadsheet, name) {
   const sheet = spreadsheet.getSheetByName(name)
@@ -197,7 +186,7 @@ function findSheet(spreadsheet, name) {
   return sheet
 }
 
-// A door for Node to read this file through, nothing more. Apps Script has no module, so it never runs there.
+// Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, writeOutputs, run, runOnActiveSpreadsheet,

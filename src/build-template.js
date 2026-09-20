@@ -1,17 +1,16 @@
 /**
- * Make the one template (docs/tech-requirements.md 8 の 1).
+ * テンプレートを 1 つ作る（docs/tech-requirements.md 8 の 1）。
  *
- * Who runs this is the side that prepares the template (the implementer). It is run once, and
- * the spreadsheet it produces is what the staff copy.
- * It is not put on the staff's menu (menu.js) — what the staff do is the 10 lines of
- * 2「担当者がやることの全部」, and this operation is not among them.
+ * 走らせるのはテンプレートを用意する側（実装者）である。1 回だけ走らせて、
+ * 出来上がったスプレッドシートを担当者にコピーさせる。
+ * 担当者のメニュー（menu.js）には出さない — 担当者の操作は
+ * 2「担当者がやることの全部」の 10 行だけで、そこにこの操作は無い。
  *
- * Never silently fix. Never silently run.
- * If the headings of a sheet that is already there differ from the layout, it names it and stops
- * (it does not overwrite).
+ * 黙って直さない。黙って走らない。
+ * すでにあるシートの見出しが構成と違えば、名指しで止まる（上書きしない）。
  */
 
-/** The door to run this by hand from the Apps Script editor. */
+/** Apps Script のエディタから手で走らせる入口。 */
 function buildTemplate() {
   const log = buildTemplateInto(SpreadsheetApp.getActive())
   console.log(log.join('\n'))
@@ -19,8 +18,10 @@ function buildTemplate() {
 }
 
 /**
- * Make the sheets as sheetLayout has them, put the headings in, and protect the generated sheets.
- * However many times it is run, the shape comes out the same (only what is missing gets added).
+ * sheetLayout どおりにシートを作り、見出しを置き、生成シートに保護をかける。
+ * 何度走らせても同じ形になる（足りないものだけ足す）。
+ * 名前が buildTemplate と別なのは、コアの build と重ならないようにするためである
+ * （Apps Script は .gs で 1 つのグローバルを共有する）。
  */
 function buildTemplateInto(spreadsheet) {
   const log = []
@@ -44,7 +45,7 @@ function buildTemplateInto(spreadsheet) {
   return log
 }
 
-/** Per section, put the heading row and the column name row in. Where the content differs, it stops instead of overwriting. */
+/** 区画ごとに、見出しの行と列名の行を置く。中身が違うときは上書きせずに止まる。 */
 function putHeaders(sheet, layout, log) {
   const columnNameRow = layout.hasSectionHeadings ? 2 : 1
 
@@ -62,7 +63,7 @@ function putHeaders(sheet, layout, log) {
   })
 }
 
-/** Empty, so write. The same, so do nothing. Different, so name it and stop. */
+/** 空なら書く。同じなら何もしない。違うなら名指しで止まる。 */
 function replaceValues(sheet, row, startColumn, values, sheetName, log) {
   const range = sheet.getRange(row, startColumn, 1, values.length)
   const actual = range.getValues()[0].map((cell) => String(cell))
@@ -82,9 +83,9 @@ function replaceValues(sheet, row, startColumn, values, sheetName, log) {
 }
 
 /**
- * Put protection on the generated sheets.
- * The protection is warning-only — the owner of the copied file is the staff member themselves,
- * and Google Sheets has no protection that can shut the owner out (→ src/README.md).
+ * 生成シートに保護をかける。
+ * 保護は「警告のみ」である — コピーしたファイルの持ち主は担当者自身で、
+ * 持ち主を締め出せる保護は Google スプレッドシートに無い（→ src/README.md）。
  */
 function applyProtection(sheet, layout, log) {
   sheet
@@ -97,7 +98,7 @@ function applyProtection(sheet, layout, log) {
   log.push(`シート「${layout.name}」に保護をかけた（警告のみ）`)
 }
 
-/** Delete the empty sheet a new spreadsheet comes with. If it has content, keep it and name it. */
+/** 新しいスプレッドシートに最初からある空のシートを消す。中身があれば残して名指しする。 */
 function removeDefaultSheet(spreadsheet, log) {
   const layoutNames = sheetLayout.map((layout) => layout.name)
 

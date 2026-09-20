@@ -1,12 +1,15 @@
 /**
- * The menu that comes up when the staff open the file they copied.
+ * 担当者がコピーしたファイルを開いたときに出るメニュー。
  *
- * The items carry the same names as operations 3, 7 and 9 of
- * docs/tech-requirements.md 2「担当者がやることの全部」. Not one new operation is added for the staff.
- * Not a single screen is built (→ 6 の #2) — the hand edits happen in the spreadsheet itself.
+ * 項目は docs/tech-requirements.md 2「担当者がやることの全部」の
+ * 操作 3・7・9 と同じ名前である。担当者に新しい操作を 1 つも増やさない。
+ * 画面は 1 枚も作らない（→ 6 の #2）— 手直しはスプレッドシートそのもので行う。
  *
- * The contents are put in by their own issues. Anything not in yet says「まだ作っていない」by name
- * when it is pressed (it never runs silently).
+ * 中身はそれぞれの issue が入れる。まだ入っていないものは、
+ * 押したら「まだ作っていない」と名指しで言う（黙って走らない）。
+ *
+ * label は担当者に見える表示名、functionName は Apps Script が名前で呼ぶ関数である。
+ * 表示名は日本語のまま、呼ぶ名前は英字である（→ src/README.md の「名前の線」）。
  */
 
 const menuName = 'シフト'
@@ -35,7 +38,7 @@ function exportImages() {
   notBuiltYet('画像を書き出す')
 }
 
-/** Stop by name. Never run silently (→ 2 の「止まる箇所」#8). */
+/** 名指しで止まる。黙って走らない（→ 2 の「止まる箇所」#8）。 */
 function notBuiltYet(label) {
   const pressed = menuItems.filter((item) => item.label === label)[0]
   SpreadsheetApp.getActive().toast(

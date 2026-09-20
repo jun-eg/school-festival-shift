@@ -1,18 +1,15 @@
 #!/usr/bin/env node
-// Checks on the sheet layout — holding what src/sheet-layout.js defines up against the shape that was decided.
+// シート構成の検査 — src/sheet-layout.js の定義が、決めた形どおりかを突き合わせる。
 //
-//   How to run it: node src/sheet-layout.test.mjs
+//   使い方: node src/sheet-layout.test.mjs
 //
-// There are 2 things it looks at.
-//   ① the shape docs/tech-requirements.md and issue #135 decided
-//      (5 sheets, which ones the staff write, which ones are protected, the columns)
-//   ② whether the columns of the 回答 sheet match the headings of data/前回の希望データ-モック.csv
-//      — the columns of the 回答 sheet are a copy of the form questions (4-1), so they can be
-//        held up against the record
+// 見るものは 2 つある。
+//   ① docs/tech-requirements.md と issue #135 が決めた形（5 枚・担当者が書く側・保護する側・列）
+//   ② 回答シートの列が、data/前回の希望データ-モック.csv の見出しと一致するか
+//      — 回答シートの列はフォームの設問（4-1）の転記なので、記録と突き合わせられる
 //
-// This is a contract, not an implementation. It rewrites nothing.
-// How it behaves up on a real Google spreadsheet (protection, copying) cannot be seen from here
-// (→ src/README.md).
+// これは契約であって実装ではない。何も書き換えない。
+// 実際の Google スプレッドシートの上での挙動（保護・コピー）はここでは分からない（→ src/README.md）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -34,7 +31,7 @@ function check(title, actual, expected) {
   else failed.push({ title, actual, expected })
 }
 
-// ---- ① the shape that was decided -------------------------------------------
+// ---- ① 決めた形 ------------------------------------------------------------
 
 check(
   '5 枚あり、並びは issue #135 の表どおりである',
@@ -83,8 +80,7 @@ for (const layout of sheetLayout) {
   const byStartColumn = [...layout.sections].sort((a, b) => a.startColumn - b.startColumn)
   byStartColumn.forEach((section, i) => {
     const next = byStartColumn[i + 1]
-    // There is at least 1 empty column between sections (so that adding rows below never runs
-    // into the section next door)
+    // 区画のあいだは 1 列以上空ける（下に行を足しても隣の区画とぶつからないため）
     if (next && section.startColumn + section.columns.length >= next.startColumn) {
       overlaps.push(`${layout.name}: ${section.heading} と ${next.heading}`)
     }
@@ -124,11 +120,11 @@ check(
   [],
 )
 
-// ---- ② holding it up against the record -------------------------------------
+// ---- ② 記録との突き合わせ ---------------------------------------------------
 
 const csvHeadings = fs
   .readFileSync(path.join(root, 'data/前回の希望データ-モック.csv'), 'utf8')
-  .replace(/^﻿/, '')
+  .replace(/^\uFEFF/, '')
   .split('\n')[0]
   .trim()
   .split(',')
@@ -139,7 +135,7 @@ check(
   csvHeadings,
 )
 
-// ---- results ----------------------------------------------------------------
+// ---- 結果 ------------------------------------------------------------------
 
 console.log('シート構成の検査（src/sheet-layout.js）')
 console.log('')

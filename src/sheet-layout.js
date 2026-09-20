@@ -1,17 +1,16 @@
 /**
- * Layout of the 5 sheets.
+ * シート 5 枚の構成。
  *
- * This is the concrete form of what docs/tech-requirements.md 2「実行形態と前提」's
- *「何で動かすか」settled: the conditions, the answers, the assignments and the check results
- * all sit as sheets inside one and the same file. The columns come down from 5-1「入力の型」
- * and 5-4「『違反』と『未充足』は別に数える」.
+ * docs/tech-requirements.md 2「実行形態と前提」の「何で動かすか」が決めた
+ * 「条件の入力・回答・割り当て・検証結果が同じ 1 ファイルの中のシートとして並ぶ」の実体である。
+ * 列の中身は 5-1「入力の型」と 5-4「『違反』と『未充足』は別に数える」から降ろした。
  *
- * This file holds definitions only, no values. It never touches SpreadsheetApp (→ 6 の #8).
- * It holds no initial values for the input sheets either — the template being empty is itself
- * what satisfies「前年の値を既定にしない ◎」(5-1 の #1) (→ the rejected side of 6 の #1).
+ * ここは値を持たない定義だけである。SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
+ * 入力の初期値も持たない — テンプレートが空であること自体が
+ * 「前年の値を既定にしない ◎」（5-1 の #1）を満たしている（→ 6 の #1 の却下側）。
  */
 
-/** The text put on the protection of the generated sheets. For how strong it is, read src/README.md. */
+/** 生成シートの保護にかける説明文。保護の強さについては src/README.md を読む。 */
 const protectionNote = 'スクリプトが書くシートである（手で書き換えない）'
 
 const sheetLayout = [
@@ -130,10 +129,10 @@ const sheetLayout = [
   },
 ]
 
-/** The 2 values that go into the「種別」column of the 検証結果 sheet (→ 5-4). */
+/** 検証結果シートの「種別」に入る 2 つ（→ 5-4）。値がそのままシートに書かれる。 */
 const checkKind = { violation: '違反', unmet: '未充足' }
 
-// A door for Node to read this file through, nothing more. Apps Script has no module, so it never runs there.
+// Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = { sheetLayout, checkKind, protectionNote }
 }

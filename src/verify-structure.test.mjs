@@ -1,21 +1,18 @@
 #!/usr/bin/env node
-// Checks on the structure check — running src/verify-structure.js on top of a read-only fake spreadsheet.
+// 構造の検証の検査 — src/verify-structure.js を、読むだけの偽のスプレッドシートの上で走らせる。
 //
-//   How to run it: node src/verify-structure.test.mjs
+//   使い方: node src/verify-structure.test.mjs
 //
-// There are 6 things it looks at.
-//   ① laid out as the layout has it, there are 0 broken spots (it runs)
-//   ② deleting one sheet, inserting one column, rewriting one heading — each one puts out a
-//      line that names it
-//   ③ deleting rows, overwriting a generated sheet and deleting columns in one go all get named
-//      (→ the 3 ways of breaking it in #8)
-//   ④ 0 spots got silently fixed (not one cell changed)
-//   ⑤ reading is once per sheet, never back and forth cell by cell (→ 6 の #2 の実装上の注意)
-//   ⑥ if it is broken, checkStructure stops and holds every broken spot as a sentence
+// 見るものは 6 つある。
+//   ① 構成どおりに並んでいれば、崩れは 0 箇所である（走る）
+//   ② シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える、のそれぞれで名指しの行が出る
+//   ③ 行を消しても、生成シートを上書きしても、列をまとめて消しても名指しする（→ #8 の 3 つの壊し方）
+//   ④ 黙って直した箇所が 0 である（セルが 1 つも変わっていない）
+//   ⑤ 読むのはシートごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
+//   ⑥ 崩れていれば checkStructure が止まり、崩れている箇所を全部文にして持っている
 //
-// This is a contract, not an implementation. It rewrites nothing.
-// That generation does not run while it is broken is src/shell.test.mjs's to look at
-// (run calls this first).
+// これは契約であって実装ではない。何も書き換えない。
+// 崩れた状態で生成が走らないことは src/shell.test.mjs が見る（run が最初に呼ぶ）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -24,9 +21,9 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- the read-only fake spreadsheet -----------------------------------------
-// The structure check only reads. That is why this fake sheet has no setValues.
-// Try to write and it falls over right there (「never silently fix」checked from the tooling side).
+// ---- 読むだけの偽のスプレッドシート -----------------------------------------
+// 構造の検証は読むだけである。だから、この偽のシートには setValues が無い。
+// 書こうとしたら、そこで落ちる（「黙って直さない」を、道具の側で確かめている）。
 
 const roundTrips = { reads: 0 }
 
@@ -47,14 +44,13 @@ class FakeRange {
 }
 
 class FakeSheet {
-  // 1000 rows by 26 columns is the default size of a new spreadsheet
+  // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
   constructor(name) {
     Object.assign(this, { name, cells: new Map(), maxRows: 1000, maxColumns: 26 })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) {
-    // The real thing throws when a range is taken outside the sheet. That the structure check
-    // never goes there is what is checked here
+    // 本物は範囲外を取ると例外を投げる。構造の検証がそこへ行かないことを、ここで確かめている
     if (column + columnCount - 1 > this.maxColumns) throw new Error(`範囲外（${this.name} の ${column + columnCount - 1} 列目）`)
     if (row + rowCount - 1 > this.maxRows) throw new Error(`範囲外（${this.name} の ${row + rowCount - 1} 行目）`)
     return new FakeRange(this, row, column, rowCount, columnCount)
@@ -67,7 +63,7 @@ class FakeSheet {
       .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
   }
   put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
-  /** Put it in the state where the staff deleted columns in one go (everything right of that column goes). */
+  /** 担当者が列をまとめて消した状態にする（その列より右が消える）。 */
   cutColumnsTo(maxColumns) {
     this.maxColumns = maxColumns
     this.cells = new Map(
@@ -75,7 +71,7 @@ class FakeSheet {
     )
     return this
   }
-  /** Put it in the state where the staff deleted rows in one go (everything below that row goes). */
+  /** 担当者が行をまとめて消した状態にする（その行より下が消える）。 */
   cutRowsTo(maxRows) {
     this.maxRows = maxRows
     this.cells = new Map(
@@ -83,7 +79,7 @@ class FakeSheet {
     )
     return this
   }
-  /** Put it in the state where the staff inserted one column (everything from that column right slides by one). */
+  /** 担当者が列を 1 つ挿した状態にする（その列から右が 1 つずれる）。 */
   insertColumn(at) {
     this.cells = new Map(
       [...this.cells.entries()].map(([key, value]) => {
@@ -93,7 +89,7 @@ class FakeSheet {
     )
     return this
   }
-  /** Put it in the state where the staff deleted one row (everything from that row down moves up by one). */
+  /** 担当者が行を 1 つ消した状態にする（その行から下が 1 つ上がる）。 */
   deleteRow(at) {
     this.cells = new Map(
       [...this.cells.entries()]
@@ -105,7 +101,7 @@ class FakeSheet {
     )
     return this
   }
-  /** Put it in the state where the whole content of the sheet was wiped (a generated sheet overwritten). */
+  /** シートの中身を丸ごと消した状態にする（生成シートの上書き）。 */
   clear() { this.cells = new Map(); return this }
 }
 
@@ -115,11 +111,9 @@ class FakeSpreadsheet {
   snapshot() { return JSON.stringify(this.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])) }
 }
 
-// ---- loading ----------------------------------------------------------------
-// headerRowCount and normalizeValue, which the structure check uses, are in shell.js, so that is
-// read in too.
-// SpreadsheetApp is not put into the context — the one line that touches it is in shell.js, and
-// nothing here goes through it.
+// ---- 読み込む ---------------------------------------------------------------
+// 構造の検証が使う headerRowCount と normalizeValue は shell.js にあるので、一緒に読む。
+// SpreadsheetApp は文脈に置いていない — 掴むのは shell.js の 1 行だけで、そこは通らない。
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
@@ -145,7 +139,7 @@ function whyItStopped(work) {
   }
 }
 
-/** Make the 5 empty sheets, with the headings put in as sheetLayout has them. */
+/** sheetLayout どおりに見出しを置いた、空の 5 枚を作る。 */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
     const sheet = new FakeSheet(layout.name)
@@ -163,17 +157,17 @@ function namedLines(book) {
   return nameBreakages(book).map(breakageToText)
 }
 
-// ---- ① nothing broken means 0 spots -----------------------------------------
+// ---- ① 崩れていなければ 0 箇所 ----------------------------------------------
 
 check('① 構成どおりに並んでいれば、崩れは 0 箇所である', namedLines(emptyTemplate()), [])
 
-// Rows the staff write can be added without breaking anything, because only the headings are looked at
+// 担当者が書く行を足しても、見出しだけを見ているので崩れない
 const bookWithMoreRows = emptyTemplate()
 bookWithMoreRows.getSheetByName('条件入力').put(3, 1, '2025-11-01').put(4, 1, '2025-11-02')
 bookWithMoreRows.getSheetByName('割り当て').put(2, 1, '2025-11-01')
 check('① 担当者がデータの行を書き足しても崩れない（見るのは見出しの行だけである）', namedLines(bookWithMoreRows), [])
 
-// ---- ② deleting a sheet / inserting a column / rewriting a heading -----------
+// ---- ② シートを消す／列を挿す／見出しを書き換える ---------------------------
 
 const bookMissingASheet = emptyTemplate()
 bookMissingASheet.sheets = bookMissingASheet.sheets.filter((s) => s.getName() !== '回答')
@@ -197,7 +191,7 @@ check(
   ],
 )
 
-// 条件入力 has its 5 sections side by side, so inserting one column slides every section to the right of it
+// 条件入力は 5 区画が横に並ぶので、1 つ挿すと右の区画まで全部ずれる
 const conditionsWithInsertedColumn = emptyTemplate()
 conditionsWithInsertedColumn.getSheetByName('条件入力').insertColumn(2)
 const conditionBreakages = nameBreakages(conditionsWithInsertedColumn)
@@ -228,7 +222,7 @@ check(
   ],
 )
 
-// ---- ③ deleting a row / overwriting a generated sheet -----------------------
+// ---- ③ 行を消す／生成シートを上書きする -------------------------------------
 
 const bookWithDeletedRow = emptyTemplate()
 bookWithDeletedRow.getSheetByName('条件入力').deleteRow(1)
@@ -251,9 +245,8 @@ check(
   ],
 )
 
-// Delete columns in one go and the column count the layout needs is gone outright.
-// Taking the range to read outside the sheet would be an out-of-range exception, so it gets named
-// before the reading
+// 列をまとめて消されると、構成の要る列数そのものが無くなる。
+// 読む範囲をシートの外に取れば範囲外の例外になるので、読む前に名指しする
 const bookWithCutColumns = emptyTemplate()
 bookWithCutColumns.getSheetByName('割り当て').cutColumnsTo(4)
 
@@ -267,7 +260,7 @@ check(
   ],
 )
 
-// 条件入力 has heading rows down to row 2. With only 1 row left, the column name row itself is gone
+// 条件入力は 2 行目までが見出しである。行が 1 行しか残っていなければ、列名の行そのものが無い
 const bookWithCutRows = emptyTemplate()
 bookWithCutRows.getSheetByName('条件入力').cutRowsTo(1)
 
@@ -278,7 +271,7 @@ check(
     + 'いま: （空） / （空） / （空） / （空） / （空） ／ 構成: 日付 / 準備開始 / 調理開始 / 調理終了 / 片付け開始',
 )
 
-// ---- ④ nothing got silently fixed -------------------------------------------
+// ---- ④ 黙って直していない ---------------------------------------------------
 
 const bookLeftBroken = emptyTemplate()
 bookLeftBroken.getSheetByName('検証結果').put(1, 1, '区分')
@@ -292,7 +285,7 @@ check(
   snapshotBeforeChecking,
 )
 
-// ---- ⑤ reading is once per sheet --------------------------------------------
+// ---- ⑤ 読むのはシートごとに 1 回 --------------------------------------------
 
 roundTrips.reads = 0
 nameBreakages(emptyTemplate())
@@ -304,7 +297,7 @@ nameBreakages(bookMissingASheet)
 
 check('⑤ 無いシートは読まない（4 枚で 4 回）', roundTrips.reads, sheetLayout.length - 1)
 
-// ---- ⑥ broken means it stops ------------------------------------------------
+// ---- ⑥ 崩れていれば止まる ---------------------------------------------------
 
 check(
   '⑥ 崩れていなければ、構造を確かめる は 0 箇所を返して通す',
@@ -330,7 +323,7 @@ check(
   [],
 )
 
-// ---- results ----------------------------------------------------------------
+// ---- 結果 ------------------------------------------------------------------
 
 console.log('構造の検証の検査（src/verify-structure.js／読むだけの偽のスプレッドシートの上）')
 console.log('')

@@ -1,31 +1,26 @@
 /**
- * The core — where the pure functions live, the ones that take arrays and return arrays
- * (docs/tech-requirements.md 6 の #8).
+ * コア — 配列を受けて配列を返す純粋な関数の置き場（docs/tech-requirements.md 6 の #8）。
  *
- * It never touches SpreadsheetApp. The moment it does, the way out written in 6-1 の #2
- * (if we hit the execution time limit, move the generation to the browser side; the method
- * itself does not change) disappears because of how the code is written — there is no
- * SpreadsheetApp inside a dialog.
+ * SpreadsheetApp を 1 度も掴まない。掴んだ瞬間に、6-1 の #2 に書いてある逃げ道
+ * （実行時間の上限に当たったら生成をブラウザ側に移す。方式は変えない）が、書き方のせいで消える
+ * — ダイアログの中に SpreadsheetApp は無い。
  *
- * Reading and writing, and lining the value representations up, is shell.js's job.
- * What arrives here is arrays of rows made of strings and numbers only (→ checkRepresentation).
- * Unless the wobble is shut inside the shell, determinism breaks outside the core
- * (→ 6 の #8 の理由 ③).
+ * 読み書きと、値の表現を揃えるのは shell.js の仕事である。
+ * ここに入ってくるのは、文字列と数値だけでできた行の配列である（→ checkRepresentation）。
+ * 揺れを殻に閉じ込めないと、決定性がコアの外で崩れる（→ 6 の #8 の理由 ③）。
  *
- * This file is a skeleton. The contents of each step are put in by their own issue (→ coreSteps).
- * A step that is not in yet returns an empty array and carries back a named「まだ作っていない」.
- * It never runs silently. No new judgement gets written here (→ src/README.md).
+ * ここは骨組みである。各段の中身は、それぞれの issue が入れる（→ coreSteps）。
+ * 入っていない段は空の配列を返し、「まだ作っていない」を名指しで持ち帰る。黙って走らない。
+ * ここに判断を新しく書かない（→ src/README.md）。
  *
- * Never use a value from another file at the top level of this file. Apps Script evaluates the
- * .gs files one by one in order, so it breaks on the ordering. sheet-layout.js is only ever
- * looked at from inside a function.
+ * 他のファイルの値をこのファイルの最上位で使わない。Apps Script は .gs を 1 つずつ順に評価するので、
+ * 並び順で壊れる。sheet-layout.js を見るのは関数の中だけにしてある。
  */
 
 /**
- * The steps of the core, and the issue that puts the contents of each one in
- * (docs/tech-requirements.md 8「作業の順序」).
- * The order is the order build calls them in. writesTo is the generated sheet the step puts
- * rows into (null for a step that puts out none).
+ * コアの段と、それぞれの中身を入れる issue（docs/tech-requirements.md 8「作業の順序」）。
+ * 並びは build が呼ぶ順である。writesTo は、その段が行を出す生成シートである（出さない段は null）。
+ * name の値は段の名前で、steps のキーと突き合わせる文字列である（→ build）。
  */
 const coreSteps = [
   { name: '取り込む', issue: 146, writesTo: null, whatItDoes: '回答の行を 1 人 1 件に畳む（規則 2 ／ 8 の 6）' },
@@ -36,18 +31,17 @@ const coreSteps = [
   { name: '指標を出す', issue: 154, writesTo: '指標', whatItDoes: '人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7 ／ 8 の 9）' },
 ]
 
-/** The sheets the core returns. These are the 3 that generation writes (→ 5 の #6・#7・5-4). */
+/** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */
 const outputNames = ['割り当て', '検証結果', '指標']
 
-/** Sheets the core does not read. Only generation writes them, so they are not inputs (→ 5-4・5 の #7). */
+/** コアが読まないシート。生成しか書かないので、入力にならない（→ 5-4・5 の #7）。 */
 const sheetsNotRead = ['検証結果', '指標']
 
 /**
- * The names of the inputs the core takes. Every value is an「array of rows」.
- * 条件入力 comes in per section (5-1 の #1〜#5); 回答 and 割り当て come in one per sheet.
- * 割り当て is in there so that the hand edits from the previous round can be stacked back in
- * as fixed rows (→ 5-3).
- * The names are pulled from sheet-layout.js — hold a string in two places and one of them goes stale.
+ * コアが受け取る入力の名前。値はどれも「行の配列」である。
+ * 条件入力は区画ごと（5-1 の #1〜#5）、回答と割り当てはシートごとに 1 つ。
+ * 割り当てが入っているのは、前の周の手直しを固定として積み直すためである（→ 5-3）。
+ * 名前は sheet-layout.js から引く — 文字列を二重に持つと、片方が古くなる。
  */
 function inputNames() {
   const names = []
@@ -58,7 +52,7 @@ function inputNames() {
   return names
 }
 
-/** The names of the 5 sections of 条件入力 (→ 5-1 の #1〜#5). This is as far as the generating and counting sides see. */
+/** 条件入力の 5 区画の名前（→ 5-1 の #1〜#5）。生成と数える側に渡るのはここまでである。 */
 function conditionNames() {
   return sheetLayout
     .filter((layout) => layout.name === '条件入力')[0]
@@ -66,15 +60,14 @@ function conditionNames() {
 }
 
 /**
- * Build the rows of the 3 generated sheets out of the input rows.
+ * 入力の行から、生成シート 3 枚の行を組む。
  *
- * steps maps a step name to a function (a step that is not passed in becomes「まだ作っていない」).
- * It is passed in this swappable shape because 8 の 3 comes before 8 の 8 — the counting side
- * alone can be put in and run while there is no generation yet.
+ * steps は段の名前から関数への対応である（渡さなかった段は「まだ作っていない」になる）。
+ * 差し替えで渡せる形にしてあるのは、8 の 3 が 8 の 8 より先にあるからである
+ * — 数える側だけを先に入れて、生成が無いまま回せる。
  *
- * What it returns: { 割り当て, 検証結果, 指標, notBuilt }.
- * notBuilt names the steps whose contents are not in. How to show it, and how far to write,
- * is the shell's call.
+ * 返すもの: { 割り当て, 検証結果, 指標, notBuilt }。シート 3 枚のキーは、シート名そのものである。
+ * notBuilt は中身の入っていない段の名指しである。どう見せるか・どこまで書くかは殻が決める。
  */
 function build(inputs, steps) {
   checkRepresentation(inputs)
@@ -89,17 +82,16 @@ function build(inputs, steps) {
     return stepsToCall[name].apply(null, args)
   }
 
-  // Never let the raw answers flow straight on. Only the wishes that went through the intake
-  // (規則 2) go downstream. The friend column not showing up in the input of the generation
-  // follows from this shape (→ 5-2).
+  // 回答をそのまま先へ流さない。取り込み（規則 2）を通った希望だけが下流へ行く。
+  // 友達欄が生成の入力に現れないのは、この形の帰結である（→ 5-2）。
   const wishes = callStep('取り込む', [inputs['回答']])
   const candidates = callStep('展開する', [wishes, inputs['日ごとの営業 4 時刻']])
 
   const conditions = takeConditions(inputs)
-  const fixed = inputs['割り当て'] // what the staff rewrote in the previous round (→ 5-3)
+  const fixed = inputs['割り当て'] // 前の周で担当者が書き換えたところ（→ 5-3）
   const assignments = callStep('生成する', [candidates, conditions, fixed])
 
-  // 違反 and 未充足 are counted separately and laid out on the same one sheet, split by 種別 (→ 5-4).
+  // 違反と未充足は別に数えて、同じ 1 枚に種別で分けて並べる（→ 5-4）。
   const violations = callStep('違反を数える', [assignments, conditions, wishes])
   const unmet = callStep('未充足を名指しする', [assignments, conditions])
   const metrics = callStep('指標を出す', [assignments])
@@ -110,14 +102,14 @@ function build(inputs, steps) {
   return output
 }
 
-/** Take just the 5 sections of 条件入力 out of the inputs (→ 5-1 の #1〜#5). */
+/** 入力から条件入力の 5 区画だけを取り出す（→ 5-1 の #1〜#5）。 */
 function takeConditions(inputs) {
   const conditions = {}
   conditionNames().forEach((name) => { conditions[name] = inputs[name] })
   return conditions
 }
 
-/** Look up the one row of coreSteps by step name. If the name is not in the table, it stops right there. */
+/** 段の名前から coreSteps の 1 行を引く。名前が表に無ければ、そこで止まる。 */
 function findStep(name) {
   const step = coreSteps.filter((row) => row.name === name)[0]
   if (!step) throw new Error(`コアの段に「${name}」が無い（coreSteps と build が食い違っている）`)
@@ -125,13 +117,11 @@ function findStep(name) {
 }
 
 /**
- * Check, at the door of the core, that the shell lined the value representations up.
+ * 殻が値の表現を揃えたかを、コアの入口で確かめる。
  *
- * All it looks at is「string or number」. How dates and times are written is shell.js's to hold
- * (→ valueRepresentation). Values read from SpreadsheetApp wobble in representation with the
- * locale and the cell format (a time arrives as a Date, or as a string).
- * If one comes in still wobbling, it stops and names it instead of silently fixing it
- * (→ 6 の #8 の理由 ③).
+ * 見るのは「文字列か数値か」だけである。日付と時刻の書き方そのものは shell.js が持つ（→ valueRepresentation）。
+ * SpreadsheetApp から読んだ値はロケールと書式で表現が揺れる（時刻が Date で来るか文字列で来るか）。
+ * 揺れたまま入ってきたら、黙って直さずに名指しで止まる（→ 6 の #8 の理由 ③）。
  */
 function checkRepresentation(inputs) {
   if (!inputs || typeof inputs !== 'object') throw new Error('入力が、名前と行の配列の対応になっていない')
@@ -161,9 +151,8 @@ function checkRepresentation(inputs) {
 }
 
 /**
- * Check that the rows a step returned fit the shape of the sheet they are written into.
- * Write them in without fitting and the columns slide on the staff's screen. Nothing gets
- * silently squeezed in.
+ * 段が返した行が、書き込む先のシートの形に合っているかを確かめる。
+ * 合わないまま書くと、担当者の画面で列がずれる。黙って詰めない。
  */
 function checkOutput(output) {
   outputNames.forEach((name) => {
@@ -188,14 +177,14 @@ function checkOutput(output) {
   })
 }
 
-/** Look up the column names of one sheet. 割り当て, 検証結果 and 指標 each hold only one section. */
+/** シート 1 枚の列名を引く。割り当て・検証結果・指標はどれも区画を 1 つしか持たない。 */
 function sheetColumns(name) {
   const layout = sheetLayout.filter((c) => c.name === name)[0]
   if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
   return layout.sections[0].columns
 }
 
-// A door for Node to read this file through, nothing more. Apps Script has no module, so it never runs there.
+// Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
     coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames,

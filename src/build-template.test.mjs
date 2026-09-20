@@ -1,19 +1,17 @@
 #!/usr/bin/env node
-// Checks on the building — running src/build-template.js on top of a fake spreadsheet.
+// 組み立ての検査 — src/build-template.js を、偽のスプレッドシートの上で走らせる。
 //
-//   How to run it: node src/build-template.test.mjs
+//   使い方: node src/build-template.test.mjs
 //
-// There are 4 things it looks at.
-//   ① the 5 sheets come out in the order of the layout, and the empty sheet that was there from
-//      the start goes
-//   ② protection goes on the 3 generated sheets only, and it goes on as warning-only
-//   ③ running it twice does not change the shape (only what is missing gets added)
-//   ④ where a heading differs from the layout, it names it and stops instead of overwriting
-//      (it never silently fixes)
+// 見るものは 4 つある。
+//   ① 5 枚が構成の並びででき、最初からある空のシートが消える
+//   ② 保護がかかるのは生成シートの 3 枚だけで、かかり方は「警告のみ」である
+//   ③ 2 回走らせても形が変わらない（足りないものだけ足す）
+//   ④ 見出しが構成と違うときは、上書きせずに名指しで止まる（黙って直さない）
 //
-// What can be seen here is the building procedure and nothing else.
-// Whether the protection holds on a real Google spreadsheet, or whether the script travels with
-// a copy, cannot be seen (→ src/README.md・issue #136).
+// ここで分かるのは組み立ての手順だけである。
+// 本物の Google スプレッドシートで保護が効くか・コピーでスクリプトが渡るかは分からない
+// （→ src/README.md・issue #136）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -22,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- the fake spreadsheet ---------------------------------------------------
+// ---- 偽のスプレッドシート ---------------------------------------------------
 
 class FakeRange {
   constructor(sheet, row, column, rowCount, columnCount) {
@@ -98,7 +96,7 @@ class FakeSpreadsheet {
   }
 }
 
-// ---- loading ----------------------------------------------------------------
+// ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({
   SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' } },
@@ -107,12 +105,11 @@ const context = vm.createContext({
 for (const name of ['sheet-layout.js', 'build-template.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-// const does not become a property of the context, so it is taken out with an expression
-// (function does show up on the context)
+// const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { buildTemplateInto } = context
 const { sheetLayout, protectionNote } = vm.runInContext('({ sheetLayout, protectionNote })', context)
 
-// ---- the checks -------------------------------------------------------------
+// ---- 検査 -------------------------------------------------------------------
 
 const failed = []
 const passed = []
@@ -193,7 +190,7 @@ check(
   ['合計時間（時）'],
 )
 
-// ---- results ----------------------------------------------------------------
+// ---- 結果 -------------------------------------------------------------------
 
 console.log('組み立ての検査（src/build-template.js／偽のスプレッドシートの上）')
 console.log('')
