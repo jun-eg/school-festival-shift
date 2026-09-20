@@ -42,6 +42,22 @@ node を使わないのは、nvm 管理の node が**フックの環境の PATH 
 （`env -i /bin/sh -c 'command -v node'` が空になる）。`/usr/bin/python3` は素の環境にも居る。
 **このリポジトリをクローンした別の環境で柵が素通りしないことを、依存の選び方で担保する。**
 
+## 実装が 2 つ並んでいる（要判断）
+
+いま [`hooks/`](hooks/) には**同じことをする実装が 2 本ある**。採用しているのは python3 版
+（[`settings.json`](settings.json) が呼んでいるのはこちら）で、jq + grep 版は比較のために置いてある。
+
+| | [`guard-bash.py`](hooks/guard-bash.py) | [`guard-bash.sh`](hooks/guard-bash.sh) |
+| --- | --- | --- |
+| **契約** | 37 件 0 失敗 | 37 件 0 失敗（**同じ検査を共有**） |
+| **コード行数** | 112 行 | **77 行** |
+| **外部依存** | **`python3` だけ** | `jq` `sed` `grep` `xargs` `basename` `bash` |
+| **1 回あたり** | **約 25 ms** | 約 38 ms |
+| **引用符の解釈** | `shlex` | `xargs`（`eval` と違いコマンド置換をしない） |
+
+**どちらか 1 本に決めて、もう 1 本は消す。** 2 本置いたままにしない
+（検査が 2 本を縛っているうちは壊れないが、片方だけ直す日が必ず来る）。
+
 ## 例外：どうしても必要になったら
 
 `deny` もフックも**確認ダイアログを出さずに落とす**ので、「そのときだけ許可」ができない。
@@ -57,10 +73,12 @@ node を使わないのは、nvm 管理の node が**フックの環境の PATH 
 ## 確かめ方
 
 ```
-python3 .claude/hooks/guard-bash.test.py
+python3 .claude/hooks/guard-bash.test.py                        # 採用している python3 版
+python3 .claude/hooks/guard-bash.test.py .claude/hooks/guard-bash.sh   # jq + grep 版
 ```
 
-**止まる形と通る形を 1 本ずつ突き合わせる**（34 件）。何も書き換えない。
+**止まる形と通る形を 1 本ずつ突き合わせる**（37 件）。**この 37 件が契約であり、実装ではない。**
+何も書き換えない。
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
 
 `settings.json` を書き換えたら、**Claude Code の `/hooks` を一度開くか、セッションを開き直す。**

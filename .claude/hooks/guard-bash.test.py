@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""guard-bash.py が止める形・通す形を 1 本ずつ確かめる。
+"""ガードが止める形・通す形を 1 本ずつ確かめる。
 
-    python3 .claude/hooks/guard-bash.test.py
+    python3 .claude/hooks/guard-bash.test.py                          # 既定（python3 版）
+    python3 .claude/hooks/guard-bash.test.py .claude/hooks/guard-bash.sh   # jq + grep 版
 
+**この 34 件が契約である。** 実装が python3 でも jq + grep でも、同じここを通る。
 依存はゼロである（Python の標準だけを使う）。何も書き換えない。
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
 """
@@ -12,7 +14,10 @@ import os
 import subprocess
 import sys
 
-HOOK = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "guard-bash.py")]
+HERE = os.path.dirname(os.path.abspath(__file__))
+TARGET = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "guard-bash.py")
+# .py は sys.executable 経由、それ以外は実行権限で直に呼ぶ
+HOOK = [sys.executable, TARGET] if TARGET.endswith(".py") else [TARGET]
 
 # 止まってほしい形
 DENY = [
@@ -33,6 +38,7 @@ DENY = [
     "gh api repos/o/r/issues/73 -f body=@body.md -X PATCH",
     "gh api repos/o/r/issues/73 --raw-field body=@body.md",
     "gh api repos/o/r/issues/73 -fbody=@body.md",
+    "git push --force-with-lease=origin/main origin main",
     "cd /tmp && git push origin main --force",
     "echo hi; gh api x -f body=@f.md",
 ]
@@ -46,6 +52,8 @@ ALLOW = [
     "git rebase --abort",
     "git rebase --quit",
     "git commit -m 'force push の話'",
+    'git commit -m "fix the --amend bug"',
+    "git push --repo=origin",
     "git reset HEAD~1",
     "git restore --staged x",
     "gh api repos/o/r/issues/73 -X PATCH -F body=@body.md",
@@ -77,7 +85,7 @@ for cmd in ALLOW:
     print(f"{mark} allow | {cmd}")
 
 print()
-print(f"{len(DENY)+len(ALLOW)} cases, {len(fails)} failures")
+print(f"{TARGET}: {len(DENY)+len(ALLOW)} cases, {len(fails)} failures")
 for kind, cmd in fails:
     print(f"  {kind}: {cmd}")
 sys.exit(1 if fails else 0)

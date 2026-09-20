@@ -14,8 +14,8 @@ import re
 import shlex
 import sys
 
-# git push で履歴を上書きする指定
-FORCE_LONG = ("--force", "--force-with-lease", "--force-if-includes")
+# git push で履歴を上書きする指定。`--force-with-lease=origin/main` のように値を付けた形も拾う
+FORCE_LONG = re.compile(r"^--force(-with-lease|-if-includes)?(=|$)")
 # `-f` 単体と `-fu` のような短縮フラグの束
 FORCE_SHORT = re.compile(r"^-[a-zA-Z]*f[a-zA-Z]*$")
 # rebase を始めない形だけは通す（途中で詰まったときの逃げ道）
@@ -77,7 +77,7 @@ def check_git(tokens):
     sub, args = git_subcommand(tokens)
     if sub == "push":
         for arg in args:
-            if arg in FORCE_LONG or arg.startswith("--force="):
+            if FORCE_LONG.match(arg):
                 return MSG_FORCE
             if FORCE_SHORT.match(arg):
                 return MSG_FORCE
