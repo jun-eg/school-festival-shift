@@ -84,7 +84,7 @@ const SpreadsheetAppを掴むファイル = fs
   .sort()
 
 見る(
-  '① SpreadsheetApp を掴むのは殻の側の 3 ファイルだけである（core.js も sheet-layout.js も掴まない）',
+  '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 2 つも、構造の検証も掴まない）',
   SpreadsheetAppを掴むファイル,
   ['build-template.js', 'menu.js', 'shell.js'],
 )

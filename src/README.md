@@ -12,11 +12,12 @@
 | [`sheet-layout.js`](sheet-layout.js) | **5 枚のシートの定義だけ** | **コア** |
 | [`core.js`](core.js) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`コアの口`）と、段をつなぐ 1 本（`組む`） | **コア** |
 | [`shell.js`](shell.js) | **シートを読んで値の表現を揃え、コアを呼び、返ってきた行を書く** | **殻** |
+| [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
 | [`build-template.js`](build-template.js) | 定義どおりにシートを作り、見出しを置き、生成シートに保護をかける | **殻** |
 | [`menu.js`](menu.js) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`） | **殻** |
 | [`appsscript.json`](appsscript.json) | マニフェスト。**権限スコープはまだ書いていない**（→ [#139](https://github.com/jun-eg/school-festival-shift/issues/139)） | — |
 | `*.test.mjs` | **手元で回す検査。**Apps Script には上げない（`.claspignore` で外してある） | — |
-| [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、手元の検査 66 件との対応も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
+| [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、手元の検査 85 件との対応も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
 
 **コアの側は `SpreadsheetApp` を 1 度も掴まない**（→ 6 の #8・下の「コアと殻の境目」）。
 
@@ -70,6 +71,10 @@
 | **`SpreadsheetApp`** | **1 度も掴まない** | **ここだけが掴む** |
 | **持つもの** | 割り当ての規則と、段のつなぎ方 | 読む範囲・書く範囲・値の表現 |
 
+**構造の検証（[`verify-structure.js`](verify-structure.js)）も殻の側である** — スプレッドシートを読むからである。
+**ただし `SpreadsheetApp` を名指しはしない**（スプレッドシートを引数で受ける）ので、
+**手元では偽のスプレッドシートを渡して回せる**（→ 下の「確かめ方」）。
+
 **境目を引いてあるのは、書いてある逃げ道を書き方で消さないためである。**
 
 - **6-1 の #2 のフォールバックが実行できる。**「実行時間の上限に当たったら生成をブラウザ側に移す。方式は変えない」と要件定義書に書いてあるが、**コアが `SpreadsheetApp` を掴んでいたら移せない**（ダイアログの中に `SpreadsheetApp` は無い）
@@ -117,8 +122,8 @@
 [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（生成）である。
 
 **ファイルを貼る順に依存しない。** Apps Script は `.gs` を 1 つずつ順に評価するので、
-**他のファイルの値をファイルの最上位で使うと、並び順で壊れる。**`core.js` も `shell.js` も、
-[`sheet-layout.js`](sheet-layout.js) を見るのは関数の中だけにしてある。
+**他のファイルの値をファイルの最上位で使うと、並び順で壊れる。**`core.js` も `shell.js` も
+`verify-structure.js` も、[`sheet-layout.js`](sheet-layout.js) を見るのは関数の中だけにしてある。
 
 ## 保護は「警告のみ」である
 
@@ -132,10 +137,34 @@
 編集者を絞る形（`removeEditors`）を書いても、持ち主である担当者には効かない。
 **採れるいちばん強い形が「警告のみ」である。**
 
-**これは 2 の「止まる箇所」#8 の予防のうち、片方だけが立っているということである。**
-もう片方（**走る前に構造を検証し、崩れていれば名指しで出す**）は
-[#138](https://github.com/jun-eg/school-festival-shift/issues/138) が引き受ける。
+**これは 2 の「止まる箇所」#8 の予防のうち、片方が弱いということである。**
+もう片方（**走る前に構造を検証し、崩れていれば名指しで出す**）が下の節である。
 **復旧の側は動かない** — **テンプレートをもう 1 回コピーして条件を入れ直す**（→ 6 の #1 の理由 ⑤）。
+
+## 走る前に構造を検証する
+
+**保護と並ぶ、2 の「止まる箇所」#8 のもう片方の予防である**
+（[`verify-structure.js`](verify-structure.js)／[#138](https://github.com/jun-eg/school-festival-shift/issues/138)）。
+**[`shell.js`](shell.js) の `走らせる` が、シートを読む前に最初に呼ぶ。**
+
+| 見るもの | 崩れていたら |
+| --- | --- |
+| **5 枚のシートがあるか** | **名指しして止まる。**黙って作らない |
+| **区画の見出しと列名が、構成どおりの場所にあるか** | **名指しして止まる。**黙って置き直さない |
+| **区画のあいだ・区画の右端より右に中身が無いか**（列数） | **名指しして止まる。**列を 1 つ挿すと、右へずれた見出しがここに落ちてくる |
+| **構成が要る列数だけシートに列があるか** | **名指しして止まる。**列をまとめて消されると、読む範囲がシートの外に出る — **範囲外の例外ではなく、名指しで止める**（行をまとめて消された側は、見出しの行が空として名指しになる） |
+
+**崩れている箇所を全部出す。** 最初の 1 件で切り上げない —
+直すのはスプレッドシートの上なので、**1 箇所ずつ走らせ直させるより手数が少ない。**
+
+**黙って直さない。黙って走らない**（「**満たせない枠は黙って埋めない**」→ 5 の #6 と同じ扱い）。
+**セルを 1 つも書き換えない**（読むだけである）し、**崩れていれば入力を 1 行も読まないので、生成は動かない。**
+**戻し方はここが決めない** — **テンプレートをもう 1 回コピーして条件を入れ直す**（上の「保護は『警告のみ』である」）。
+
+**見るのは見出しの行だけである。** データの行は見ない —
+**条件入力と割り当ては担当者が書く所**で、**行が増えたり減ったりするのが仕様である**（→ 5-1・5-3）。
+**構成に無いシートが 1 枚増えていても止めない** — 生成が書く先は 3 枚に決まっていて、崩れないからである
+（**組み立てのほうは、構成に無いシートに中身があれば残して名指しする** → [`build-template.js`](build-template.js)）。
 
 ## メニューは 1 つである
 
@@ -157,8 +186,8 @@
 
 1. Google ドライブで**スプレッドシートを 1 つ**作り、**名前を付ける**
 2. **拡張機能 → Apps Script** を開く
-3. `src/` の **`.js` 5 つ**を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
-   `sheet-layout` ／ `core` ／ `shell` ／ `build-template` ／ `menu`。
+3. `src/` の **`.js` 6 つ**を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
+   `sheet-layout` ／ `core` ／ `shell` ／ `verify-structure` ／ `build-template` ／ `menu`。
    **日本語の名前でも通ることは実機で見たが、英字にそろえてある**
    （→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175)・上の「名前の線」）。
    **貼る順は問わない**（→「コアと殻の境目」の最後）
@@ -187,8 +216,9 @@
 | **ファイル名が 1 対 1 で対応する** | **貼った名前がそのまま付く**ので、リポジトリの `.js` と Apps Script の `.gs` が名前で突き合わせられる（**日本語の名前でもそのまま通った** → [`real-device-log.md`](real-device-log.md)。**いまは英字である** → [#175](https://github.com/jun-eg/school-festival-shift/issues/175)） |
 
 **却下ではない** — clasp を使いたい実装者が使うのは構わない。**手順の原本がどちらかを決めただけである。**
-**`src/` のファイルが増えたら、この判断は見直す。****4 つから 6 つになったが、動かしていない**
-（`core.js` と `shell.js` が増えた → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)）
+**`src/` のファイルが増えたら、この判断は見直す。****4 つから 7 つになったが、動かしていない**
+（`core.js` と `shell.js` → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)、
+`verify-structure.js` → [#138](https://github.com/jun-eg/school-festival-shift/issues/138)）
 — **貼る回数はまだ手で追える**し、**貼るのが 1 回だけであることも、インストールが 0 であることも変わっていない。**
 **clasp の導入を担当者に要求することは、どちらにしても無い。**
 
@@ -198,6 +228,7 @@
 node src/sheet-layout.test.mjs
 node src/core.test.mjs
 node src/shell.test.mjs
+node src/verify-structure.test.mjs
 node src/build-template.test.mjs
 ```
 
@@ -208,10 +239,11 @@ node src/build-template.test.mjs
 | --- | --- | --- |
 | [`sheet-layout.test.mjs`](sheet-layout.test.mjs) | 5 枚・担当者が書く側・保護する側・区画・列名。**回答シートの列は [`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の見出しと突き合わせる** | 14 |
 | [`core.test.mjs`](core.test.mjs) | **スプレッドシートを 1 つも作らずにコアを走らせる。**`SpreadsheetApp` を掴むファイルの一覧／配列を渡して配列が返るか／入っていない段が名指しで返るか／段を差し替えて先に回せるか／**表現の揺れ・列数の違い・決めていない種別で止まるか** | 23 |
-| [`shell.test.mjs`](shell.test.mjs) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか** | 20 |
+| [`shell.test.mjs`](shell.test.mjs) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか**／**構造が崩れていれば 1 行も読まず 1 枚も書かずに止まるか** | 23 |
+| [`verify-structure.test.mjs`](verify-structure.test.mjs) | **読むだけの偽のスプレッドシートの上で構造を照らす。****シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える／行を 1 つ消す／生成シートを上書きする／行と列をまとめて消す、のそれぞれで名指しの行が出るか**／**セルが 1 つも変わっていないか**／読むのがシートごとに 1 回か | 16 |
 | [`build-template.test.mjs`](build-template.test.mjs) | **偽のスプレッドシートの上で組み立てを走らせる。**5 枚できるか／保護が 3 枚に警告のみでかかるか／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか** | 9 |
 
-**この 4 つで分かるのは、手元で回る範囲だけである。**
+**この 5 つで分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
 [`real-device-log.md`](real-device-log.md) が持つ。ここに二重に書かない。**
 
@@ -220,8 +252,7 @@ node src/build-template.test.mjs
 | 何 | どこが決めるか |
 | --- | --- |
 | **要求する権限スコープ**（`appsscript.json` の `oauthScopes`）と、初回承認で出る画面 | [#139](https://github.com/jun-eg/school-festival-shift/issues/139)（→ 6-1 の #4） |
-| **走る前の構造の検証**（崩れていれば名指しで出す） | [#138](https://github.com/jun-eg/school-festival-shift/issues/138)（→ 2 の「止まる箇所」#8）。**殻はシートが無ければ名指しで止まるだけである** |
 | **コアの段 6 つの中身**（骨組みだけがある。→「コアと殻の境目」の段の表） | [#146](https://github.com/jun-eg/school-festival-shift/issues/146)／[#149](https://github.com/jun-eg/school-festival-shift/issues/149)／[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#141](https://github.com/jun-eg/school-festival-shift/issues/141)／[#142](https://github.com/jun-eg/school-festival-shift/issues/142)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
-| **殻をメニューに繋ぐこと**（`いまのスプレッドシートで走らせる` を押す口） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（→ 5 の #6） |
+| **殻をメニューに繋ぐこと**（`いまのスプレッドシートで走らせる` を押す口）と、**崩れの名指しが担当者の画面にどう出るか**（いまは走らせたときの例外である） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（→ 5 の #6・上の「走る前に構造を検証する」） |
 | **回答シートに回答先を向けること。**フォームが別のシートを作る形になるなら、繋ぎ方はそこで決まる | [#144](https://github.com/jun-eg/school-festival-shift/issues/144)（→ 6 の #6） |
 | **生成シート 3 枚に実際に何行書くか**（割り当て・検証結果・指標の中身） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#141](https://github.com/jun-eg/school-festival-shift/issues/141)・[#142](https://github.com/jun-eg/school-festival-shift/issues/142)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
