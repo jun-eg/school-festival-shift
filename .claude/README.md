@@ -32,8 +32,15 @@
 落ちてしまうからである。rebase の判断はフックが持つ。
 
 **依存はゼロである**（Python の標準だけを使う）。`/usr/bin/python3` を絶対パスで呼ぶ。
+
+`jq` を使わないのは、**jq がやれるのは JSON から `.tool_input.command` を取り出すところまで**だからである。
+判断の本体は「**コマンドをトークンに割って**、`git -C dir push ... --force` の `push` を見つけ、
+`-fu` のような短縮フラグの束を見て、`grep -f patterns.txt` と `gh -f body=@` を区別する」側にある。
+ここを jq + grep の正規表現でやると、[検査](hooks/guard-bash.test.py)で押さえている 34 件を表現しきれない。
+
 node を使わないのは、nvm 管理の node が**フックの環境の PATH に居ない**ためである
-（`env -i /bin/sh -c 'command -v node'` が空になる）。
+（`env -i /bin/sh -c 'command -v node'` が空になる）。`/usr/bin/python3` は素の環境にも居る。
+**このリポジトリをクローンした別の環境で柵が素通りしないことを、依存の選び方で担保する。**
 
 ## 例外：どうしても必要になったら
 
