@@ -33,30 +33,28 @@
 
 **依存はゼロである**（Python の標準だけを使う）。`/usr/bin/python3` を絶対パスで呼ぶ。
 
-`jq` を使わないのは、**jq がやれるのは JSON から `.tool_input.command` を取り出すところまで**だからである。
-判断の本体は「**コマンドをトークンに割って**、`git -C dir push ... --force` の `push` を見つけ、
-`-fu` のような短縮フラグの束を見て、`grep -f patterns.txt` と `gh -f body=@` を区別する」側にある。
-ここを jq + grep の正規表現でやると、[検査](hooks/guard-bash.test.py)で押さえている 34 件を表現しきれない。
+**jq + grep でも同じ判断は書ける**（実際に書いて、同じ検査を通した。[issue #73 のコメント](https://github.com/jun-eg/school-festival-shift/issues/73#issuecomment-5749758983)に比較がある）。
+それでも python3 を採ったのは、**依存の数**である。
 
-node を使わないのは、nvm 管理の node が**フックの環境の PATH に居ない**ためである
-（`env -i /bin/sh -c 'command -v node'` が空になる）。`/usr/bin/python3` は素の環境にも居る。
+- jq 版は `jq` `sed` `grep` `xargs` が要る。**このマシンにも後から入れた。**
+- **柵が依存の欠けで素通りしても、素通りしたことに気づけない。**
+  止まらなかったコマンドは、ただ成功して終わる。**静かに失敗する柵は、無い柵より悪い。**
+- `/usr/bin/python3` は素の環境にも居る。nvm 管理の node は**フックの環境の PATH に居ない**
+  （`env -i /bin/sh -c 'command -v node'` が空になる）。
+
 **このリポジトリをクローンした別の環境で柵が素通りしないことを、依存の選び方で担保する。**
 
-## 実装が 2 つ並んでいる（要判断）
+## 採らなかった道
 
-いま [`hooks/`](hooks/) には**同じことをする実装が 2 本ある**。採用しているのは python3 版
-（[`settings.json`](settings.json) が呼んでいるのはこちら）で、jq + grep 版は比較のために置いてある。
+**同じ柵を jq + grep でも書いた**（[#164](https://github.com/jun-eg/school-festival-shift/pull/164)）。
+行数は短かった（77 行 対 112 行）が、上のとおり**依存**で落とした。速さも python3 が約 1.5 倍（25 ms 対 38 ms）。
 
-| | [`guard-bash.py`](hooks/guard-bash.py) | [`guard-bash.sh`](hooks/guard-bash.sh) |
-| --- | --- | --- |
-| **契約** | 37 件 0 失敗 | 37 件 0 失敗（**同じ検査を共有**） |
-| **コード行数** | 112 行 | **77 行** |
-| **外部依存** | **`python3` だけ** | `jq` `sed` `grep` `xargs` `basename` `bash` |
-| **1 回あたり** | **約 25 ms** | 約 38 ms |
-| **引用符の解釈** | `shlex` | `xargs`（`eval` と違いコマンド置換をしない） |
+**書いた価値はあった。** 突き合わせて python3 版の取りこぼし
+（`--force-with-lease=origin/main` のように `=` で値を付けた形）が 1 つ見つかっている。
+**同じものを 2 回書くと、片方だけが間違っている場所が出る。**
 
-**どちらか 1 本に決めて、もう 1 本は消す。** 2 本置いたままにしない
-（検査が 2 本を縛っているうちは壊れないが、片方だけ直す日が必ず来る）。
+[検査](hooks/guard-bash.test.py)が実装のパスを引数で受け取るのは、この比較の名残である。
+**次に実装を入れ替えたくなったときも、契約のほうは動かさずに済む。**
 
 ## 例外：どうしても必要になったら
 
@@ -73,8 +71,8 @@ node を使わないのは、nvm 管理の node が**フックの環境の PATH 
 ## 確かめ方
 
 ```
-python3 .claude/hooks/guard-bash.test.py                        # 採用している python3 版
-python3 .claude/hooks/guard-bash.test.py .claude/hooks/guard-bash.sh   # jq + grep 版
+python3 .claude/hooks/guard-bash.test.py              # 既定（採用している guard-bash.py）
+python3 .claude/hooks/guard-bash.test.py 別の実装のパス   # 実装を入れ替えるとき
 ```
 
 **止まる形と通る形を 1 本ずつ突き合わせる**（37 件）。**この 37 件が契約であり、実装ではない。**
