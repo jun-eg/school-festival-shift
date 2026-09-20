@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// コアの検査 — src/コア.js を、スプレッドシートを 1 つも作らずに走らせる。
+// コアの検査 — src/core.js を、スプレッドシートを 1 つも作らずに走らせる。
 //
-//   使い方: node src/コア.test.mjs
+//   使い方: node src/core.test.mjs
 //
 // 見るものは 5 つある。
 //   ① コアの側のファイルに SpreadsheetApp が 1 度も出てこない（→ 6 の #8）
@@ -11,7 +11,7 @@
 //   ⑤ 表現の揺れ・列数の違い・決めていない種別は、黙って直さずに名指しで止まる
 //
 // これは契約であって実装ではない。何も書き換えない。
-// 値の表現を揃える側（殻）の検査は src/殻.test.mjs が持つ。
+// 値の表現を揃える側（殻）の検査は src/shell.test.mjs が持つ。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -24,7 +24,7 @@ const ここ = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const 文脈 = vm.createContext({})
-for (const 名 of ['シート構成.js', 'コア.js']) {
+for (const 名 of ['sheet-layout.js', 'core.js']) {
   vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -84,9 +84,9 @@ const SpreadsheetAppを掴むファイル = fs
   .sort()
 
 見る(
-  '① SpreadsheetApp を掴むのは殻の側の 3 ファイルだけである（コア.js も シート構成.js も掴まない）',
+  '① SpreadsheetApp を掴むのは殻の側の 3 ファイルだけである（core.js も sheet-layout.js も掴まない）',
   SpreadsheetAppを掴むファイル,
-  ['テンプレートを組み立てる.js', 'メニュー.js', '殻.js'],
+  ['build-template.js', 'menu.js', 'shell.js'],
 )
 
 見る(
@@ -274,7 +274,7 @@ const 決めていない種別 = 止まった理由(() => 組む(骨組みの入
   [true, true],
 )
 
-// ---- 入力の名前が シート構成.js から引かれているか ---------------------------
+// ---- 入力の名前が sheet-layout.js から引かれているか ------------------------
 
 見る(
   '入力の名前は、条件入力の 5 区画 ＋ 回答 ＋ 割り当てである（検証結果と指標は入らない）',
@@ -290,7 +290,7 @@ const 決めていない種別 = 止まった理由(() => 組む(骨組みの入
 
 // ---- 結果 ------------------------------------------------------------------
 
-console.log('コアの検査（src/コア.js／スプレッドシート無し）')
+console.log('コアの検査（src/core.js／スプレッドシート無し）')
 console.log('')
 for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
 for (const { 見出し, 実測, 期待 } of 落ちた) {
