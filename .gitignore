@@ -1,2 +1,5 @@
 # スプレッドシートごとに違う値が入るので、リポジトリに入れない（→ src/README.md）
 .clasp.json
+
+# worktree の置き場。作業ツリーそのものなので、リポジトリに入れない（→ CLAUDE.md）
+.claude/worktrees/
