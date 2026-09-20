@@ -1,398 +1,411 @@
 #!/usr/bin/env node
-// 殻の検査 — src/shell.js を、偽のスプレッドシートの上で走らせる。
+// Checks on the shell — running src/shell.js on top of a fake spreadsheet.
 //
-//   使い方: node src/shell.test.mjs
+//   How to run it: node src/shell.test.mjs
 //
-// 見るものは 6 つある。
-//   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
-//   ② 読んだ入力が、そのままコアの入口（表現を確かめる）を通る
-//   ③ 見出しの行を読まない。横に並んだ 5 区画を、区画ごとに切って読む（→ src/README.md）
-//   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
-//   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
-//   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
+// There are 6 things it looks at.
+//   ① the value representations line up (Date, booleans, whitespace and empty cells all become
+//      a string or a number → 6 の #8 の理由 ③)
+//   ② the inputs it read go through the door of the core (checkRepresentation) as they are
+//   ③ it does not read the heading rows. The 5 sections lying side by side are cut apart and
+//      read per section (→ src/README.md)
+//   ④ reading and writing is once per range, never back and forth cell by cell
+//      (→ 6 の #2 の実装上の注意)
+//   ⑤ if even one step is not in, not a single sheet is written (the hand edits never silently
+//      disappear → 5-3)
+//   ⑥ if the structure is broken, it stops without reading a single row or writing a single sheet
+//      (→ verify-structure.js・issue #138)
 //
-// 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
+// How the breakages themselves get named is src/verify-structure.test.mjs's to look at.
+// Here, all that is looked at is that it does not run.
 //
-// これは契約であって実装ではない。何も書き換えない。
-// 本物のスプレッドシートで Date がどう返ってくるかはここでは分からない（→ src/real-device-log.md）。
+// This is a contract, not an implementation. It rewrites nothing.
+// How a Date comes back on a real spreadsheet cannot be seen from here (→ src/real-device-log.md).
 
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
-const ここ = path.dirname(fileURLToPath(import.meta.url))
+const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- 偽のスプレッドシート ---------------------------------------------------
-// 殻 が使うのは getSheetByName / getLastRow / getRange と、範囲の getValues・setValues・clearContent だけである。
-// 走る前の構造の検証（→ verify-structure.js）が、これに getMaxRows / getMaxColumns / getLastColumn を足す。
+// ---- the fake spreadsheet ---------------------------------------------------
+// All the shell uses is getSheetByName / getLastRow / getRange, plus getValues, setValues and
+// clearContent on a range.
+// Checking the structure before running (→ verify-structure.js) adds getMaxRows / getMaxColumns /
+// getLastColumn to that.
 
-const 往復 = { 読み: 0, 書き: 0 }
+const roundTrips = { reads: 0, writes: 0 }
 
-class 偽の範囲 {
-  constructor(シート, 行, 列, 行数, 列数) {
-    Object.assign(this, { シート, 行, 列, 行数, 列数 })
+class FakeRange {
+  constructor(sheet, row, column, rowCount, columnCount) {
+    Object.assign(this, { sheet, row, column, rowCount, columnCount })
   }
   getValues() {
-    往復.読み += 1
-    const 表 = []
-    for (let r = this.行; r < this.行 + this.行数; r++) {
-      const 行 = []
-      for (let c = this.列; c < this.列 + this.列数; c++) 行.push(this.シート.セル.get(`${r},${c}`) ?? '')
-      表.push(行)
+    roundTrips.reads += 1
+    const table = []
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      const row = []
+      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
+      table.push(row)
     }
-    return 表
+    return table
   }
-  setValues(表) {
-    往復.書き += 1
-    表.forEach((行, i) => 行.forEach((値, j) => this.シート.セル.set(`${this.行 + i},${this.列 + j}`, 値)))
+  setValues(table) {
+    roundTrips.writes += 1
+    table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
     return this
   }
   clearContent() {
-    往復.書き += 1
-    for (let r = this.行; r < this.行 + this.行数; r++) {
-      for (let c = this.列; c < this.列 + this.列数; c++) this.シート.セル.delete(`${r},${c}`)
+    roundTrips.writes += 1
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.cells.delete(`${r},${c}`)
     }
     return this
   }
 }
 
-class 偽のシート {
-  constructor(名前) {
-    Object.assign(this, { 名前, セル: new Map() })
+class FakeSheet {
+  constructor(name) {
+    Object.assign(this, { name, cells: new Map() })
   }
-  getName() { return this.名前 }
-  getRange(行, 列, 行数 = 1, 列数 = 1) { return new 偽の範囲(this, 行, 列, 行数, 列数) }
+  getName() { return this.name }
+  getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   getLastRow() {
-    return [...this.セル.entries()]
-      .filter(([, 値]) => 値 !== '')
-      .reduce((最大, [鍵]) => Math.max(最大, Number(鍵.split(',')[0])), 0)
+    return [...this.cells.entries()]
+      .filter(([, value]) => value !== '')
+      .reduce((max, [key]) => Math.max(max, Number(key.split(',')[0])), 0)
   }
   getLastColumn() {
-    return [...this.セル.entries()]
-      .filter(([, 値]) => 値 !== '')
-      .reduce((最大, [鍵]) => Math.max(最大, Number(鍵.split(',')[1])), 0)
+    return [...this.cells.entries()]
+      .filter(([, value]) => value !== '')
+      .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
   }
-  // 1000 行 26 列は新しいスプレッドシートの既定の大きさである
-  // （構造の検証が、読む範囲をシートの外に出さないために見る → verify-structure.js）
+  // 1000 rows by 26 columns is the default size of a new spreadsheet
+  // (checking the structure looks at this to keep the range it reads inside the sheet
+  //  → verify-structure.js)
   getMaxRows() { return Math.max(1000, this.getLastRow()) }
   getMaxColumns() { return Math.max(26, this.getLastColumn()) }
-  置く(行, 列, 値) { this.セル.set(`${行},${列}`, 値); return this }
+  put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
 }
 
-class 偽のスプレッドシート {
-  constructor(シートたち) { this.シートたち = シートたち }
-  getSheetByName(名前) { return this.シートたち.find((s) => s.getName() === 名前) ?? null }
+class FakeSpreadsheet {
+  constructor(sheets) { this.sheets = sheets }
+  getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
 }
 
-// ---- 読み込む ---------------------------------------------------------------
+// ---- loading ----------------------------------------------------------------
 
-const 文脈 = vm.createContext({})
-for (const 名 of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
-  vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
+const context = vm.createContext({})
+for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
+  vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { 入力を読む, 走らせる, 表現を揃える, 表現を確かめる, シートの列 } = 文脈
-const { 値の表現, シートの構成, 検証の種別, コアの口 } = vm.runInContext(
-  '({ 値の表現, シートの構成, 検証の種別, コアの口 })',
-  文脈,
+const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns } = context
+const { valueRepresentation, sheetLayout, checkKind, coreSteps } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps })',
+  context,
 )
 
-const 落ちた = []
-const 通った = []
+const failed = []
+const passed = []
 
-function 見る(見出し, 実測, 期待) {
-  if (JSON.stringify(実測) === JSON.stringify(期待)) 通った.push(見出し)
-  else 落ちた.push({ 見出し, 実測, 期待 })
+function check(title, actual, expected) {
+  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
+  else failed.push({ title, actual, expected })
 }
 
-function 止まった理由(はたらき) {
+function whyItStopped(work) {
   try {
-    はたらき()
+    work()
     return null
-  } catch (例外) {
-    return 例外.message
+  } catch (error) {
+    return error.message
   }
 }
 
-/** シートの構成どおりに見出しを置いた、空の 5 枚を作る。 */
-function 空のテンプレート() {
-  const シートたち = シートの構成.map((構成) => {
-    const シート = new 偽のシート(構成.名前)
-    構成.区画.forEach((区画) => {
-      if (構成.区画の見出しを置くか) シート.置く(1, 区画.開始列, 区画.見出し)
-      const 列名の行 = 構成.区画の見出しを置くか ? 2 : 1
-      区画.列.forEach((列名, i) => シート.置く(列名の行, 区画.開始列 + i, 列名))
+/** Make the 5 empty sheets, with the headings put in as sheetLayout has them. */
+function emptyTemplate() {
+  const sheets = sheetLayout.map((layout) => {
+    const sheet = new FakeSheet(layout.name)
+    layout.sections.forEach((section) => {
+      if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
+      const columnNameRow = layout.hasSectionHeadings ? 2 : 1
+      section.columns.forEach((columnName, i) => sheet.put(columnNameRow, section.startColumn + i, columnName))
     })
-    return シート
+    return sheet
   })
-  return new 偽のスプレッドシート(シートたち)
+  return new FakeSpreadsheet(sheets)
 }
 
-/** 条件・回答・前の周の手直しを入れた 1 冊。時刻のセルにはわざと Date を置く。 */
-function 中身の入った帳面() {
-  const 帳面 = 空のテンプレート()
-  const 条件 = 帳面.getSheetByName('条件入力')
+/** One book with the conditions, the answers and the previous round's hand edits in it. The time cells deliberately hold Dates. */
+function filledBook() {
+  const book = emptyTemplate()
+  const conditions = book.getSheetByName('条件入力')
 
-  // 日ごとの営業 4 時刻（A〜E）— 2 日ぶん。時刻だけのセルは Date で返ってくる
-  ;[[1, 8, 10, 20, 20], [2, 8, 10, 20, 20]].forEach((行, i) => {
-    条件.置く(3 + i, 1, new Date(2025, 10, 行[0]))
-    行.slice(1).forEach((時, j) => 条件.置く(3 + i, 2 + j, new Date(1899, 11, 30, 時, 0, 0)))
+  // 日ごとの営業 4 時刻 (A〜E) — 2 days. A time-only cell comes back as a Date
+  ;[[1, 8, 10, 20, 20], [2, 8, 10, 20, 20]].forEach((row, i) => {
+    conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
+    row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
   })
-  // 役割と必要人数（G〜K）— 1 行だけ。日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）
-  ;['', '', '', '調理', 2].forEach((値, j) => 条件.置く(3, 7 + j, 値))
-  // 調理責任者の学年（M）— 2 行
-  条件.置く(3, 13, '3年生').置く(4, 13, ' 4年生 ')
-  // 準備・片付けのルール（U〜V）— 1 行
-  条件.置く(3, 21, '午前と午後の境目').置く(3, 22, new Date(1899, 11, 30, 12, 0, 0))
+  // 役割と必要人数 (G〜K) — one row only. A row with the day and the time span left empty applies
+  // to every slot (→ 5-1 の #2)
+  ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 7 + j, value))
+  // 調理責任者の学年 (M) — 2 rows
+  conditions.put(3, 13, '3年生').put(4, 13, ' 4年生 ')
+  // 準備・片付けのルール (U〜V) — one row
+  conditions.put(3, 21, '午前と午後の境目').put(3, 22, new Date(1899, 11, 30, 12, 0, 0))
 
-  const 回答 = 帳面.getSheetByName('回答')
-  const 回答の行 = [
+  const answers = book.getSheetByName('回答')
+  const answerRow = [
     new Date(2025, 8, 23, 16, 31, 9), 'EED2349987', '高木琴音', '3年生', 'いいえ', '',
     '8:00-21:00', '8:00-20:00', '8:00-22:00', '8:00-15:00',
   ]
-  回答の行.forEach((値, j) => 回答.置く(2, 1 + j, 値))
+  answerRow.forEach((value, j) => answers.put(2, 1 + j, value))
 
-  const 割り当て = 帳面.getSheetByName('割り当て')
+  const assignments = book.getSheetByName('割り当て')
   ;['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']
-    .forEach((値, j) => 割り当て.置く(2, 1 + j, 値))
+    .forEach((value, j) => assignments.put(2, 1 + j, value))
 
-  // 前の周の残りかす。段が入っていれば消える、入っていなければ触らない
-  帳面.getSheetByName('指標').置く(2, 1, '古い行')
-  return 帳面
+  // Leftovers from the previous round. They go when a step is in, and are left alone when it is not
+  book.getSheetByName('指標').put(2, 1, '古い行')
+  return book
 }
 
-// ---- ① 値の表現が揃う -------------------------------------------------------
+// ---- ① the value representations line up ------------------------------------
 
-見る(
+check(
   '① 時刻だけのセル（1899-12-30 を土台にした Date）が HH:MM になる',
-  [表現を揃える(new Date(1899, 11, 30, 8, 0, 0)), 表現を揃える(new Date(1899, 11, 30, 12, 30, 0))],
+  [normalizeValue(new Date(1899, 11, 30, 8, 0, 0)), normalizeValue(new Date(1899, 11, 30, 12, 30, 0))],
   ['08:00', '12:30'],
 )
 
-見る(
+check(
   '① 日付だけのセルが YYYY-MM-DD になり、日時は秒まで付く',
-  [表現を揃える(new Date(2025, 10, 1)), 表現を揃える(new Date(2025, 8, 23, 16, 31, 9))],
+  [normalizeValue(new Date(2025, 10, 1)), normalizeValue(new Date(2025, 8, 23, 16, 31, 9))],
   ['2025-11-01', '2025-09-23 16:31:09'],
 )
 
-見る(
+check(
   '① 数値はそのまま、真偽値と空のセルは文字列になる',
-  [表現を揃える(2), 表現を揃える(true), 表現を揃える(false), 表現を揃える(null), 表現を揃える(undefined)],
+  [normalizeValue(2), normalizeValue(true), normalizeValue(false), normalizeValue(null), normalizeValue(undefined)],
   [2, 'TRUE', 'FALSE', '', ''],
 )
 
-見る(
+check(
   '① 文字列は両端の空白を落とすだけで、中身に手を入れない',
-  [表現を揃える('  3年生 '), 表現を揃える('8:00-21:00'), 表現を揃える('15:00-00:00')],
+  [normalizeValue('  3年生 '), normalizeValue('8:00-21:00'), normalizeValue('15:00-00:00')],
   ['3年生', '8:00-21:00', '15:00-00:00'],
 )
 
-見る(
+check(
   '① 揃えた先の形は、値の表現 に書いてあるとおりである',
-  [値の表現.日付, 値の表現.時刻, 値の表現.日時],
+  [valueRepresentation.date, valueRepresentation.time, valueRepresentation.dateTime],
   ['YYYY-MM-DD', 'HH:MM', 'YYYY-MM-DD HH:MM:SS'],
 )
 
-// ---- ②③ 読む ---------------------------------------------------------------
+// ---- ②③ reading ------------------------------------------------------------
 
-const 入力 = 入力を読む(中身の入った帳面())
+const inputs = readInputs(filledBook())
 
-見る(
+check(
   '② 読んだ入力が、そのままコアの入口を通る（表現の揺れが残っていない）',
-  止まった理由(() => 表現を確かめる(入力)),
+  whyItStopped(() => checkRepresentation(inputs)),
   null,
 )
 
-見る(
+check(
   '③ 条件入力は 2 行目までが見出しなので、3 行目から読む',
-  入力['日ごとの営業 4 時刻'],
+  inputs['日ごとの営業 4 時刻'],
   [['2025-11-01', '08:00', '10:00', '20:00', '20:00'], ['2025-11-02', '08:00', '10:00', '20:00', '20:00']],
 )
 
-見る(
+check(
   '③ 区画ごとに列を切って読む（役割と必要人数は G 列から 5 列ぶん）',
-  入力['役割と必要人数'],
+  inputs['役割と必要人数'],
   [['', '', '', '調理', 2]],
 )
 
-見る(
+check(
   '③ 行数の違う区画は、下の空の行が落ちる（横に並べてあるので最終行は揃っている）',
-  [入力['調理責任者の学年'], 入力['委員会の指定枠'], 入力['準備・片付けのルール']],
+  [inputs['調理責任者の学年'], inputs['委員会の指定枠'], inputs['準備・片付けのルール']],
   [[['3年生'], ['4年生']], [], [['午前と午後の境目', '12:00']]],
 )
 
-見る(
+check(
   '③ 回答と割り当ては 1 行目が見出しなので、2 行目から読む',
-  [入力['回答'][0].slice(0, 5), 入力['割り当て']],
+  [inputs['回答'][0].slice(0, 5), inputs['割り当て']],
   [
     ['2025-09-23 16:31:09', 'EED2349987', '高木琴音', '3年生'].concat(['いいえ']),
     [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']],
   ],
 )
 
-見る(
+check(
   '③ 読むのは 3 枚だけである（検証結果と指標は生成しか書かないので読まない）',
-  Object.keys(入力).length,
-  シートの構成.filter((構成) => 構成.名前 === '条件入力')[0].区画.length + 2,
+  Object.keys(inputs).length,
+  sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 2,
 )
 
-// ---- ④⑤ 書く ---------------------------------------------------------------
+// ---- ④⑤ writing -------------------------------------------------------------
 
-const 検証結果の列 = シートの列('検証結果')
+const checkResultColumns = sheetColumns('検証結果')
 
-function 検証結果の行(種別, 内容) {
-  const 行 = 検証結果の列.map(() => '')
-  行[検証結果の列.indexOf('種別')] = 種別
-  行[検証結果の列.indexOf('内容')] = 内容
-  return 行
+function checkResultRow(kind, detail) {
+  const row = checkResultColumns.map(() => '')
+  row[checkResultColumns.indexOf('種別')] = kind
+  row[checkResultColumns.indexOf('内容')] = detail
+  return row
 }
 
-const 骨組みの帳面 = 中身の入った帳面()
-往復.読み = 0
-往復.書き = 0
-const 未了 = 走らせる(骨組みの帳面, {})
+const skeletonBook = filledBook()
+roundTrips.reads = 0
+roundTrips.writes = 0
+const notBuilt = run(skeletonBook, {})
 
-見る(
+check(
   '⑤ 骨組みのまま走らせても、割り当てシートの手直しが残っている（→ 5-3）',
-  骨組みの帳面.getSheetByName('割り当て').getRange(2, 1, 1, 6).getValues()[0],
+  skeletonBook.getSheetByName('割り当て').getRange(2, 1, 1, 6).getValues()[0],
   ['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音'],
 )
 
-見る(
+check(
   '⑤ 段が入っていないあいだは、生成シートに 1 度も書いていない',
-  往復.書き,
+  roundTrips.writes,
   0,
 )
 
-見る(
+check(
   '⑤ 何が入っていないかは、issue 番号つきで返る',
-  未了.map((口) => `${口.名前}#${口.issue}`),
-  コアの口.map((口) => `${口.名前}#${口.issue}`),
+  notBuilt.map((step) => `${step.name}#${step.issue}`),
+  coreSteps.map((step) => `${step.name}#${step.issue}`),
 )
 
-// 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）
-const 一部だけの帳面 = 中身の入った帳面()
-往復.書き = 0
-走らせる(一部だけの帳面, {
-  指標を出す: () => [],
+// If even one step is missing, nothing is written however many of the rest are in (what comes
+// after the missing step comes back empty)
+const partialBook = filledBook()
+roundTrips.writes = 0
+run(partialBook, {
+  '指標を出す': () => [],
 })
 
-見る(
+check(
   '⑤ 段が 1 つでも欠けていれば、残りが入っていても 1 枚も書かない',
-  [往復.書き, 一部だけの帳面.getSheetByName('指標').getRange(2, 1, 1, 1).getValues()[0][0]],
+  [roundTrips.writes, partialBook.getSheetByName('指標').getRange(2, 1, 1, 1).getValues()[0][0]],
   [0, '古い行'],
 )
 
-const そろった帳面 = 中身の入った帳面()
-往復.読み = 0
-往復.書き = 0
-const そろった未了 = 走らせる(そろった帳面, {
-  取り込む: (回答) => 回答.map((行) => [行[1], 行[3], 行[4]]),
-  展開する: (希望) => 希望.map((行) => [行[0]]),
-  生成する: (候補) => 候補.map((行) => ['2025-11-01', '10:00', '10:30', '調理', 行[0], '高木琴音']),
-  違反を数える: () => [検証結果の行(検証の種別.違反, '検便を通っていない')],
-  未充足を名指しする: () => [検証結果の行(検証の種別.未充足, 'あと 1 人')],
-  指標を出す: (割り当て) => 割り当て.map((行) => [行[4], 行[5], 0.5, 1, 0]),
+const fullBook = filledBook()
+roundTrips.reads = 0
+roundTrips.writes = 0
+const fullNotBuilt = run(fullBook, {
+  '取り込む': (answers) => answers.map((row) => [row[1], row[3], row[4]]),
+  '展開する': (wishes) => wishes.map((row) => [row[0]]),
+  '生成する': (candidates) => candidates.map((row) => ['2025-11-01', '10:00', '10:30', '調理', row[0], '高木琴音']),
+  '違反を数える': () => [checkResultRow(checkKind.violation, '検便を通っていない')],
+  '未充足を名指しする': () => [checkResultRow(checkKind.unmet, 'あと 1 人')],
+  '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
 })
-// 下の 見る が getValues を呼ぶので、数えた往復はここで写し取る
-const そろった往復 = { 読み: 往復.読み, 書き: 往復.書き }
+// The checks below call getValues, so the round trips that were counted are copied off here
+const fullRoundTrips = { reads: roundTrips.reads, writes: roundTrips.writes }
 
-見る('④ 全部そろえば、未了は 1 つも無い', そろった未了, [])
+check('④ 全部そろえば、未了は 1 つも無い', fullNotBuilt, [])
 
-見る(
+check(
   '④ 生成シート 3 枚に、見出しの次の行から書かれている',
   [
-    そろった帳面.getSheetByName('割り当て').getRange(2, 1, 1, 6).getValues()[0],
-    そろった帳面.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((行) => 行[0]),
-    そろった帳面.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0],
+    fullBook.getSheetByName('割り当て').getRange(2, 1, 1, 6).getValues()[0],
+    fullBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => row[0]),
+    fullBook.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0],
   ],
   [
     ['2025-11-01', '10:00', '10:30', '調理', 'EED2349987', '高木琴音'],
-    [検証の種別.違反, 検証の種別.未充足],
+    [checkKind.violation, checkKind.unmet],
     ['EED2349987', '高木琴音', 0.5, 1, 0],
   ],
 )
 
-見る(
+check(
   '④ 前の周の残りかすが消えている（指標の「古い行」が残っていない）',
-  そろった帳面.getSheetByName('指標').getRange(3, 1, 1, 1).getValues()[0],
+  fullBook.getSheetByName('指標').getRange(3, 1, 1, 1).getValues()[0],
   [''],
 )
 
-// 読むのは、走る前の構造の検証がシートごとに 1 回（5 枚）＋ 入力が区画ごとに 1 回である。
-// 書くのは生成シートごとに「消す」と「置く」の 2 回までである
-見る(
+// Reading is: checking the structure before running, once per sheet (5 of them), plus the inputs,
+// once per section.
+// Writing is at most twice per generated sheet —「clear」and「put」
+check(
   '④ 読み書きはどちらも範囲ごとに 1 回で、セル単位で往復していない（→ 6 の #2）',
-  [そろった往復.読み, そろった往復.書き <= vm.runInContext('出力の名前.length', 文脈) * 2],
-  [シートの構成.length + Object.keys(入力).length, true],
+  [fullRoundTrips.reads, fullRoundTrips.writes <= vm.runInContext('outputNames.length', context) * 2],
+  [sheetLayout.length + Object.keys(inputs).length, true],
 )
 
-// ---- シートが無いとき -------------------------------------------------------
+// ---- when a sheet is missing ------------------------------------------------
 
-const 欠けた帳面 = 空のテンプレート()
-欠けた帳面.シートたち = 欠けた帳面.シートたち.filter((s) => s.getName() !== '回答')
+const bookMissingASheet = emptyTemplate()
+bookMissingASheet.sheets = bookMissingASheet.sheets.filter((s) => s.getName() !== '回答')
 
-見る(
+check(
   'シートが 1 枚でも無ければ、名指しして止まる（黙って作らない）',
-  止まった理由(() => 入力を読む(欠けた帳面))?.includes('シート「回答」が無い'),
+  whyItStopped(() => readInputs(bookMissingASheet))?.includes('シート「回答」が無い'),
   true,
 )
 
-// ---- ⑥ 構造が崩れているとき -------------------------------------------------
-// 走らせる は、読む前に 構造を確かめる を呼ぶ（→ verify-structure.js）。
-// 崩れたまま走ると、担当者の手直し（→ 5-3）が黙って消えるか、列がずれたまま書かれる。
+// ---- ⑥ when the structure is broken -----------------------------------------
+// run calls checkStructure before reading (→ verify-structure.js).
+// Run it while it is broken and the staff's hand edits (→ 5-3) silently disappear, or the rows
+// get written with the columns still slid over.
 
-const 崩れた帳面 = 中身の入った帳面()
-崩れた帳面.getSheetByName('検証結果').置く(1, 1, '区分')
-const 崩れた帳面の写し = JSON.stringify(
-  崩れた帳面.シートたち.map((s) => [s.名前, [...s.セル.entries()].sort()]),
+const brokenBook = filledBook()
+brokenBook.getSheetByName('検証結果').put(1, 1, '区分')
+const brokenBookCopy = JSON.stringify(
+  brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()]),
 )
-往復.読み = 0
-往復.書き = 0
-const 崩れで止まった理由 = 止まった理由(() => 走らせる(崩れた帳面, {
-  取り込む: () => [],
-  展開する: () => [],
-  生成する: () => [],
-  違反を数える: () => [],
-  未充足を名指しする: () => [],
-  指標を出す: () => [],
+roundTrips.reads = 0
+roundTrips.writes = 0
+const whyTheBreakageStoppedIt = whyItStopped(() => run(brokenBook, {
+  '取り込む': () => [],
+  '展開する': () => [],
+  '生成する': () => [],
+  '違反を数える': () => [],
+  '未充足を名指しする': () => [],
+  '指標を出す': () => [],
 }))
 
-見る(
+check(
   '⑥ 構造が崩れていれば、段が全部そろっていても走らずに名指しで止まる',
   [
-    崩れで止まった理由?.includes('生成を走らせない'),
-    崩れで止まった理由?.includes('「検証結果」の 1 行目 1 列目'),
+    whyTheBreakageStoppedIt?.includes('生成を走らせない'),
+    whyTheBreakageStoppedIt?.includes('「検証結果」の 1 行目 1 列目'),
   ],
   [true, true],
 )
 
-見る(
+check(
   '⑥ 止まったとき、生成シートに 1 度も書いていない（入力も 1 行も読んでいない）',
-  [往復.書き, 往復.読み],
-  [0, シートの構成.length],
+  [roundTrips.writes, roundTrips.reads],
+  [0, sheetLayout.length],
 )
 
-見る(
+check(
   '⑥ 止まったとき、セルが 1 つも変わっていない（黙って直した箇所が 0 である）',
-  JSON.stringify(崩れた帳面.シートたち.map((s) => [s.名前, [...s.セル.entries()].sort()])),
-  崩れた帳面の写し,
+  JSON.stringify(brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])),
+  brokenBookCopy,
 )
 
-// ---- 結果 ------------------------------------------------------------------
+// ---- results ----------------------------------------------------------------
 
 console.log('殻の検査（src/shell.js／偽のスプレッドシートの上）')
 console.log('')
-for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
-for (const { 見出し, 実測, 期待 } of 落ちた) {
-  console.log(`  NG   ${見出し}`)
-  console.log(`         実測: ${JSON.stringify(実測)}`)
-  console.log(`         期待: ${JSON.stringify(期待)}`)
+for (const title of passed) console.log(`  OK   ${title}`)
+for (const { title, actual, expected } of failed) {
+  console.log(`  NG   ${title}`)
+  console.log(`         実測: ${JSON.stringify(actual)}`)
+  console.log(`         期待: ${JSON.stringify(expected)}`)
 }
 console.log('')
-if (落ちた.length === 0) {
-  console.log(`結果: 全件一致（${通った.length} 件）`)
+if (failed.length === 0) {
+  console.log(`結果: 全件一致（${passed.length} 件）`)
   process.exit(0)
 }
-console.log(`結果: 不一致 ${落ちた.length} 件 ／ 一致 ${通った.length} 件`)
+console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
 process.exit(1)

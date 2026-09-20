@@ -1,207 +1,214 @@
 /**
- * 走る前の構造の検証 — シートの有無・見出し・列数を照らす
- * （docs/tech-requirements.md 2 の「止まる箇所」#8 ／ issue #138）。
+ * Checking the structure before running — holding the sheets, the headings and the column
+ * counts up against the layout
+ * (docs/tech-requirements.md 2 の「止まる箇所」#8 ／ issue #138).
  *
- * #8 の予防は 2 つあり、これはそのもう片方である。
- * 片方（生成シートに保護をかける）は build-template.js が持つが、
- * かかり方は「警告のみ」で、押し切れば書ける（→ src/README.md「保護は『警告のみ』である」）。
+ * There are 2 guards for #8, and this is the other one.
+ * The first (putting protection on the generated sheets) is build-template.js's to hold, but
+ * it only goes on as a warning, and it can be written through (→ src/README.md「保護は『警告のみ』である」).
  *
- * 壊れうるのは行の削除・列の挿入・生成シートの上書きで、
- * 担当者から見ると「触っていい操作」と見分けが付かない
- * — 手直しの画面がスプレッドシートそのもの（→ 6 の #2）で、
- * セルを書き換えることが仕様だからである（→ 5-3）。
+ * What can break is a deleted row, an inserted column, an overwritten generated sheet — and
+ * from where the staff sit, none of that looks different from an operation they are allowed to do,
+ * because the screen for the hand edits is the spreadsheet itself (→ 6 の #2) and rewriting cells
+ * is the specification (→ 5-3).
  *
- * 崩れていたら、崩れている箇所を全部名指しして止まる。
- *   黙って直さない — セルを 1 つも書き換えない。読むだけである
- *   黙って走らない — 読む前に止まるので、生成は 1 行も動かない
- * 「満たせない枠は黙って埋めない」（→ 5 の #6）と同じ扱いである。
+ * If it is broken, every broken spot is named and it stops.
+ *   Never silently fix — not one cell is rewritten. It only reads
+ *   Never silently run — it stops before reading, so generation does not move a single row
+ * This is the same treatment as「満たせない枠は黙って埋めない」(→ 5 の #6).
  *
- * 直し方はここが決めない。テンプレートをもう 1 回コピーして条件を入れ直す
- * （→ 6 の #1 の理由 ⑤・src/README.md の「テンプレートの作り方」）。
+ * How to fix it is not decided here. Copy the template once more and put the conditions back in
+ * (→ 6 の #1 の理由 ⑤・src/README.md の「テンプレートの作り方」).
  *
- * 見るのは見出しの行だけである。データの行は見ない — 条件入力と割り当ては担当者が書く所で、
- * 行が増えたり減ったりするのが仕様である（→ 5-1・5-3）。
- * 列数は見出しの行で見る（区画の右端より右や、区画のあいだに中身があれば名指しする）。
+ * Only the heading rows are looked at. The data rows are not — 条件入力 and 割り当て are where the
+ * staff write, and rows growing and shrinking there is the specification (→ 5-1・5-3).
+ * Column counts are looked at in the heading rows (anything to the right of the right edge of the
+ * sections, or between two sections, gets named).
  *
- * スプレッドシートは引数で受ける。SpreadsheetApp を名指しするのは shell.js の 1 行だけである。
- * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
+ * The spreadsheet comes in as an argument. The one line that names SpreadsheetApp is in shell.js.
+ * Never use a value from another file at the top level of this file (→ the same note in core.js).
  */
 
-/** 崩れの種類。文にするときの形が種類ごとに違う（→ 崩れを文にする）。 */
-const 崩れの種類 = {
-  シートが無い: 'シートが無い',
-  列が足りない: '列が足りない',
-  見出しが違う: '見出しが違う',
-  構成に無い列: '構成に無い列',
+/** The kinds of breakage. The shape of the sentence differs per kind (→ breakageToText). */
+const breakageKind = {
+  missingSheet: 'シートが無い',
+  tooFewColumns: '列が足りない',
+  headingMismatch: '見出しが違う',
+  unknownColumn: '構成に無い列',
 }
 
 /**
- * 崩れている箇所を全部名指しして返す（崩れていなければ空の配列）。
+ * Name every broken spot and return them (an empty array if nothing is broken).
  *
- * 最初の 1 件で切り上げない。担当者が直すのはスプレッドシートの上なので、
- * 1 箇所ずつ走らせ直させるより、いま崩れている所を一度に出したほうが手数が少ない。
- * 読むのはシートごとに 1 回である。セル単位で往復しない（→ 6 の #2 の実装上の注意）。
+ * It does not cut off at the first one. What the staff fix is up on the spreadsheet, so putting
+ * out everything that is broken right now takes fewer moves than making them run it again for
+ * each spot. Reading is once per sheet. Never go back and forth cell by cell
+ * (→ 6 の #2 の実装上の注意).
  */
-function 崩れを名指しする(スプレッドシート) {
-  const 崩れ = []
+function nameBreakages(spreadsheet) {
+  const breakages = []
 
-  シートの構成.forEach((構成) => {
-    const シート = スプレッドシート.getSheetByName(構成.名前)
-    if (!シート) {
-      崩れ.push({ シート: 構成.名前, 種類: 崩れの種類.シートが無い, 行: null, 列: null, いま: [], 構成: [] })
+  sheetLayout.forEach((layout) => {
+    const sheet = spreadsheet.getSheetByName(layout.name)
+    if (!sheet) {
+      breakages.push({ sheet: layout.name, kind: breakageKind.missingSheet, row: null, column: null, actual: [], expected: [] })
       return
     }
-    列数を照らす(シート, 構成, 崩れ)
-    const 見出しの行 = 見出しの行を読む(シート, 構成)
-    区画を照らす(構成, 見出しの行, 崩れ)
-    構成に無い列を照らす(構成, 見出しの行, 崩れ)
+    checkColumnCount(sheet, layout, breakages)
+    const headerRows = readHeaderRows(sheet, layout)
+    checkSections(layout, headerRows, breakages)
+    checkUnknownColumns(layout, headerRows, breakages)
   })
 
-  return 崩れ
+  return breakages
 }
 
 /**
- * 走る前に構造を確かめる。崩れていれば、崩れている箇所を全部名指しして止まる。
- * 崩れていなければ空の配列を返す（分岐させるためではなく、0 箇所であることを見せるためである）。
+ * Check the structure before running. If it is broken, every broken spot is named and it stops.
+ * If it is not broken, it returns an empty array (not to branch on, but to show that it is 0 spots).
  */
-function 構造を確かめる(スプレッドシート) {
-  const 崩れ = 崩れを名指しする(スプレッドシート)
-  if (崩れ.length === 0) return 崩れ
+function checkStructure(spreadsheet) {
+  const breakages = nameBreakages(spreadsheet)
+  if (breakages.length === 0) return breakages
 
   throw new Error(
-    `シートの構造が ${崩れ.length} 箇所崩れているので、生成を走らせない。`
+    `シートの構造が ${breakages.length} 箇所崩れているので、生成を走らせない。`
       + '中身を見てから決める（黙って直さない）。'
       + '戻せないときは、テンプレートをもう 1 回コピーして条件を入れ直す（→ src/README.md）。\n'
-      + 崩れ.map(崩れを文にする).join('\n'),
+      + breakages.map(breakageToText).join('\n'),
   )
 }
 
-/** 崩れ 1 つを、場所を名指しした 1 行にする。担当者が読むのはこの行である。 */
-function 崩れを文にする(崩れ) {
-  if (崩れ.種類 === 崩れの種類.シートが無い) {
-    return `シート「${崩れ.シート}」が無い`
+/** Turn one breakage into one line that names where it is. This line is what the staff read. */
+function breakageToText(breakage) {
+  if (breakage.kind === breakageKind.missingSheet) {
+    return `シート「${breakage.sheet}」が無い`
   }
-  if (崩れ.種類 === 崩れの種類.列が足りない) {
-    return `シート「${崩れ.シート}」の列が ${崩れ.いま[0]} 列しかない（構成は ${崩れ.構成[0]} 列である）`
+  if (breakage.kind === breakageKind.tooFewColumns) {
+    return `シート「${breakage.sheet}」の列が ${breakage.actual[0]} 列しかない（構成は ${breakage.expected[0]} 列である）`
   }
-  const 場所 = `「${崩れ.シート}」の ${崩れ.行} 行目 ${崩れ.列} 列目`
-  if (崩れ.種類 === 崩れの種類.構成に無い列) {
-    return `${場所} に、構成に無い「${崩れ.いま[0]}」がある`
+  const where = `「${breakage.sheet}」の ${breakage.row} 行目 ${breakage.column} 列目`
+  if (breakage.kind === breakageKind.unknownColumn) {
+    return `${where} に、構成に無い「${breakage.actual[0]}」がある`
   }
-  const 幅 = 崩れ.構成.length > 1 ? `から ${崩れ.構成.length} 列` : ''
-  return `${場所}${幅} が構成と違う。`
-    + `いま: ${崩れ.いま.map(空を書く).join(' / ')} ／ 構成: ${崩れ.構成.join(' / ')}`
+  const width = breakage.expected.length > 1 ? `から ${breakage.expected.length} 列` : ''
+  return `${where}${width} が構成と違う。`
+    + `いま: ${breakage.actual.map(showBlank).join(' / ')} ／ 構成: ${breakage.expected.join(' / ')}`
 }
 
 /**
- * シートの列が、構成の要る数だけあるかを見る。
- * 列をまとめて消されると、読む前にここで名指しになる
- * （読む範囲をシートの外に取ると、名指しの代わりに範囲外の例外が出てしまう）。
+ * Look at whether the sheet has as many columns as the layout needs.
+ * If the columns were deleted in one go, it gets named here, before the reading
+ * (take the range to read outside the sheet and an out-of-range exception comes out instead of
+ * the naming).
  */
-function 列数を照らす(シート, 構成, 崩れ) {
-  const 右端 = 区画の右端(構成)
-  if (シート.getMaxColumns() >= 右端) return
+function checkColumnCount(sheet, layout, breakages) {
+  const rightEdge = sectionRightEdge(layout)
+  if (sheet.getMaxColumns() >= rightEdge) return
 
-  崩れ.push({
-    シート: 構成.名前,
-    種類: 崩れの種類.列が足りない,
-    行: null,
-    列: null,
-    いま: [String(シート.getMaxColumns())],
-    構成: [String(右端)],
+  breakages.push({
+    sheet: layout.name,
+    kind: breakageKind.tooFewColumns,
+    row: null,
+    column: null,
+    actual: [String(sheet.getMaxColumns())],
+    expected: [String(rightEdge)],
   })
 }
 
 /**
- * 見出しの行だけを 1 回で読む。区画の右端より右も、中身があるところまで読む（挿された列を見るため）。
- * 読む範囲をシートの外に出さない — 出すと、名指しの代わりに範囲外の例外が出てしまう。
- * 消された側は空として突き合わせるので、名指しは 区画を照らす から出る。
+ * Read just the heading rows, in one go. To the right of the right edge of the sections it reads
+ * as far as there is content (to see an inserted column).
+ * Never take the range to read outside the sheet — do that and an out-of-range exception comes
+ * out instead of the naming.
+ * The deleted side is held up against the layout as empty, so its naming comes out of checkSections.
  */
-function 見出しの行を読む(シート, 構成) {
-  const 行数 = Math.min(見出しの行数(構成), シート.getMaxRows())
-  const 列数 = Math.min(
-    Math.max(区画の右端(構成), シート.getLastColumn()),
-    シート.getMaxColumns(),
+function readHeaderRows(sheet, layout) {
+  const rowCount = Math.min(headerRowCount(layout), sheet.getMaxRows())
+  const columnCount = Math.min(
+    Math.max(sectionRightEdge(layout), sheet.getLastColumn()),
+    sheet.getMaxColumns(),
   )
-  return シート
-    .getRange(1, 1, 行数, 列数)
+  return sheet
+    .getRange(1, 1, rowCount, columnCount)
     .getValues()
-    .map((行) => 行.map((セル) => String(表現を揃える(セル))))
+    .map((row) => row.map((cell) => String(normalizeValue(cell))))
 }
 
-/** 区画ごとに、見出しのセルと列名の並びを突き合わせる。並びは 1 件にまとめて名指しする。 */
-function 区画を照らす(構成, 見出しの行, 崩れ) {
-  const 列名の行 = 見出しの行数(構成)
+/** Per section, hold the heading cells up against the column names. A run is named as one item. */
+function checkSections(layout, headerRows, breakages) {
+  const columnNameRow = headerRowCount(layout)
 
-  構成.区画.forEach((区画) => {
-    if (構成.区画の見出しを置くか) {
-      照らす(構成, 見出しの行, 1, 区画.開始列, [区画.見出し], 崩れ)
+  layout.sections.forEach((section) => {
+    if (layout.hasSectionHeadings) {
+      checkRange(layout, headerRows, 1, section.startColumn, [section.heading], breakages)
     }
-    照らす(構成, 見出しの行, 列名の行, 区画.開始列, 区画.列, 崩れ)
+    checkRange(layout, headerRows, columnNameRow, section.startColumn, section.columns, breakages)
   })
 }
 
-/** 1 行の中の 1 続きの範囲を突き合わせる。違えば 1 件だけ積む。 */
-function 照らす(構成, 見出しの行, 行, 開始列, これから, 崩れ) {
-  const いま = []
-  for (let i = 0; i < これから.length; i++) いま.push(セルを取る(見出しの行, 行, 開始列 + i))
-  const 期待 = これから.map((値) => String(値))
-  if (いま.join('\t') === 期待.join('\t')) return
+/** Hold one continuous range inside one row up against the layout. If it differs, push exactly one item. */
+function checkRange(layout, headerRows, row, startColumn, expectedNames, breakages) {
+  const actual = []
+  for (let i = 0; i < expectedNames.length; i++) actual.push(cellAt(headerRows, row, startColumn + i))
+  const expected = expectedNames.map((value) => String(value))
+  if (actual.join('\t') === expected.join('\t')) return
 
-  崩れ.push({
-    シート: 構成.名前,
-    種類: 崩れの種類.見出しが違う,
-    行: 行,
-    列: 開始列,
-    いま: いま,
-    構成: 期待,
+  breakages.push({
+    sheet: layout.name,
+    kind: breakageKind.headingMismatch,
+    row: row,
+    column: startColumn,
+    actual: actual,
+    expected: expected,
   })
 }
 
 /**
- * 見出しの行のうち、どの区画にも入らない列に中身があれば名指しする。
+ * Name any column of the heading rows that has content in it but belongs to no section.
  *
- * 見るのは区画のあいだ（条件入力は 5 区画が横に並ぶ）と、区画の右端より右である。
- * 列を 1 つ挿すと、右へずれた見出しがここに落ちてくる。
+ * What is looked at is between the sections (条件入力 has its 5 sections side by side) and to the
+ * right of the right edge of the sections.
+ * Insert one column and the heading that slid right lands here.
  */
-function 構成に無い列を照らす(構成, 見出しの行, 崩れ) {
-  const 区画の列 = {}
-  構成.区画.forEach((区画) => {
-    for (let i = 0; i < 区画.列.length; i++) 区画の列[区画.開始列 + i] = true
+function checkUnknownColumns(layout, headerRows, breakages) {
+  const sectionColumns = {}
+  layout.sections.forEach((section) => {
+    for (let i = 0; i < section.columns.length; i++) sectionColumns[section.startColumn + i] = true
   })
 
-  見出しの行.forEach((行の値, i) => {
-    行の値.forEach((セル, j) => {
-      if (セル === '' || 区画の列[j + 1]) return
-      崩れ.push({
-        シート: 構成.名前,
-        種類: 崩れの種類.構成に無い列,
-        行: i + 1,
-        列: j + 1,
-        いま: [セル],
-        構成: [],
+  headerRows.forEach((rowValues, i) => {
+    rowValues.forEach((cell, j) => {
+      if (cell === '' || sectionColumns[j + 1]) return
+      breakages.push({
+        sheet: layout.name,
+        kind: breakageKind.unknownColumn,
+        row: i + 1,
+        column: j + 1,
+        actual: [cell],
+        expected: [],
       })
     })
   })
 }
 
-/** 区画の右端の列。構成が要る列数である。 */
-function 区画の右端(構成) {
-  return 構成.区画.reduce((右端, 区画) => Math.max(右端, 区画.開始列 + 区画.列.length - 1), 0)
+/** The rightmost column of the sections. This is the column count the layout needs. */
+function sectionRightEdge(layout) {
+  return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + section.columns.length - 1), 0)
 }
 
-/** 読んだ見出しの行から 1 セル取る。読んだ範囲の外は空として扱う（列を消された側である）。 */
-function セルを取る(見出しの行, 行, 列) {
-  const 行の値 = 見出しの行[行 - 1] || []
-  return 列 <= 行の値.length ? 行の値[列 - 1] : ''
+/** Take one cell out of the heading rows that were read. Outside what was read counts as empty (that is the deleted-column side). */
+function cellAt(headerRows, row, column) {
+  const rowValues = headerRows[row - 1] || []
+  return column <= rowValues.length ? rowValues[column - 1] : ''
 }
 
-/** 空のセルは、文の中で見えないと場所が読めない。 */
-function 空を書く(値) {
-  return 値 === '' ? '（空）' : 値
+/** An empty cell has to be visible in the sentence, or the place cannot be read. */
+function showBlank(value) {
+  return value === '' ? '（空）' : value
 }
 
-// Node から読むためだけの口。Apps Script では module が無いので通らない。
+// A door for Node to read this file through, nothing more. Apps Script has no module, so it never runs there.
 if (typeof module !== 'undefined') {
-  module.exports = { 崩れの種類, 崩れを名指しする, 構造を確かめる, 崩れを文にする, 区画の右端 }
+  module.exports = { breakageKind, nameBreakages, checkStructure, breakageToText, sectionRightEdge }
 }

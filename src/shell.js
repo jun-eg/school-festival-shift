@@ -1,195 +1,206 @@
 /**
- * 殻 — SpreadsheetApp に触る唯一の場所（docs/tech-requirements.md 6 の #8）。
+ * The shell — the only place that touches SpreadsheetApp (docs/tech-requirements.md 6 の #8).
  *
- * やることは 3 つだけである。
- *   ① シートを読んで、値の表現を揃えてコアに渡す
- *   ② コア（core.js の 組む）を呼ぶ
- *   ③ 返ってきた行を生成シートに書く
+ * It does 3 things and no more.
+ *   ① read the sheets, line the value representations up, and hand them to the core
+ *   ② call the core (build in core.js)
+ *   ③ write the rows that come back into the generated sheets
  *
- * 走る前の構造の検証（シートの有無・見出し・列数）は verify-structure.js が持つ。
- * 走らせる が最初に呼ぶ — 崩れていれば、読む前に名指しして止まる。
+ * Checking the structure before running (sheets present, headings, column counts) is
+ * verify-structure.js's to hold. run calls it first — if the structure is broken, it names
+ * what is broken and stops before reading anything.
  *
- * ここに割り当ての規則を書かない。規則はコアが持つ。
- * 逆に、コアに SpreadsheetApp を持ち込まない — 持ち込むと 6-1 の #2 の逃げ道が消える。
+ * No assignment rule gets written here. The rules are the core's to hold.
+ * The other way round, SpreadsheetApp never gets carried into the core — carry it in and the
+ * way out of 6-1 の #2 disappears.
  *
- * 読み書きは範囲ごとに 1 回で済ませる。セル単位で往復しない（→ 6 の #2 の実装上の注意）。
- * 時間を食うのは計算ではなく SpreadsheetApp の往復のほうである。
+ * Reading and writing is done once per range. Never go back and forth cell by cell
+ * (→ 6 の #2 の実装上の注意). What costs time is the round trips to SpreadsheetApp,
+ * not the computation.
  *
- * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
+ * Never use a value from another file at the top level of this file (→ the same note in core.js).
  */
 
 /**
- * 殻がコアに渡す値の表現。コアはこの形の文字列と、数値しか受け取らない
- * （→ core.js の 表現を確かめる）。
+ * The value representations the shell hands to the core. The core takes only strings in these
+ * shapes, and numbers (→ checkRepresentation in core.js).
  *
- * 時刻が HH:MM であることは sheet-layout.js の注記が決めている（条件入力の「日ごとの営業 4 時刻」）。
- * 日付が YYYY-MM-DD であることは data/前回の確定シフト-モック-0N.json の転記元の形である。
+ * That times are HH:MM is settled by the notes in sheet-layout.js (条件入力's「日ごとの営業 4 時刻」).
+ * That dates are YYYY-MM-DD is the shape of what data/前回の確定シフト-モック-0N.json was copied from.
  */
-const 値の表現 = {
-  日付: 'YYYY-MM-DD',
-  時刻: 'HH:MM',
-  日時: 'YYYY-MM-DD HH:MM:SS',
+const valueRepresentation = {
+  date: 'YYYY-MM-DD',
+  time: 'HH:MM',
+  dateTime: 'YYYY-MM-DD HH:MM:SS',
 }
 
-/** 殻が読むシート。生成しか書かない 2 枚は読まない（→ core.js の 読まないシート）。 */
-function 読むシート() {
-  return シートの構成
-    .filter((構成) => 読まないシート.indexOf(構成.名前) === -1)
-    .map((構成) => 構成.名前)
+/** The sheets the shell reads. The 2 that only generation writes are not read (→ sheetsNotRead in core.js). */
+function sheetsToRead() {
+  return sheetLayout
+    .filter((layout) => sheetsNotRead.indexOf(layout.name) === -1)
+    .map((layout) => layout.name)
 }
 
-/** 区画の見出しを置くシートは 2 行、置かないシートは 1 行が見出しである（→ build-template.js）。 */
-function 見出しの行数(構成) {
-  return 構成.区画の見出しを置くか ? 2 : 1
+/** A sheet that carries section headings has 2 heading rows; one that does not has 1 (→ build-template.js). */
+function headerRowCount(layout) {
+  return layout.hasSectionHeadings ? 2 : 1
 }
 
 /**
- * コアに渡す入力を読む。名前は core.js の 入力の名前 と同じ順で並ぶ。
- * 値はどれも、表現を揃えたあとの行の配列である。
+ * Read the inputs to hand to the core. The names come in the same order as inputNames in core.js.
+ * Every value is an array of rows whose representations have been lined up.
  */
-function 入力を読む(スプレッドシート) {
-  const 入力 = {}
-  読むシート().forEach((名前) => {
-    const 構成 = 構成を引く(名前)
-    const シート = シートを引く(スプレッドシート, 名前)
-    構成.区画.forEach((区画) => {
-      入力[構成.区画の見出しを置くか ? 区画.見出し : 名前] = 区画を読む(シート, 構成, 区画)
+function readInputs(spreadsheet) {
+  const inputs = {}
+  sheetsToRead().forEach((name) => {
+    const layout = findLayout(name)
+    const sheet = findSheet(spreadsheet, name)
+    layout.sections.forEach((section) => {
+      inputs[layout.hasSectionHeadings ? section.heading : name] = readSection(sheet, layout, section)
     })
   })
-  return 入力
+  return inputs
 }
 
 /**
- * 区画 1 つぶんの行を読む。
+ * Read the rows of one section.
  *
- * 空の行を落とすのは、条件入力の 5 区画を横に並べてある（→ src/README.md）からである。
- * 行数の違う区画が同じ最終行まで読まれるので、短いほうの下は空の行で埋まる。
+ * Empty rows are dropped because the 5 sections of 条件入力 sit side by side (→ src/README.md).
+ * Sections with different row counts are all read down to the same last row, so below the
+ * shorter ones there are empty rows.
  */
-function 区画を読む(シート, 構成, 区画) {
-  const 見出し = 見出しの行数(構成)
-  const 最終行 = シート.getLastRow()
-  if (最終行 <= 見出し) return []
+function readSection(sheet, layout, section) {
+  const headerRows = headerRowCount(layout)
+  const lastRow = sheet.getLastRow()
+  if (lastRow <= headerRows) return []
 
-  return シート
-    .getRange(見出し + 1, 区画.開始列, 最終行 - 見出し, 区画.列.length)
+  return sheet
+    .getRange(headerRows + 1, section.startColumn, lastRow - headerRows, section.columns.length)
     .getValues()
-    .map((行) => 行.map(表現を揃える))
-    .filter((行) => 行.some((セル) => セル !== ''))
+    .map((row) => row.map(normalizeValue))
+    .filter((row) => row.some((cell) => cell !== ''))
 }
 
 /**
- * 生成シートに書き戻す。
+ * Write back into the generated sheets.
  *
- * 段が 1 つでも入っていなければ、1 枚も書かない。
- * 段はつながっているので、前の段が欠けたまま後ろの段だけ走らせても、出てくるのは空である。
- * 空の配列で上書きすると、担当者が割り当てシートに入れた手直し（→ 5-3）が黙って消える。
- * 何が入っていないかは 未了 が名指しで持っている（→ core.js の コアの口）。
+ * If even one step is not in, not a single sheet gets written.
+ * The steps are chained, so running only the later ones while an earlier one is missing puts
+ * out nothing but emptiness. Overwriting with an empty array silently wipes the hand edits the
+ * staff put into the 割り当て sheet (→ 5-3).
+ * What is not in is named in notBuilt (→ coreSteps in core.js).
  */
-function 出力を書く(スプレッドシート, 出力) {
-  if ((出力.未了 || []).length > 0) return
+function writeOutputs(spreadsheet, output) {
+  if ((output.notBuilt || []).length > 0) return
 
-  出力の名前.forEach((名前) => {
-    const 構成 = 構成を引く(名前)
-    const シート = シートを引く(スプレッドシート, 名前)
-    const 列数 = 構成.区画[0].列.length
-    const 見出し = 見出しの行数(構成)
-    const 最終行 = シート.getLastRow()
+  outputNames.forEach((name) => {
+    const layout = findLayout(name)
+    const sheet = findSheet(spreadsheet, name)
+    const columnCount = layout.sections[0].columns.length
+    const headerRows = headerRowCount(layout)
+    const lastRow = sheet.getLastRow()
 
-    if (最終行 > 見出し) {
-      シート.getRange(見出し + 1, 1, 最終行 - 見出し, 列数).clearContent()
+    if (lastRow > headerRows) {
+      sheet.getRange(headerRows + 1, 1, lastRow - headerRows, columnCount).clearContent()
     }
-    if (出力[名前].length === 0) return
-    シート.getRange(見出し + 1, 1, 出力[名前].length, 列数).setValues(出力[名前])
+    if (output[name].length === 0) return
+    sheet.getRange(headerRows + 1, 1, output[name].length, columnCount).setValues(output[name])
   })
 }
 
 /**
- * Apps Script から呼ぶ入口。SpreadsheetApp を名指しするのは、このファイルのこの 1 行だけである。
- * メニューから呼ぶのは issue #151（生成）で、そこで手順を渡す。
+ * The door Apps Script calls in through. This one line of this one file is the only place
+ * SpreadsheetApp is named. Calling it from the menu is issue #151 (生成), and the steps are
+ * handed in there.
  */
-function いまのスプレッドシートで走らせる(手順) {
-  return 走らせる(SpreadsheetApp.getActive(), 手順)
+function runOnActiveSpreadsheet(steps) {
+  return run(SpreadsheetApp.getActive(), steps)
 }
 
 /**
- * 構造を確かめる → 読む → コアを呼ぶ → 書く。殻の側の 1 本である。
- * スプレッドシートは引数で受ける — 手元の検査で偽のスプレッドシートを渡せるようにするためである。
- * 手順 はコアの段（→ core.js の コアの口）で、入っている段だけを渡す。
- * 返すのは 未了 — 担当者に何と言うかは、メニューから呼ぶ側（issue #151）が決める。
+ * Check the structure → read → call the core → write. This is the one line of the shell side.
+ * The spreadsheet comes in as an argument — so that the checks here can hand in a fake one.
+ * steps are the steps of the core (→ coreSteps in core.js), and only the ones that are in get handed in.
+ * What it returns is notBuilt — what to say to the staff is for the caller from the menu
+ * (issue #151) to decide.
  *
- * 構造が崩れていれば、1 行も読まずに名指しして止まる（→ verify-structure.js）。
- * 未了 と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、
- * 何を直すかはメニューの出方に関わらず同じである。
+ * If the structure is broken, it names what is broken and stops without reading a single row
+ * (→ verify-structure.js).
+ * Unlike notBuilt, that is not carried back in the return value — what is broken is the staff's
+ * sheet, and what to fix is the same however the menu turns out.
  */
-function 走らせる(スプレッドシート, 手順) {
-  構造を確かめる(スプレッドシート)
-  const 出力 = 組む(入力を読む(スプレッドシート), 手順)
-  出力を書く(スプレッドシート, 出力)
-  return 出力.未了
+function run(spreadsheet, steps) {
+  checkStructure(spreadsheet)
+  const output = build(readInputs(spreadsheet), steps)
+  writeOutputs(spreadsheet, output)
+  return output.notBuilt
 }
 
 /**
- * セル 1 つの表現を揃える。ここが、コアに表現の揺れを入れないための関門である。
+ * Line up the representation of one cell. This is the gate that keeps the wobble out of the core.
  *
- * SpreadsheetApp を掴まない純粋な関数にしてあるのは、手元で回して確かめられるようにするためである。
- * 黙って解釈し直さない — 文字列は両端の空白を落とすだけで、中身には手を入れない。
+ * It is a pure function that never touches SpreadsheetApp, so that it can be run and checked
+ * here. It never silently reinterprets anything — a string only loses the whitespace at both
+ * ends, and what is inside is left alone.
  */
-function 表現を揃える(値) {
-  if (値 === null || 値 === undefined) return ''
-  if (typeof 値 === 'number') return 値
-  if (typeof 値 === 'boolean') return 値 ? 'TRUE' : 'FALSE'
-  // instanceof を使わない。vm やダイアログを跨ぐと Date が別物になる
-  if (Object.prototype.toString.call(値) === '[object Date]') return 日時を文字列にする(値)
-  return String(値).trim()
+function normalizeValue(value) {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'number') return value
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+  // No instanceof. Across a vm or a dialog, Date is a different thing
+  if (Object.prototype.toString.call(value) === '[object Date]') return formatDateTime(value)
+  return String(value).trim()
 }
 
 /**
- * Date を 値の表現 の 3 つのどれかにする。
+ * Turn a Date into one of the 3 in valueRepresentation.
  *
- * 時刻だけのセルは 1899-12-30 を土台にした Date で返ってくるので、年で見分ける。
- * ちょうど 00:00:00 の日時は日付になる — セルの表示と同じで、ここで作り分けられる情報が無い。
+ * A time-only cell comes back as a Date built on 1899-12-30, so it is told apart by the year.
+ * A date-time of exactly 00:00:00 becomes a date — same as what the cell shows, and there is
+ * nothing here to tell the two apart by.
  */
-function 日時を文字列にする(日時) {
-  const 年 = 日時.getFullYear()
-  const 日付 = `${年}-${二桁(日時.getMonth() + 1)}-${二桁(日時.getDate())}`
-  const 時刻 = `${二桁(日時.getHours())}:${二桁(日時.getMinutes())}`
-  const 秒 = 二桁(日時.getSeconds())
+function formatDateTime(dateTime) {
+  const year = dateTime.getFullYear()
+  const date = `${year}-${twoDigits(dateTime.getMonth() + 1)}-${twoDigits(dateTime.getDate())}`
+  const time = `${twoDigits(dateTime.getHours())}:${twoDigits(dateTime.getMinutes())}`
+  const seconds = twoDigits(dateTime.getSeconds())
 
-  if (年 < 1900) return 時刻
-  if (`${時刻}:${秒}` === '00:00:00') return 日付
-  return `${日付} ${時刻}:${秒}`
+  if (year < 1900) return time
+  if (`${time}:${seconds}` === '00:00:00') return date
+  return `${date} ${time}:${seconds}`
 }
 
-function 二桁(数) {
-  return String(数).length < 2 ? `0${数}` : String(数)
+function twoDigits(number) {
+  return String(number).length < 2 ? `0${number}` : String(number)
 }
 
-/** シートの構成から 1 枚を引く。無ければ名指しで止まる。 */
-function 構成を引く(名前) {
-  const 構成 = シートの構成.filter((c) => c.名前 === 名前)[0]
-  if (!構成) throw new Error(`シートの構成に「${名前}」が無い`)
-  return 構成
+/** Look one sheet up in sheetLayout. If it is not there, it stops and names it. */
+function findLayout(name) {
+  const layout = sheetLayout.filter((c) => c.name === name)[0]
+  if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
+  return layout
 }
 
 /**
- * スプレッドシートから 1 枚を引く。無ければ名指しで止まる（黙って作らない）。
- * ここに来る前に 構造を確かめる が通っているので、走らせる 経由なら無いことは起きない。
- * それでも見るのは、入力を読む を単体で呼べる形にしてあるからである（→ verify-structure.js）。
+ * Look one sheet up in the spreadsheet. If it is not there, it stops and names it (it never
+ * silently creates one).
+ * checkStructure has passed before anything gets here, so coming through run it cannot be missing.
+ * It is looked at anyway because readInputs is left callable on its own (→ verify-structure.js).
  */
-function シートを引く(スプレッドシート, 名前) {
-  const シート = スプレッドシート.getSheetByName(名前)
-  if (!シート) {
+function findSheet(spreadsheet, name) {
+  const sheet = spreadsheet.getSheetByName(name)
+  if (!sheet) {
     throw new Error(
-      `シート「${名前}」が無い。テンプレートを組み立て直す（→ src/README.md）`,
+      `シート「${name}」が無い。テンプレートを組み立て直す（→ src/README.md）`,
     )
   }
-  return シート
+  return sheet
 }
 
-// Node から読むためだけの口。Apps Script では module が無いので通らない。
+// A door for Node to read this file through, nothing more. Apps Script has no module, so it never runs there.
 if (typeof module !== 'undefined') {
   module.exports = {
-    値の表現, 読むシート, 見出しの行数, 入力を読む, 区画を読む, 出力を書く, 走らせる, いまのスプレッドシートで走らせる,
-    表現を揃える, 日時を文字列にする, 構成を引く, シートを引く,
+    valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, writeOutputs, run, runOnActiveSpreadsheet,
+    normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }

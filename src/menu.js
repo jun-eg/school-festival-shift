@@ -1,46 +1,46 @@
 /**
- * 担当者がコピーしたファイルを開いたときに出るメニュー。
+ * The menu that comes up when the staff open the file they copied.
  *
- * 項目は docs/tech-requirements.md 2「担当者がやることの全部」の
- * 操作 3・7・9 と同じ名前である。担当者に新しい操作を 1 つも増やさない。
- * 画面は 1 枚も作らない（→ 6 の #2）— 手直しはスプレッドシートそのもので行う。
+ * The items carry the same names as operations 3, 7 and 9 of
+ * docs/tech-requirements.md 2「担当者がやることの全部」. Not one new operation is added for the staff.
+ * Not a single screen is built (→ 6 の #2) — the hand edits happen in the spreadsheet itself.
  *
- * 中身はそれぞれの issue が入れる。まだ入っていないものは、
- * 押したら「まだ作っていない」と名指しで言う（黙って走らない）。
+ * The contents are put in by their own issues. Anything not in yet says「まだ作っていない」by name
+ * when it is pressed (it never runs silently).
  */
 
-const メニューの名前 = 'シフト'
+const menuName = 'シフト'
 
-const メニューの項目 = [
-  { 表示: 'フォームを作る', 関数: 'フォームを作る', issue: 144 },
-  { 表示: '生成', 関数: '生成', issue: 151 },
-  { 表示: '画像を書き出す', 関数: '画像を書き出す', issue: 157 },
+const menuItems = [
+  { label: 'フォームを作る', functionName: 'createForm', issue: 144 },
+  { label: '生成', functionName: 'generate', issue: 151 },
+  { label: '画像を書き出す', functionName: 'exportImages', issue: 157 },
 ]
 
 function onOpen() {
-  const メニュー = SpreadsheetApp.getUi().createMenu(メニューの名前)
-  メニューの項目.forEach((項目) => メニュー.addItem(項目.表示, 項目.関数))
-  メニュー.addToUi()
+  const menu = SpreadsheetApp.getUi().createMenu(menuName)
+  menuItems.forEach((item) => menu.addItem(item.label, item.functionName))
+  menu.addToUi()
 }
 
-function フォームを作る() {
-  まだ作っていない('フォームを作る')
+function createForm() {
+  notBuiltYet('フォームを作る')
 }
 
-function 生成() {
-  まだ作っていない('生成')
+function generate() {
+  notBuiltYet('生成')
 }
 
-function 画像を書き出す() {
-  まだ作っていない('画像を書き出す')
+function exportImages() {
+  notBuiltYet('画像を書き出す')
 }
 
-/** 名指しで止まる。黙って走らない（→ 2 の「止まる箇所」#8）。 */
-function まだ作っていない(表示) {
-  const 押された項目 = メニューの項目.filter((項目) => 項目.表示 === 表示)[0]
+/** Stop by name. Never run silently (→ 2 の「止まる箇所」#8). */
+function notBuiltYet(label) {
+  const pressed = menuItems.filter((item) => item.label === label)[0]
   SpreadsheetApp.getActive().toast(
-    `「${表示}」はまだ作っていない（issue #${押された項目.issue}）`,
-    メニューの名前,
+    `「${label}」はまだ作っていない（issue #${pressed.issue}）`,
+    menuName,
     5,
   )
 }
