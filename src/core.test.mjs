@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -84,7 +84,7 @@ const filesTouchingSpreadsheetApp = fs
   .sort()
 
 check(
-  '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 4 つも、構造の検証も掴まない）',
+  '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 5 つも、構造の検証も掴まない）',
   filesTouchingSpreadsheetApp,
   ['build-template.js', 'menu.js', 'shell.js'],
 )
@@ -173,15 +173,26 @@ check(
 )
 
 check(
-  '③ 中身が入っている段は、未了に出ない（違反を数える → count-violations.js ／ issue #141）',
+  '③ 中身が入っている段は、未了に出ない（数える側 2 つ → count-violations.js ／ name-unmet.js）',
   [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
-  [['違反を数える'], []],
+  [['違反を数える', '未充足を名指しする'], []],
 )
 
 check(
-  '③ 生成シート 3 枚は空の配列で返る（何も書かない）',
-  outputNames.map((name) => skeletonOutput[name]),
-  [[], [], []],
+  '③ 生成の段が入っていないので、割り当てと指標は空の配列で返る（何も書かない）',
+  [skeletonOutput['割り当て'], skeletonOutput['指標']],
+  [[], []],
+)
+
+// 置いた行が 1 つも無いのは、足りていないことである。未充足の側だけは 0 件にならない（→ 5-4・#142）。
+// 段が欠けているあいだ、殻はこの行を 1 枚も書かない（→ src/README.md・shell.test.mjs）。
+check(
+  '③ 置いた行が 1 つも無ければ、要る枠が全部未充足として返る（違反は 0 件のまま → 5-4）',
+  [
+    skeletonOutput['検証結果'].length,
+    skeletonOutput['検証結果'].map((row) => row[kindColumn]).filter((kind) => kind !== checkKind.unmet),
+  ],
+  [24, []],
 )
 
 check(

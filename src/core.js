@@ -48,7 +48,10 @@ function builtInSteps() {
   if (typeof countViolations !== 'function') {
     throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
   }
-  return { '違反を数える': countViolations }
+  if (typeof nameUnmet !== 'function') {
+    throw new Error('name-unmet.js が貼られていない（「未充足を名指しする」の中身がそこにある → issue #142）')
+  }
+  return { '違反を数える': countViolations, '未充足を名指しする': nameUnmet }
 }
 
 /** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */
