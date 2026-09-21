@@ -9,6 +9,9 @@
  * ここに入ってくるのは、文字列と数値だけでできた行の配列である（→ checkRepresentation）。
  * 揺れを殻に閉じ込めないと、決定性がコアの外で崩れる（→ 6 の #8 の理由 ③）。
  *
+ * 行のまま段へ渡さない。入口で 5-1 の型に直してから渡す（→ input-types.js ／ takeConditions）。
+ * 段が受け取るのは型であって、シートの列の並びではない。
+ *
  * ここは骨組みである。各段の中身は、それぞれの issue が入れる（→ coreSteps）。
  * 入っていない段は空の配列を返し、「まだ作っていない」を名指しで持ち帰る。黙って走らない。
  * ここに判断を新しく書かない（→ src/README.md）。
@@ -52,7 +55,10 @@ function inputNames() {
   return names
 }
 
-/** 条件入力の 5 区画の名前（→ 5-1 の #1〜#5）。生成と数える側に渡るのはここまでである。 */
+/**
+ * 条件入力の 5 区画の名前（→ 5-1 の #1〜#5）。殻が読む単位であり、入力の名前の一部である。
+ * 段に渡るのはこの名前ではなく、ここから直した型のほうである（→ takeConditions）。
+ */
 function conditionNames() {
   return sheetLayout
     .filter((layout) => layout.name === '条件入力')[0]
@@ -82,12 +88,13 @@ function build(inputs, steps) {
     return stepsToCall[name].apply(null, args)
   }
 
-  // 回答をそのまま先へ流さない。取り込み（規則 2）を通った希望だけが下流へ行く。
-  // 友達欄が生成の入力に現れないのは、この形の帰結である（→ 5-2）。
-  const wishes = callStep('取り込む', [inputs['回答']])
-  const candidates = callStep('展開する', [wishes, inputs['日ごとの営業 4 時刻']])
-
   const conditions = takeConditions(inputs)
+
+  // 回答をそのまま先へ流さない。取り込み（規則 2）を通った希望だけが下流へ行く。
+  // 取り込むが返すのは型 #6（1 人 1 件）で、友達欄も氏名もそこに乗っていない（→ 5-2・input-types.js）。
+  const wishes = callStep('取り込む', [inputs['回答']])
+  const candidates = callStep('展開する', [wishes, conditions.days])
+
   const fixed = inputs['割り当て'] // 前の周で担当者が書き換えたところ（→ 5-3）
   const assignments = callStep('生成する', [candidates, conditions, fixed])
 
@@ -102,10 +109,13 @@ function build(inputs, steps) {
   return output
 }
 
-/** 入力から条件入力の 5 区画だけを取り出す（→ 5-1 の #1〜#5）。 */
+/**
+ * 入力から条件入力の 5 区画を取り出し、5-1 の型に直す（→ input-types.js の conditionTypes）。
+ * キーは型の側の名前である — 段が掴むのは型であって、区画の見出しではない。
+ */
 function takeConditions(inputs) {
   const conditions = {}
-  conditionNames().forEach((name) => { conditions[name] = inputs[name] })
+  conditionTypes().forEach((type) => { conditions[type.key] = toType(type, inputs[type.source]) })
   return conditions
 }
 

@@ -24,13 +24,13 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'core.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { build, inputNames, conditionNames, sheetColumns } = context
-const { coreSteps, outputNames, sheetLayout, checkKind } = vm.runInContext(
-  '({ coreSteps, outputNames, sheetLayout, checkKind })',
+const { coreSteps, outputNames, sheetLayout, checkKind, inputTypes } = vm.runInContext(
+  '({ coreSteps, outputNames, sheetLayout, checkKind, inputTypes })',
   context,
 )
 
@@ -55,7 +55,7 @@ function whyItStopped(work) {
 /** 骨組みを回すのに足りるだけの入力。値は data/ の転記元と同じ表現で置く。 */
 function skeletonInputs(overrides) {
   const inputs = {
-    '日ごとの営業 4 時刻': [['2025-11-01', '08:00', '10:00', '20:00', '20:00']],
+    '日ごとの営業時刻': [['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00']],
     '役割と必要人数': [['', '', '', '調理', 2]],
     '調理責任者の学年': [['3年生'], ['4年生']],
     '委員会の指定枠': [],
@@ -94,6 +94,21 @@ check(
   typeof build,
   'function',
 )
+
+// Apps Script は .gs で 1 つのグローバルを共有する。同じ名前が 2 つのファイルにあると、
+// 後から貼ったほうが黙って勝つ（→ build-template.js の buildTemplate の注意）。
+const declaredTwice = []
+const declaredIn = {}
+fs.readdirSync(here).filter((name) => name.endsWith('.js')).sort().forEach((file) => {
+  const source = stripComments(fs.readFileSync(path.join(here, file), 'utf8'))
+  const names = source.match(/^(?:function \w+|const \w+ =)/gm) || []
+  names.map((line) => line.replace(/^(?:function |const )/, '').replace(/ =$/, '')).forEach((name) => {
+    if (declaredIn[name] && declaredIn[name] !== file) declaredTwice.push(`${name}（${declaredIn[name]} と ${file}）`)
+    declaredIn[name] = file
+  })
+})
+
+check('① 同じ名前を 2 つのファイルが最上位に持っていない（.gs は 1 つのグローバルである）', declaredTwice, [])
 
 // ---- ② 配列を渡し、配列を受け取る -------------------------------------------
 
@@ -188,6 +203,7 @@ check(
 
 const receivedArgs = {}
 build(skeletonInputs(), {
+  '展開する': (wishes, days) => { receivedArgs['展開する'] = [wishes, days]; return [] },
   '生成する': (candidates, conditions, fixed) => { receivedArgs['生成する'] = [candidates, conditions, fixed]; return [] },
   '違反を数える': (assignments, conditions) => { receivedArgs['違反を数える'] = [assignments, conditions]; return [] },
 })
@@ -195,7 +211,24 @@ build(skeletonInputs(), {
 check(
   '④-2 生成に渡るのは条件入力の 5 区画だけで、回答そのものは渡らない（→ 5-2）',
   Object.keys(receivedArgs['生成する'][1]),
-  conditionNames(),
+  inputTypes.filter((type) => type.source !== '回答').map((type) => type.key),
+)
+
+check(
+  '④-2 条件は行のままではなく、5-1 の型で渡る（→ input-types.js）',
+  [
+    receivedArgs['生成する'][1].days[0].slots.length,
+    receivedArgs['生成する'][1].roleNeeds[0].role,
+    receivedArgs['生成する'][1].cookLeaderGrades,
+    receivedArgs['生成する'][1].prepCleanupRule.noonBoundary,
+  ],
+  [24, '調理', ['3年生', '4年生'], '12:00'],
+)
+
+check(
+  '④-2 展開する段に渡るのは、刻まれた枠（型 #1）である（→ 規則 1 の ①）',
+  [receivedArgs['展開する'][1][0].date, receivedArgs['展開する'][1][0].slots[0]],
+  ['2025-11-01', { start: '08:00', end: '08:30' }],
 )
 
 check(
@@ -216,14 +249,14 @@ check(
 // ---- ⑤ 黙って直さずに止まる -------------------------------------------------
 
 const stillWobbling = whyItStopped(() => build(skeletonInputs({
-  '日ごとの営業 4 時刻': [['2025-11-01', new Date(1899, 11, 30, 8, 0), '10:00', '20:00', '20:00']],
+  '日ごとの営業時刻': [['2025-11-01', new Date(1899, 11, 30, 8, 0), '10:00', '18:00', '18:00', '20:00']],
 })))
 
 check(
   '⑤ Date が混じったまま渡すと、区画と行と列を名指しして止まる',
   [
     stillWobbling !== null,
-    stillWobbling?.includes('「日ごとの営業 4 時刻」の 1 行目 2 列目'),
+    stillWobbling?.includes('「日ごとの営業時刻」の 1 行目 2 列目'),
     stillWobbling?.includes('殻'),
   ],
   [true, true, true],

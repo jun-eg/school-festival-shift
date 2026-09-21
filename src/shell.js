@@ -22,7 +22,7 @@
  * 殻がコアに渡す値の表現。コアはこの形の文字列と、数値しか受け取らない
  * （→ core.js の checkRepresentation）。
  *
- * 時刻が HH:MM であることは sheet-layout.js の注記が決めている（条件入力の「日ごとの営業 4 時刻」）。
+ * 時刻が HH:MM であることは sheet-layout.js の注記が決めている（条件入力の「日ごとの営業時刻」）。
  * 日付が YYYY-MM-DD であることは data/前回の確定シフト-モック-0N.json の転記元の形である。
  */
 const valueRepresentation = {
@@ -62,19 +62,25 @@ function readInputs(spreadsheet) {
 /**
  * 区画 1 つぶんの行を読む。
  *
- * 空の行を落とすのは、条件入力の 5 区画を横に並べてある（→ src/README.md）からである。
+ * 下の空の行を落とすのは、条件入力の 5 区画を横に並べてある（→ src/README.md）からである。
  * 行数の違う区画が同じ最終行まで読まれるので、短いほうの下は空の行で埋まる。
+ *
+ * 落とすのは下の空の行だけで、区画の途中の空の行は残す。詰めると、その下の行の番号がずれて、
+ * 名指しの「N 行目」が担当者のシートの行を指さなくなる（→ input-types.js の whereIs）。
+ * 途中の空の行を読み飛ばすのは、型に直す側である。
  */
 function readSection(sheet, layout, section) {
   const headerRows = headerRowCount(layout)
   const lastRow = sheet.getLastRow()
   if (lastRow <= headerRows) return []
 
-  return sheet
+  const rows = sheet
     .getRange(headerRows + 1, section.startColumn, lastRow - headerRows, section.columns.length)
     .getValues()
     .map((row) => row.map(normalizeValue))
-    .filter((row) => row.some((cell) => cell !== ''))
+
+  while (rows.length > 0 && rows[rows.length - 1].every((cell) => cell === '')) rows.pop()
+  return rows
 }
 
 /**

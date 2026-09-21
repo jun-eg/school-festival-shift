@@ -88,7 +88,7 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns } = context
@@ -133,17 +133,17 @@ function filledBook() {
   const book = emptyTemplate()
   const conditions = book.getSheetByName('条件入力')
 
-  // 日ごとの営業 4 時刻（A〜E）— 2 日ぶん。時刻だけのセルは Date で返ってくる
-  ;[[1, 8, 10, 20, 20], [2, 8, 10, 20, 20]].forEach((row, i) => {
+  // 日ごとの営業時刻（A〜F）— 2 日ぶん。時刻だけのセルは Date で返ってくる
+  ;[[1, 8, 10, 18, 18, 20], [2, 8, 10, 18, 18, 20]].forEach((row, i) => {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
     row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
   })
-  // 役割と必要人数（G〜K）— 1 行だけ。日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）
-  ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 7 + j, value))
-  // 調理責任者の学年（M）— 2 行
-  conditions.put(3, 13, '3年生').put(4, 13, ' 4年生 ')
-  // 準備・片付けのルール（U〜V）— 1 行
-  conditions.put(3, 21, '午前と午後の境目').put(3, 22, new Date(1899, 11, 30, 12, 0, 0))
+  // 役割と必要人数（H〜L）— 1 行だけ。日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）
+  ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 8 + j, value))
+  // 調理責任者の学年（N）— 2 行
+  conditions.put(3, 14, '3年生').put(4, 14, ' 4年生 ')
+  // 準備・片付けのルール（V〜W）— 1 行
+  conditions.put(3, 22, '午前と午後の境目').put(3, 23, new Date(1899, 11, 30, 12, 0, 0))
 
   const answers = book.getSheetByName('回答')
   const answerRow = [
@@ -205,12 +205,15 @@ check(
 
 check(
   '③ 条件入力は 2 行目までが見出しなので、3 行目から読む',
-  inputs['日ごとの営業 4 時刻'],
-  [['2025-11-01', '08:00', '10:00', '20:00', '20:00'], ['2025-11-02', '08:00', '10:00', '20:00', '20:00']],
+  inputs['日ごとの営業時刻'],
+  [
+    ['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00'],
+    ['2025-11-02', '08:00', '10:00', '18:00', '18:00', '20:00'],
+  ],
 )
 
 check(
-  '③ 区画ごとに列を切って読む（役割と必要人数は G 列から 5 列ぶん）',
+  '③ 区画ごとに列を切って読む（役割と必要人数は H 列から 5 列ぶん）',
   inputs['役割と必要人数'],
   [['', '', '', '調理', 2]],
 )
