@@ -88,10 +88,10 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns } = context
+const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns, builtInSteps } = context
 const { valueRepresentation, sheetLayout, checkKind, coreSteps } = vm.runInContext(
   '({ valueRepresentation, sheetLayout, checkKind, coreSteps })',
   context,
@@ -268,9 +268,11 @@ check(
 )
 
 check(
-  '⑤ 何が入っていないかは、issue 番号つきで返る',
+  '⑤ 何が入っていないかは、issue 番号つきで返る（中身が入っている段は出ない → core.js の builtInSteps）',
   notBuilt.map((step) => `${step.name}#${step.issue}`),
-  coreSteps.map((step) => `${step.name}#${step.issue}`),
+  coreSteps
+    .filter((step) => Object.keys(builtInSteps()).indexOf(step.name) === -1)
+    .map((step) => `${step.name}#${step.issue}`),
 )
 
 // 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）

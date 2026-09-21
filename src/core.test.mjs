@@ -24,11 +24,11 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
-const { build, inputNames, conditionNames, sheetColumns } = context
+const { build, inputNames, conditionNames, sheetColumns, builtInSteps } = context
 const { coreSteps, outputNames, sheetLayout, checkKind, inputTypes } = vm.runInContext(
   '({ coreSteps, outputNames, sheetLayout, checkKind, inputTypes })',
   context,
@@ -84,7 +84,7 @@ const filesTouchingSpreadsheetApp = fs
   .sort()
 
 check(
-  '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 2 つも、構造の検証も掴まない）',
+  '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 4 つも、構造の検証も掴まない）',
   filesTouchingSpreadsheetApp,
   ['build-template.js', 'menu.js', 'shell.js'],
 )
@@ -163,10 +163,19 @@ check(
 
 const skeletonOutput = build(skeletonInputs())
 
+/** 中身が入っている段。ここに名前がある段は「まだ作っていない」に出ない（→ core.js の builtInSteps）。 */
+const stepsAlreadyIn = Object.keys(builtInSteps())
+
 check(
   '③ 入っていない段が、issue 番号つきで全部名指しされる',
   skeletonOutput.notBuilt.map((step) => [step.name, step.issue]),
-  coreSteps.map((step) => [step.name, step.issue]),
+  coreSteps.filter((step) => stepsAlreadyIn.indexOf(step.name) === -1).map((step) => [step.name, step.issue]),
+)
+
+check(
+  '③ 中身が入っている段は、未了に出ない（違反を数える → count-violations.js ／ issue #141）',
+  [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
+  [['違反を数える'], []],
 )
 
 check(
@@ -178,7 +187,7 @@ check(
 check(
   '③ 未了は、どのシートに出す段だったかを持っている（殻が上書きを避けるのに要る）',
   skeletonOutput.notBuilt.map((step) => step.writesTo),
-  coreSteps.map((step) => step.writesTo),
+  coreSteps.filter((step) => stepsAlreadyIn.indexOf(step.name) === -1).map((step) => step.writesTo),
 )
 
 // ---- ④ 段を差し替えて、先に回す ---------------------------------------------
@@ -196,7 +205,9 @@ check(
 check(
   '④ 入れた段は未了から消え、残りだけが名指しされる',
   countingSideOnly.notBuilt.map((step) => step.name),
-  coreSteps.map((step) => step.name).filter((name) => name !== '未充足を名指しする'),
+  coreSteps
+    .map((step) => step.name)
+    .filter((name) => name !== '未充足を名指しする' && stepsAlreadyIn.indexOf(name) === -1),
 )
 
 // ---- ④-2 友達欄は生成の側へ渡らない（→ 5-2） --------------------------------

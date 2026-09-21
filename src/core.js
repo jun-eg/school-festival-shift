@@ -12,7 +12,7 @@
  * 行のまま段へ渡さない。入口で 5-1 の型に直してから渡す（→ input-types.js ／ takeConditions）。
  * 段が受け取るのは型であって、シートの列の並びではない。
  *
- * ここは骨組みである。各段の中身は、それぞれの issue が入れる（→ coreSteps）。
+ * 段の中身は、それぞれの issue が入れる（→ coreSteps）。入っている段は builtInSteps が持つ。
  * 入っていない段は空の配列を返し、「まだ作っていない」を名指しで持ち帰る。黙って走らない。
  * ここに判断を新しく書かない（→ src/README.md）。
  *
@@ -33,6 +33,23 @@ const coreSteps = [
   { name: '未充足を名指しする', issue: 142, writesTo: '検証結果', whatItDoes: '人数が足りない枠を行にする（5-4 ／ 8 の 3）' },
   { name: '指標を出す', issue: 154, writesTo: '指標', whatItDoes: '人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7 ／ 8 の 9）' },
 ]
+
+/**
+ * 中身が入っている段。渡された steps が同じ名前を持っていれば、そちらが勝つ
+ * （段を差し替えて先に回せる形は動かさない → build）。
+ *
+ * ここに名前が無い段は「まだ作っていない」である。入れたら 1 行足す
+ * — 入っているのに未了として名指しすると、notBuilt が嘘になる。
+ * 関数の中で見ているのは、ファイルを貼る順に依存しないためである（→ 先頭の注意）。
+ */
+function builtInSteps() {
+  // 手で貼る形なので、1 ファイル貼り忘れることがある（→ src/README.md の「clasp を本筋にしない」）。
+  // 貼られていなければ名指しして止まる。入っている段を「まだ作っていない」に混ぜない。
+  if (typeof countViolations !== 'function') {
+    throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
+  }
+  return { '違反を数える': countViolations }
+}
 
 /** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */
 const outputNames = ['割り当て', '検証結果', '指標']
@@ -68,7 +85,8 @@ function conditionNames() {
 /**
  * 入力の行から、生成シート 3 枚の行を組む。
  *
- * steps は段の名前から関数への対応である（渡さなかった段は「まだ作っていない」になる）。
+ * steps は段の名前から関数への対応である（中身が入っていて渡さなかった段は builtInSteps が、
+ * どちらにも無い段は「まだ作っていない」になる）。
  * 差し替えで渡せる形にしてあるのは、8 の 3 が 8 の 8 より先にあるからである
  * — 数える側だけを先に入れて、生成が無いまま回せる。
  *
@@ -77,7 +95,8 @@ function conditionNames() {
  */
 function build(inputs, steps) {
   checkRepresentation(inputs)
-  const stepsToCall = steps || {}
+  const stepsToCall = builtInSteps()
+  Object.keys(steps || {}).forEach((name) => { stepsToCall[name] = steps[name] })
   const notBuilt = []
 
   function callStep(name, args) {
@@ -99,7 +118,8 @@ function build(inputs, steps) {
   const assignments = callStep('生成する', [candidates, conditions, fixed])
 
   // 違反と未充足は別に数えて、同じ 1 枚に種別で分けて並べる（→ 5-4）。
-  const violations = callStep('違反を数える', [assignments, conditions, wishes])
+  // 数える側に候補も渡る。規則 1 の違反（希望の時間の外）は、展開した枠と照らさないと見えない。
+  const violations = callStep('違反を数える', [assignments, conditions, wishes, candidates])
   const unmet = callStep('未充足を名指しする', [assignments, conditions])
   const metrics = callStep('指標を出す', [assignments])
 
@@ -197,7 +217,7 @@ function sheetColumns(name) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames,
+    coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames, builtInSteps,
     build, takeConditions, findStep, checkRepresentation, checkOutput, sheetColumns,
   }
 }
