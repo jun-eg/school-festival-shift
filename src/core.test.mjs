@@ -84,9 +84,9 @@ const filesTouchingSpreadsheetApp = fs
   .sort()
 
 check(
-  '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 5 つも、構造の検証も掴まない）',
+  '① SpreadsheetApp を掴むのは 4 ファイルだけである（コアの 6 つも、構造の検証も掴まない）',
   filesTouchingSpreadsheetApp,
-  ['build-template.js', 'menu.js', 'shell.js'],
+  ['build-form.js', 'build-template.js', 'menu.js', 'shell.js'],
 )
 
 check(
