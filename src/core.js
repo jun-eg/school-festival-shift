@@ -45,13 +45,16 @@ const coreSteps = [
 function builtInSteps() {
   // 手で貼る形なので、1 ファイル貼り忘れることがある（→ src/README.md の「clasp を本筋にしない」）。
   // 貼られていなければ名指しして止まる。入っている段を「まだ作っていない」に混ぜない。
+  if (typeof takeIn !== 'function') {
+    throw new Error('take-in.js が貼られていない（「取り込む」の中身がそこにある → issue #146）')
+  }
   if (typeof countViolations !== 'function') {
     throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
   }
   if (typeof nameUnmet !== 'function') {
     throw new Error('name-unmet.js が貼られていない（「未充足を名指しする」の中身がそこにある → issue #142）')
   }
-  return { '違反を数える': countViolations, '未充足を名指しする': nameUnmet }
+  return { '取り込む': takeIn, '違反を数える': countViolations, '未充足を名指しする': nameUnmet }
 }
 
 /** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */
