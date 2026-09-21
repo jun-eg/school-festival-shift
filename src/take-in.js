@@ -5,7 +5,7 @@
  * 行を型に直すのは input-types.js の toWish である。ここが持つのは「どの 1 行を型にするか」だけである。
  *
  * 規則 2 の 3 つ（→ 3 の規則 2）。
- *   ① 学籍番号でまとめる（識別キーは学籍番号である ◎ → 5-1）
+ *   ① 学籍番号でまとめる（識別キーは学籍番号である ◎ → 5-1。大文字・小文字の違いは同じ人である ◎）
  *   ② タイムスタンプを見て 1 件に畳む（畳み込みのキーは 学籍番号 ＋ タイムスタンプ ◎）
  *   ③ 採る向きは後から来た行である（→ foldDirection）
  *
@@ -61,7 +61,6 @@ function takeIn(rows) {
   const columns = section.columns
   const order = []
   const kept = {}
-  const seenIds = {}
 
   eachFilledRow(source, section, rows, (row, rowIndex) => {
     const coming = {
@@ -69,8 +68,9 @@ function takeIn(rows) {
       at: readTimestamp(source, columns, row, rowIndex),
       rowIndex: rowIndex,
     }
+    // 学籍番号は大文字に揃って型に乗っている（→ input-types.js の readStudentId）ので、
+    // 大文字・小文字だけ違う 2 行は、ここまで来る時点で同じキーになっている（→ 3 の規則 2 の ①）
     const studentId = coming.wish.studentId
-    checkSameSpelling(source, studentId, rowIndex, seenIds)
 
     // ① 学籍番号でまとめる — 初めて出てきた人は、そのまま置く
     if (!kept[studentId]) {
@@ -102,27 +102,6 @@ function takesOver(coming, keeping) {
 }
 
 /**
- * 同じ学籍番号が、大文字・小文字だけ違う形で 2 通り出ていないかを見る。
- *
- * まとめるのは学籍番号（① ／ 識別キー ◎）だが、フォームの正規表現は英字の大小を両方通す
- * （→ 4-1 の #1）。別の綴りが同じ人かどうかは記録に無いので、
- * 黙ってまとめず・黙って別人にもせずに名指しして止まる（→ src/README.md の「ここで決めていないこと」）。
- * 前回の希望データ（モック 50 行）には 1 件も無い（記録）。
- */
-function checkSameSpelling(source, studentId, rowIndex, seenIds) {
-  const sameLetters = studentId.toUpperCase()
-  const before = seenIds[sameLetters]
-  if (before && before.studentId !== studentId) {
-    throw new Error(
-      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が、`
-        + `${whereIs(source, before.rowIndex)}の「${before.studentId}」と大文字・小文字だけ違う。`
-        + '同じ人かどうかは記録に無いので、黙ってまとめずに止まる（→ 3 の規則 2 の ①）',
-    )
-  }
-  if (!before) seenIds[sameLetters] = { studentId: studentId, rowIndex: rowIndex }
-}
-
-/**
  * タイムスタンプのセルを取る。値の表現を揃えるのは殻の仕事で、ここに来るのは揃った行である
  * （→ shell.js の formatDateTime・core.js の checkRepresentation）。
  */
@@ -141,6 +120,6 @@ function readTimestamp(source, columns, row, rowIndex) {
 if (typeof module !== 'undefined') {
   module.exports = {
     foldDirection, timestampColumn, timestampPattern,
-    takeIn, takesOver, checkSameSpelling, readTimestamp,
+    takeIn, takesOver, readTimestamp,
   }
 }

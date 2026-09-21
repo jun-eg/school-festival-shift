@@ -398,6 +398,14 @@ check(
 )
 
 check(
+  '④ 割り当ての学籍番号が小文字でも、その人の希望に繋がる（大文字・小文字に意味は無い ◎ → 3 の規則 2 の ①）',
+  labelsOf(violationsOf(cleanRows().map((row) => row.map((cell, at) => (
+    at === sheetColumns('割り当て').indexOf('学籍番号') ? String(cell).toLowerCase() : cell
+  ))))),
+  [],
+)
+
+check(
   '④ 希望に同じ学籍番号が 2 件あれば、名指しして止まる（規則 2 が畳んでいない → 仕様 #4）',
   whyItStopped(() => violationsOf(cleanRows(), { wishes: wishes.concat([wishes[0]]) }))
     ?.includes('規則 2'),

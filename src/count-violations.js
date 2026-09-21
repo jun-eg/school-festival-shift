@@ -259,14 +259,8 @@ function readAssignments(rows, conditions) {
       start: readTime(source, columns, row, rowIndex, '開始'),
       end: readTime(source, columns, row, rowIndex, '終了'),
       role: readText(source, columns, row, rowIndex, '役割'),
-      studentId: readText(source, columns, row, rowIndex, '学籍番号'),
+      studentId: readStudentId(source, columns, row, rowIndex), // 大文字に揃う（→ 3 の規則 2 の ①）
       name: readText(source, columns, row, rowIndex, '氏名', true),
-    }
-    if (!studentIdPattern.test(one.studentId)) {
-      throw new Error(
-        `${whereIs(source, rowIndex)}の学籍番号「${one.studentId}」が形式と違う。`
-          + '10 桁の英数字である（→ 4-1 の #1）',
-      )
     }
     checkOnSlot(source, rowIndex, one, conditions.days)
     placed.push(one)
@@ -293,6 +287,9 @@ function checkOnSlot(source, rowIndex, one, days) {
 /**
  * 希望（型 #6）を学籍番号で引ける形にする。識別キーは学籍番号である ◎（→ 5-1）。
  * 規則 2 の畳み込みを通っていれば 1 人 1 件なので、2 件あれば名指しして止まる（→ 仕様 #4）。
+ *
+ * 大文字・小文字はここで気にしない — 学籍番号は読むときに大文字へ揃っている
+ * （→ input-types.js の readStudentId・3 の規則 2 の ①）ので、割り当ての行と素の等値で繋がる。
  */
 function wishesByStudentId(wishes) {
   const all = wishes || []
