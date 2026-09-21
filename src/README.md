@@ -10,7 +10,7 @@
 | ファイル | 何を持つか | どちら側か |
 | --- | --- | --- |
 | [`sheet-layout.js`](sheet-layout.js) | **5 枚のシートの定義だけ** | **コア** |
-| [`core.js`](core.js) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`コアの口`）と、段をつなぐ 1 本（`組む`） | **コア** |
+| [`core.js`](core.js) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`coreSteps`）と、段をつなぐ 1 本（`build`） | **コア** |
 | [`shell.js`](shell.js) | **シートを読んで値の表現を揃え、コアを呼び、返ってきた行を書く** | **殻** |
 | [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
 | [`build-template.js`](build-template.js) | 定義どおりにシートを作り、見出しを置き、生成シートに保護をかける | **殻** |
@@ -22,9 +22,13 @@
 **コアの側は `SpreadsheetApp` を 1 度も掴まない**（→ 6 の #8・下の「コアと殻の境目」）。
 
 **名前の線は 1 本である** — **機械が掴む名前は英字、人が読む言葉は日本語のままである**
-（→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175)）。
-**ファイル名と、メニューから呼ぶ関数名が英字の側**で、
-**関数名・変数名の中身と、コメントと、メニューの表示名が日本語の側**である。
+（→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175) ／
+[#178](https://github.com/jun-eg/school-festival-shift/issues/178)）。
+**ファイル名・関数名・変数名・引数名・オブジェクトのキーが英字の側**で、
+**コメントと JSDoc、シート名・列名・区画の見出し・段の名前・メニューの表示名・例外の文・検査の見出しが
+日本語の側**である。
+**コメントが識別子を名指しする所だけは、新しい名前で書く**（`→ coreSteps` のように）—
+**読んだ人がその名前で `grep` できないと、名指しの意味が無い。**
 
 ## シートは 5 枚である
 
@@ -92,11 +96,11 @@
 | **数** | 数値のまま | 必要人数など |
 
 **空のセルは空文字に、真偽値は `TRUE` ／ `FALSE` になる。文字列は両端の空白を落とすだけで、中身に手を入れない。**
-**揃っていない値がコアに入ったら、黙って直さずに区画・行・列を名指しして止まる**（`core.js` の `表現を確かめる`）。
+**揃っていない値がコアに入ったら、黙って直さずに区画・行・列を名指しして止まる**（`core.js` の `checkRepresentation`）。
 
 ### 段は 6 つで、中身はまだ 1 つも入っていない
 
-**`組む` が呼ぶ順である**（→ 8「作業の順序」）。**入っていない段は空の配列を返し、名指しで持ち帰る。黙って走らない。**
+**`build` が呼ぶ順である**（→ 8「作業の順序」）。**入っていない段は空の配列を返し、名指しで持ち帰る。黙って走らない。**
 
 | 段 | 何をするか | 入れる issue |
 | --- | --- | --- |
@@ -107,7 +111,7 @@
 | `未充足を名指しする` | 人数が足りない枠を行にする（5-4） | [#142](https://github.com/jun-eg/school-festival-shift/issues/142) |
 | `指標を出す` | 人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7） | [#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
 
-**段は差し替えで渡す。**`組む(入力, 手順)` の `手順` に入れた段だけが走る —
+**段は差し替えで渡す。**`build(inputs, steps)` の `steps` に入れた段だけが走る —
 **数える側だけを先に入れて、生成が無いまま回せる**（**8 の 3 が 8 の 8 より先にある** ための形である）。
 
 **段が 1 つでも入っていなければ、殻は生成シートを 1 枚も書かない。**
@@ -118,7 +122,7 @@
 **生成と数える側に渡るのは条件入力の 5 区画までである。**
 **友達欄が生成の入力に現れない**（→ 5-2）のは、この形の帰結である。
 
-**メニューにはまだ繋いでいない。** `shell.js` の `いまのスプレッドシートで走らせる` を押す口に繋ぐのは
+**メニューにはまだ繋いでいない。** `shell.js` の `runOnActiveSpreadsheet` を押す口に繋ぐのは
 [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（生成）である。
 
 **ファイルを貼る順に依存しない。** Apps Script は `.gs` を 1 つずつ順に評価するので、
@@ -145,7 +149,7 @@
 
 **保護と並ぶ、2 の「止まる箇所」#8 のもう片方の予防である**
 （[`verify-structure.js`](verify-structure.js)／[#138](https://github.com/jun-eg/school-festival-shift/issues/138)）。
-**[`shell.js`](shell.js) の `走らせる` が、シートを読む前に最初に呼ぶ。**
+**[`shell.js`](shell.js) の `run` が、シートを読む前に最初に呼ぶ。**
 
 | 見るもの | 崩れていたら |
 | --- | --- |
@@ -176,7 +180,7 @@
 （[#144](https://github.com/jun-eg/school-festival-shift/issues/144)／[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#157](https://github.com/jun-eg/school-festival-shift/issues/157) が入れる）。
 **黙って走らせない。**
 
-**`テンプレートを組み立てる` はメニューに出していない。**
+**`buildTemplate` はメニューに出していない。**
 **走らせるのはテンプレートを用意する側で、担当者ではない**（2 の一覧に無い操作を増やさないため）。
 
 ## テンプレートの作り方 — **手で貼る。これが 1 本である**
@@ -190,11 +194,13 @@
    `sheet-layout` ／ `core` ／ `shell` ／ `verify-structure` ／ `build-template` ／ `menu`。
    **日本語の名前でも通ることは実機で見たが、英字にそろえてある**
    （→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175)・上の「名前の線」）。
+   **関数名も同じで、日本語のままでもメニューから呼べることを実機で見たうえで英字にしてある**
+   （→ [#178](https://github.com/jun-eg/school-festival-shift/issues/178)）。
    **貼る順は問わない**（→「コアと殻の境目」の最後）
 4. **Apps Script プロジェクトにも名前を付ける**（初期値は `無題のプロジェクト` である）
 5. **プロジェクトの設定 →「`appsscript.json` マニフェスト ファイルをエディタで表示する」**を入れ、
    [`appsscript.json`](appsscript.json) の中身を写す
-6. エディタで **`テンプレートを組み立てる` を実行**する。**初回の権限承認はここで通る** —
+6. エディタで **`buildTemplate` を実行**する。**初回の権限承認はここで通る** —
    **「承認が必要です」→「権限を確認」→ 別ウィンドウ**の順で出る
    （どの画面が出るかを記録するのは [#139](https://github.com/jun-eg/school-festival-shift/issues/139)）
 7. **実行ログで「5 枚のうち保護したのは 3 枚である」を見る**
@@ -253,6 +259,6 @@ node src/build-template.test.mjs
 | --- | --- |
 | **要求する権限スコープ**（`appsscript.json` の `oauthScopes`）と、初回承認で出る画面 | [#139](https://github.com/jun-eg/school-festival-shift/issues/139)（→ 6-1 の #4） |
 | **コアの段 6 つの中身**（骨組みだけがある。→「コアと殻の境目」の段の表） | [#146](https://github.com/jun-eg/school-festival-shift/issues/146)／[#149](https://github.com/jun-eg/school-festival-shift/issues/149)／[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#141](https://github.com/jun-eg/school-festival-shift/issues/141)／[#142](https://github.com/jun-eg/school-festival-shift/issues/142)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
-| **殻をメニューに繋ぐこと**（`いまのスプレッドシートで走らせる` を押す口）と、**崩れの名指しが担当者の画面にどう出るか**（いまは走らせたときの例外である） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（→ 5 の #6・上の「走る前に構造を検証する」） |
+| **殻をメニューに繋ぐこと**（`runOnActiveSpreadsheet` を押す口）と、**崩れの名指しが担当者の画面にどう出るか**（いまは走らせたときの例外である） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（→ 5 の #6・上の「走る前に構造を検証する」） |
 | **回答シートに回答先を向けること。**フォームが別のシートを作る形になるなら、繋ぎ方はそこで決まる | [#144](https://github.com/jun-eg/school-festival-shift/issues/144)（→ 6 の #6） |
 | **生成シート 3 枚に実際に何行書くか**（割り当て・検証結果・指標の中身） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#141](https://github.com/jun-eg/school-festival-shift/issues/141)・[#142](https://github.com/jun-eg/school-festival-shift/issues/142)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |

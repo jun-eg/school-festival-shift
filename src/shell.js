@@ -3,11 +3,11 @@
  *
  * やることは 3 つだけである。
  *   ① シートを読んで、値の表現を揃えてコアに渡す
- *   ② コア（core.js の 組む）を呼ぶ
+ *   ② コア（core.js の build）を呼ぶ
  *   ③ 返ってきた行を生成シートに書く
  *
  * 走る前の構造の検証（シートの有無・見出し・列数）は verify-structure.js が持つ。
- * 走らせる が最初に呼ぶ — 崩れていれば、読む前に名指しして止まる。
+ * run が最初に呼ぶ — 崩れていれば、読む前に名指しして止まる。
  *
  * ここに割り当ての規則を書かない。規則はコアが持つ。
  * 逆に、コアに SpreadsheetApp を持ち込まない — 持ち込むと 6-1 の #2 の逃げ道が消える。
@@ -20,43 +20,43 @@
 
 /**
  * 殻がコアに渡す値の表現。コアはこの形の文字列と、数値しか受け取らない
- * （→ core.js の 表現を確かめる）。
+ * （→ core.js の checkRepresentation）。
  *
  * 時刻が HH:MM であることは sheet-layout.js の注記が決めている（条件入力の「日ごとの営業 4 時刻」）。
  * 日付が YYYY-MM-DD であることは data/前回の確定シフト-モック-0N.json の転記元の形である。
  */
-const 値の表現 = {
-  日付: 'YYYY-MM-DD',
-  時刻: 'HH:MM',
-  日時: 'YYYY-MM-DD HH:MM:SS',
+const valueRepresentation = {
+  date: 'YYYY-MM-DD',
+  time: 'HH:MM',
+  dateTime: 'YYYY-MM-DD HH:MM:SS',
 }
 
-/** 殻が読むシート。生成しか書かない 2 枚は読まない（→ core.js の 読まないシート）。 */
-function 読むシート() {
-  return シートの構成
-    .filter((構成) => 読まないシート.indexOf(構成.名前) === -1)
-    .map((構成) => 構成.名前)
+/** 殻が読むシート。生成しか書かない 2 枚は読まない（→ core.js の sheetsNotRead）。 */
+function sheetsToRead() {
+  return sheetLayout
+    .filter((layout) => sheetsNotRead.indexOf(layout.name) === -1)
+    .map((layout) => layout.name)
 }
 
 /** 区画の見出しを置くシートは 2 行、置かないシートは 1 行が見出しである（→ build-template.js）。 */
-function 見出しの行数(構成) {
-  return 構成.区画の見出しを置くか ? 2 : 1
+function headerRowCount(layout) {
+  return layout.hasSectionHeadings ? 2 : 1
 }
 
 /**
- * コアに渡す入力を読む。名前は core.js の 入力の名前 と同じ順で並ぶ。
+ * コアに渡す入力を読む。名前は core.js の inputNames と同じ順で並ぶ。
  * 値はどれも、表現を揃えたあとの行の配列である。
  */
-function 入力を読む(スプレッドシート) {
-  const 入力 = {}
-  読むシート().forEach((名前) => {
-    const 構成 = 構成を引く(名前)
-    const シート = シートを引く(スプレッドシート, 名前)
-    構成.区画.forEach((区画) => {
-      入力[構成.区画の見出しを置くか ? 区画.見出し : 名前] = 区画を読む(シート, 構成, 区画)
+function readInputs(spreadsheet) {
+  const inputs = {}
+  sheetsToRead().forEach((name) => {
+    const layout = findLayout(name)
+    const sheet = findSheet(spreadsheet, name)
+    layout.sections.forEach((section) => {
+      inputs[layout.hasSectionHeadings ? section.heading : name] = readSection(sheet, layout, section)
     })
   })
-  return 入力
+  return inputs
 }
 
 /**
@@ -65,16 +65,16 @@ function 入力を読む(スプレッドシート) {
  * 空の行を落とすのは、条件入力の 5 区画を横に並べてある（→ src/README.md）からである。
  * 行数の違う区画が同じ最終行まで読まれるので、短いほうの下は空の行で埋まる。
  */
-function 区画を読む(シート, 構成, 区画) {
-  const 見出し = 見出しの行数(構成)
-  const 最終行 = シート.getLastRow()
-  if (最終行 <= 見出し) return []
+function readSection(sheet, layout, section) {
+  const headerRows = headerRowCount(layout)
+  const lastRow = sheet.getLastRow()
+  if (lastRow <= headerRows) return []
 
-  return シート
-    .getRange(見出し + 1, 区画.開始列, 最終行 - 見出し, 区画.列.length)
+  return sheet
+    .getRange(headerRows + 1, section.startColumn, lastRow - headerRows, section.columns.length)
     .getValues()
-    .map((行) => 行.map(表現を揃える))
-    .filter((行) => 行.some((セル) => セル !== ''))
+    .map((row) => row.map(normalizeValue))
+    .filter((row) => row.some((cell) => cell !== ''))
 }
 
 /**
@@ -83,49 +83,49 @@ function 区画を読む(シート, 構成, 区画) {
  * 段が 1 つでも入っていなければ、1 枚も書かない。
  * 段はつながっているので、前の段が欠けたまま後ろの段だけ走らせても、出てくるのは空である。
  * 空の配列で上書きすると、担当者が割り当てシートに入れた手直し（→ 5-3）が黙って消える。
- * 何が入っていないかは 未了 が名指しで持っている（→ core.js の コアの口）。
+ * 何が入っていないかは notBuilt が名指しで持っている（→ core.js の coreSteps）。
  */
-function 出力を書く(スプレッドシート, 出力) {
-  if ((出力.未了 || []).length > 0) return
+function writeOutputs(spreadsheet, output) {
+  if ((output.notBuilt || []).length > 0) return
 
-  出力の名前.forEach((名前) => {
-    const 構成 = 構成を引く(名前)
-    const シート = シートを引く(スプレッドシート, 名前)
-    const 列数 = 構成.区画[0].列.length
-    const 見出し = 見出しの行数(構成)
-    const 最終行 = シート.getLastRow()
+  outputNames.forEach((name) => {
+    const layout = findLayout(name)
+    const sheet = findSheet(spreadsheet, name)
+    const columnCount = layout.sections[0].columns.length
+    const headerRows = headerRowCount(layout)
+    const lastRow = sheet.getLastRow()
 
-    if (最終行 > 見出し) {
-      シート.getRange(見出し + 1, 1, 最終行 - 見出し, 列数).clearContent()
+    if (lastRow > headerRows) {
+      sheet.getRange(headerRows + 1, 1, lastRow - headerRows, columnCount).clearContent()
     }
-    if (出力[名前].length === 0) return
-    シート.getRange(見出し + 1, 1, 出力[名前].length, 列数).setValues(出力[名前])
+    if (output[name].length === 0) return
+    sheet.getRange(headerRows + 1, 1, output[name].length, columnCount).setValues(output[name])
   })
 }
 
 /**
  * Apps Script から呼ぶ入口。SpreadsheetApp を名指しするのは、このファイルのこの 1 行だけである。
- * メニューから呼ぶのは issue #151（生成）で、そこで手順を渡す。
+ * メニューから呼ぶのは issue #151（生成）で、そこで steps を渡す。
  */
-function いまのスプレッドシートで走らせる(手順) {
-  return 走らせる(SpreadsheetApp.getActive(), 手順)
+function runOnActiveSpreadsheet(steps) {
+  return run(SpreadsheetApp.getActive(), steps)
 }
 
 /**
  * 構造を確かめる → 読む → コアを呼ぶ → 書く。殻の側の 1 本である。
  * スプレッドシートは引数で受ける — 手元の検査で偽のスプレッドシートを渡せるようにするためである。
- * 手順 はコアの段（→ core.js の コアの口）で、入っている段だけを渡す。
- * 返すのは 未了 — 担当者に何と言うかは、メニューから呼ぶ側（issue #151）が決める。
+ * steps はコアの段（→ core.js の coreSteps）で、入っている段だけを渡す。
+ * 返すのは notBuilt — 担当者に何と言うかは、メニューから呼ぶ側（issue #151）が決める。
  *
  * 構造が崩れていれば、1 行も読まずに名指しして止まる（→ verify-structure.js）。
- * 未了 と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、
+ * notBuilt と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、
  * 何を直すかはメニューの出方に関わらず同じである。
  */
-function 走らせる(スプレッドシート, 手順) {
-  構造を確かめる(スプレッドシート)
-  const 出力 = 組む(入力を読む(スプレッドシート), 手順)
-  出力を書く(スプレッドシート, 出力)
-  return 出力.未了
+function run(spreadsheet, steps) {
+  checkStructure(spreadsheet)
+  const output = build(readInputs(spreadsheet), steps)
+  writeOutputs(spreadsheet, output)
+  return output.notBuilt
 }
 
 /**
@@ -134,62 +134,62 @@ function 走らせる(スプレッドシート, 手順) {
  * SpreadsheetApp を掴まない純粋な関数にしてあるのは、手元で回して確かめられるようにするためである。
  * 黙って解釈し直さない — 文字列は両端の空白を落とすだけで、中身には手を入れない。
  */
-function 表現を揃える(値) {
-  if (値 === null || 値 === undefined) return ''
-  if (typeof 値 === 'number') return 値
-  if (typeof 値 === 'boolean') return 値 ? 'TRUE' : 'FALSE'
+function normalizeValue(value) {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'number') return value
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
   // instanceof を使わない。vm やダイアログを跨ぐと Date が別物になる
-  if (Object.prototype.toString.call(値) === '[object Date]') return 日時を文字列にする(値)
-  return String(値).trim()
+  if (Object.prototype.toString.call(value) === '[object Date]') return formatDateTime(value)
+  return String(value).trim()
 }
 
 /**
- * Date を 値の表現 の 3 つのどれかにする。
+ * Date を valueRepresentation の 3 つのどれかにする。
  *
  * 時刻だけのセルは 1899-12-30 を土台にした Date で返ってくるので、年で見分ける。
  * ちょうど 00:00:00 の日時は日付になる — セルの表示と同じで、ここで作り分けられる情報が無い。
  */
-function 日時を文字列にする(日時) {
-  const 年 = 日時.getFullYear()
-  const 日付 = `${年}-${二桁(日時.getMonth() + 1)}-${二桁(日時.getDate())}`
-  const 時刻 = `${二桁(日時.getHours())}:${二桁(日時.getMinutes())}`
-  const 秒 = 二桁(日時.getSeconds())
+function formatDateTime(dateTime) {
+  const year = dateTime.getFullYear()
+  const date = `${year}-${twoDigits(dateTime.getMonth() + 1)}-${twoDigits(dateTime.getDate())}`
+  const time = `${twoDigits(dateTime.getHours())}:${twoDigits(dateTime.getMinutes())}`
+  const seconds = twoDigits(dateTime.getSeconds())
 
-  if (年 < 1900) return 時刻
-  if (`${時刻}:${秒}` === '00:00:00') return 日付
-  return `${日付} ${時刻}:${秒}`
+  if (year < 1900) return time
+  if (`${time}:${seconds}` === '00:00:00') return date
+  return `${date} ${time}:${seconds}`
 }
 
-function 二桁(数) {
-  return String(数).length < 2 ? `0${数}` : String(数)
+function twoDigits(number) {
+  return String(number).length < 2 ? `0${number}` : String(number)
 }
 
-/** シートの構成から 1 枚を引く。無ければ名指しで止まる。 */
-function 構成を引く(名前) {
-  const 構成 = シートの構成.filter((c) => c.名前 === 名前)[0]
-  if (!構成) throw new Error(`シートの構成に「${名前}」が無い`)
-  return 構成
+/** sheetLayout から 1 枚を引く。無ければ名指しで止まる。 */
+function findLayout(name) {
+  const layout = sheetLayout.filter((c) => c.name === name)[0]
+  if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
+  return layout
 }
 
 /**
  * スプレッドシートから 1 枚を引く。無ければ名指しで止まる（黙って作らない）。
- * ここに来る前に 構造を確かめる が通っているので、走らせる 経由なら無いことは起きない。
- * それでも見るのは、入力を読む を単体で呼べる形にしてあるからである（→ verify-structure.js）。
+ * ここに来る前に checkStructure が通っているので、run 経由なら無いことは起きない。
+ * それでも見るのは、readInputs を単体で呼べる形にしてあるからである（→ verify-structure.js）。
  */
-function シートを引く(スプレッドシート, 名前) {
-  const シート = スプレッドシート.getSheetByName(名前)
-  if (!シート) {
+function findSheet(spreadsheet, name) {
+  const sheet = spreadsheet.getSheetByName(name)
+  if (!sheet) {
     throw new Error(
-      `シート「${名前}」が無い。テンプレートを組み立て直す（→ src/README.md）`,
+      `シート「${name}」が無い。テンプレートを組み立て直す（→ src/README.md）`,
     )
   }
-  return シート
+  return sheet
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    値の表現, 読むシート, 見出しの行数, 入力を読む, 区画を読む, 出力を書く, 走らせる, いまのスプレッドシートで走らせる,
-    表現を揃える, 日時を文字列にする, 構成を引く, シートを引く,
+    valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, writeOutputs, run, runOnActiveSpreadsheet,
+    normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }

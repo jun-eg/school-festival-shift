@@ -27,12 +27,12 @@
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
-/** 崩れの種類。文にするときの形が種類ごとに違う（→ 崩れを文にする）。 */
-const 崩れの種類 = {
-  シートが無い: 'シートが無い',
-  列が足りない: '列が足りない',
-  見出しが違う: '見出しが違う',
-  構成に無い列: '構成に無い列',
+/** 崩れの種類。文にするときの形が種類ごとに違う（→ breakageToText）。 */
+const breakageKind = {
+  missingSheet: 'シートが無い',
+  tooFewColumns: '列が足りない',
+  headingMismatch: '見出しが違う',
+  unknownColumn: '構成に無い列',
 }
 
 /**
@@ -42,55 +42,55 @@ const 崩れの種類 = {
  * 1 箇所ずつ走らせ直させるより、いま崩れている所を一度に出したほうが手数が少ない。
  * 読むのはシートごとに 1 回である。セル単位で往復しない（→ 6 の #2 の実装上の注意）。
  */
-function 崩れを名指しする(スプレッドシート) {
-  const 崩れ = []
+function nameBreakages(spreadsheet) {
+  const breakages = []
 
-  シートの構成.forEach((構成) => {
-    const シート = スプレッドシート.getSheetByName(構成.名前)
-    if (!シート) {
-      崩れ.push({ シート: 構成.名前, 種類: 崩れの種類.シートが無い, 行: null, 列: null, いま: [], 構成: [] })
+  sheetLayout.forEach((layout) => {
+    const sheet = spreadsheet.getSheetByName(layout.name)
+    if (!sheet) {
+      breakages.push({ sheet: layout.name, kind: breakageKind.missingSheet, row: null, column: null, actual: [], expected: [] })
       return
     }
-    列数を照らす(シート, 構成, 崩れ)
-    const 見出しの行 = 見出しの行を読む(シート, 構成)
-    区画を照らす(構成, 見出しの行, 崩れ)
-    構成に無い列を照らす(構成, 見出しの行, 崩れ)
+    checkColumnCount(sheet, layout, breakages)
+    const headerRows = readHeaderRows(sheet, layout)
+    checkSections(layout, headerRows, breakages)
+    checkUnknownColumns(layout, headerRows, breakages)
   })
 
-  return 崩れ
+  return breakages
 }
 
 /**
  * 走る前に構造を確かめる。崩れていれば、崩れている箇所を全部名指しして止まる。
  * 崩れていなければ空の配列を返す（分岐させるためではなく、0 箇所であることを見せるためである）。
  */
-function 構造を確かめる(スプレッドシート) {
-  const 崩れ = 崩れを名指しする(スプレッドシート)
-  if (崩れ.length === 0) return 崩れ
+function checkStructure(spreadsheet) {
+  const breakages = nameBreakages(spreadsheet)
+  if (breakages.length === 0) return breakages
 
   throw new Error(
-    `シートの構造が ${崩れ.length} 箇所崩れているので、生成を走らせない。`
+    `シートの構造が ${breakages.length} 箇所崩れているので、生成を走らせない。`
       + '中身を見てから決める（黙って直さない）。'
       + '戻せないときは、テンプレートをもう 1 回コピーして条件を入れ直す（→ src/README.md）。\n'
-      + 崩れ.map(崩れを文にする).join('\n'),
+      + breakages.map(breakageToText).join('\n'),
   )
 }
 
 /** 崩れ 1 つを、場所を名指しした 1 行にする。担当者が読むのはこの行である。 */
-function 崩れを文にする(崩れ) {
-  if (崩れ.種類 === 崩れの種類.シートが無い) {
-    return `シート「${崩れ.シート}」が無い`
+function breakageToText(breakage) {
+  if (breakage.kind === breakageKind.missingSheet) {
+    return `シート「${breakage.sheet}」が無い`
   }
-  if (崩れ.種類 === 崩れの種類.列が足りない) {
-    return `シート「${崩れ.シート}」の列が ${崩れ.いま[0]} 列しかない（構成は ${崩れ.構成[0]} 列である）`
+  if (breakage.kind === breakageKind.tooFewColumns) {
+    return `シート「${breakage.sheet}」の列が ${breakage.actual[0]} 列しかない（構成は ${breakage.expected[0]} 列である）`
   }
-  const 場所 = `「${崩れ.シート}」の ${崩れ.行} 行目 ${崩れ.列} 列目`
-  if (崩れ.種類 === 崩れの種類.構成に無い列) {
-    return `${場所} に、構成に無い「${崩れ.いま[0]}」がある`
+  const where = `「${breakage.sheet}」の ${breakage.row} 行目 ${breakage.column} 列目`
+  if (breakage.kind === breakageKind.unknownColumn) {
+    return `${where} に、構成に無い「${breakage.actual[0]}」がある`
   }
-  const 幅 = 崩れ.構成.length > 1 ? `から ${崩れ.構成.length} 列` : ''
-  return `${場所}${幅} が構成と違う。`
-    + `いま: ${崩れ.いま.map(空を書く).join(' / ')} ／ 構成: ${崩れ.構成.join(' / ')}`
+  const width = breakage.expected.length > 1 ? `から ${breakage.expected.length} 列` : ''
+  return `${where}${width} が構成と違う。`
+    + `いま: ${breakage.actual.map(showBlank).join(' / ')} ／ 構成: ${breakage.expected.join(' / ')}`
 }
 
 /**
@@ -98,63 +98,63 @@ function 崩れを文にする(崩れ) {
  * 列をまとめて消されると、読む前にここで名指しになる
  * （読む範囲をシートの外に取ると、名指しの代わりに範囲外の例外が出てしまう）。
  */
-function 列数を照らす(シート, 構成, 崩れ) {
-  const 右端 = 区画の右端(構成)
-  if (シート.getMaxColumns() >= 右端) return
+function checkColumnCount(sheet, layout, breakages) {
+  const rightEdge = sectionRightEdge(layout)
+  if (sheet.getMaxColumns() >= rightEdge) return
 
-  崩れ.push({
-    シート: 構成.名前,
-    種類: 崩れの種類.列が足りない,
-    行: null,
-    列: null,
-    いま: [String(シート.getMaxColumns())],
-    構成: [String(右端)],
+  breakages.push({
+    sheet: layout.name,
+    kind: breakageKind.tooFewColumns,
+    row: null,
+    column: null,
+    actual: [String(sheet.getMaxColumns())],
+    expected: [String(rightEdge)],
   })
 }
 
 /**
  * 見出しの行だけを 1 回で読む。区画の右端より右も、中身があるところまで読む（挿された列を見るため）。
  * 読む範囲をシートの外に出さない — 出すと、名指しの代わりに範囲外の例外が出てしまう。
- * 消された側は空として突き合わせるので、名指しは 区画を照らす から出る。
+ * 消された側は空として突き合わせるので、名指しは checkSections から出る。
  */
-function 見出しの行を読む(シート, 構成) {
-  const 行数 = Math.min(見出しの行数(構成), シート.getMaxRows())
-  const 列数 = Math.min(
-    Math.max(区画の右端(構成), シート.getLastColumn()),
-    シート.getMaxColumns(),
+function readHeaderRows(sheet, layout) {
+  const rowCount = Math.min(headerRowCount(layout), sheet.getMaxRows())
+  const columnCount = Math.min(
+    Math.max(sectionRightEdge(layout), sheet.getLastColumn()),
+    sheet.getMaxColumns(),
   )
-  return シート
-    .getRange(1, 1, 行数, 列数)
+  return sheet
+    .getRange(1, 1, rowCount, columnCount)
     .getValues()
-    .map((行) => 行.map((セル) => String(表現を揃える(セル))))
+    .map((row) => row.map((cell) => String(normalizeValue(cell))))
 }
 
 /** 区画ごとに、見出しのセルと列名の並びを突き合わせる。並びは 1 件にまとめて名指しする。 */
-function 区画を照らす(構成, 見出しの行, 崩れ) {
-  const 列名の行 = 見出しの行数(構成)
+function checkSections(layout, headerRows, breakages) {
+  const columnNameRow = headerRowCount(layout)
 
-  構成.区画.forEach((区画) => {
-    if (構成.区画の見出しを置くか) {
-      照らす(構成, 見出しの行, 1, 区画.開始列, [区画.見出し], 崩れ)
+  layout.sections.forEach((section) => {
+    if (layout.hasSectionHeadings) {
+      checkRange(layout, headerRows, 1, section.startColumn, [section.heading], breakages)
     }
-    照らす(構成, 見出しの行, 列名の行, 区画.開始列, 区画.列, 崩れ)
+    checkRange(layout, headerRows, columnNameRow, section.startColumn, section.columns, breakages)
   })
 }
 
 /** 1 行の中の 1 続きの範囲を突き合わせる。違えば 1 件だけ積む。 */
-function 照らす(構成, 見出しの行, 行, 開始列, これから, 崩れ) {
-  const いま = []
-  for (let i = 0; i < これから.length; i++) いま.push(セルを取る(見出しの行, 行, 開始列 + i))
-  const 期待 = これから.map((値) => String(値))
-  if (いま.join('\t') === 期待.join('\t')) return
+function checkRange(layout, headerRows, row, startColumn, expectedNames, breakages) {
+  const actual = []
+  for (let i = 0; i < expectedNames.length; i++) actual.push(cellAt(headerRows, row, startColumn + i))
+  const expected = expectedNames.map((value) => String(value))
+  if (actual.join('\t') === expected.join('\t')) return
 
-  崩れ.push({
-    シート: 構成.名前,
-    種類: 崩れの種類.見出しが違う,
-    行: 行,
-    列: 開始列,
-    いま: いま,
-    構成: 期待,
+  breakages.push({
+    sheet: layout.name,
+    kind: breakageKind.headingMismatch,
+    row: row,
+    column: startColumn,
+    actual: actual,
+    expected: expected,
   })
 }
 
@@ -164,44 +164,44 @@ function 照らす(構成, 見出しの行, 行, 開始列, これから, 崩れ
  * 見るのは区画のあいだ（条件入力は 5 区画が横に並ぶ）と、区画の右端より右である。
  * 列を 1 つ挿すと、右へずれた見出しがここに落ちてくる。
  */
-function 構成に無い列を照らす(構成, 見出しの行, 崩れ) {
-  const 区画の列 = {}
-  構成.区画.forEach((区画) => {
-    for (let i = 0; i < 区画.列.length; i++) 区画の列[区画.開始列 + i] = true
+function checkUnknownColumns(layout, headerRows, breakages) {
+  const sectionColumns = {}
+  layout.sections.forEach((section) => {
+    for (let i = 0; i < section.columns.length; i++) sectionColumns[section.startColumn + i] = true
   })
 
-  見出しの行.forEach((行の値, i) => {
-    行の値.forEach((セル, j) => {
-      if (セル === '' || 区画の列[j + 1]) return
-      崩れ.push({
-        シート: 構成.名前,
-        種類: 崩れの種類.構成に無い列,
-        行: i + 1,
-        列: j + 1,
-        いま: [セル],
-        構成: [],
+  headerRows.forEach((rowValues, i) => {
+    rowValues.forEach((cell, j) => {
+      if (cell === '' || sectionColumns[j + 1]) return
+      breakages.push({
+        sheet: layout.name,
+        kind: breakageKind.unknownColumn,
+        row: i + 1,
+        column: j + 1,
+        actual: [cell],
+        expected: [],
       })
     })
   })
 }
 
 /** 区画の右端の列。構成が要る列数である。 */
-function 区画の右端(構成) {
-  return 構成.区画.reduce((右端, 区画) => Math.max(右端, 区画.開始列 + 区画.列.length - 1), 0)
+function sectionRightEdge(layout) {
+  return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + section.columns.length - 1), 0)
 }
 
 /** 読んだ見出しの行から 1 セル取る。読んだ範囲の外は空として扱う（列を消された側である）。 */
-function セルを取る(見出しの行, 行, 列) {
-  const 行の値 = 見出しの行[行 - 1] || []
-  return 列 <= 行の値.length ? 行の値[列 - 1] : ''
+function cellAt(headerRows, row, column) {
+  const rowValues = headerRows[row - 1] || []
+  return column <= rowValues.length ? rowValues[column - 1] : ''
 }
 
 /** 空のセルは、文の中で見えないと場所が読めない。 */
-function 空を書く(値) {
-  return 値 === '' ? '（空）' : 値
+function showBlank(value) {
+  return value === '' ? '（空）' : value
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
-  module.exports = { 崩れの種類, 崩れを名指しする, 構造を確かめる, 崩れを文にする, 区画の右端 }
+  module.exports = { breakageKind, nameBreakages, checkStructure, breakageToText, sectionRightEdge }
 }

@@ -7,40 +7,43 @@
  *
  * 中身はそれぞれの issue が入れる。まだ入っていないものは、
  * 押したら「まだ作っていない」と名指しで言う（黙って走らない）。
+ *
+ * label は担当者に見える表示名、functionName は Apps Script が名前で呼ぶ関数である。
+ * 表示名は日本語のまま、呼ぶ名前は英字である（→ src/README.md の「名前の線」）。
  */
 
-const メニューの名前 = 'シフト'
+const menuName = 'シフト'
 
-const メニューの項目 = [
-  { 表示: 'フォームを作る', 関数: 'フォームを作る', issue: 144 },
-  { 表示: '生成', 関数: '生成', issue: 151 },
-  { 表示: '画像を書き出す', 関数: '画像を書き出す', issue: 157 },
+const menuItems = [
+  { label: 'フォームを作る', functionName: 'createForm', issue: 144 },
+  { label: '生成', functionName: 'generate', issue: 151 },
+  { label: '画像を書き出す', functionName: 'exportImages', issue: 157 },
 ]
 
 function onOpen() {
-  const メニュー = SpreadsheetApp.getUi().createMenu(メニューの名前)
-  メニューの項目.forEach((項目) => メニュー.addItem(項目.表示, 項目.関数))
-  メニュー.addToUi()
+  const menu = SpreadsheetApp.getUi().createMenu(menuName)
+  menuItems.forEach((item) => menu.addItem(item.label, item.functionName))
+  menu.addToUi()
 }
 
-function フォームを作る() {
-  まだ作っていない('フォームを作る')
+function createForm() {
+  notBuiltYet('フォームを作る')
 }
 
-function 生成() {
-  まだ作っていない('生成')
+function generate() {
+  notBuiltYet('生成')
 }
 
-function 画像を書き出す() {
-  まだ作っていない('画像を書き出す')
+function exportImages() {
+  notBuiltYet('画像を書き出す')
 }
 
 /** 名指しで止まる。黙って走らない（→ 2 の「止まる箇所」#8）。 */
-function まだ作っていない(表示) {
-  const 押された項目 = メニューの項目.filter((項目) => 項目.表示 === 表示)[0]
+function notBuiltYet(label) {
+  const pressed = menuItems.filter((item) => item.label === label)[0]
   SpreadsheetApp.getActive().toast(
-    `「${表示}」はまだ作っていない（issue #${押された項目.issue}）`,
-    メニューの名前,
+    `「${label}」はまだ作っていない（issue #${pressed.issue}）`,
+    menuName,
     5,
   )
 }

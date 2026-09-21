@@ -18,175 +18,175 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
-const ここ = path.dirname(fileURLToPath(import.meta.url))
+const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 偽のスプレッドシート ---------------------------------------------------
 
-class 偽の範囲 {
-  constructor(シート, 行, 列, 行数, 列数) {
-    Object.assign(this, { シート, 行, 列, 行数, 列数 })
+class FakeRange {
+  constructor(sheet, row, column, rowCount, columnCount) {
+    Object.assign(this, { sheet, row, column, rowCount, columnCount })
   }
-  位置() {
-    const 並び = []
-    for (let r = this.行; r < this.行 + this.行数; r++) {
-      for (let c = this.列; c < this.列 + this.列数; c++) 並び.push(`${r},${c}`)
+  positions() {
+    const keys = []
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) keys.push(`${r},${c}`)
     }
-    return 並び
+    return keys
   }
   getValues() {
-    const 表 = []
-    for (let r = this.行; r < this.行 + this.行数; r++) {
-      const 行 = []
-      for (let c = this.列; c < this.列 + this.列数; c++) 行.push(this.シート.セル.get(`${r},${c}`) ?? '')
-      表.push(行)
+    const table = []
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      const row = []
+      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
+      table.push(row)
     }
-    return 表
+    return table
   }
-  setValues(表) {
-    表.forEach((行, i) => 行.forEach((値, j) => this.シート.セル.set(`${this.行 + i},${this.列 + j}`, 値)))
+  setValues(table) {
+    table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
     return this
   }
-  setFontWeight(太さ) {
-    this.位置().forEach((鍵) => this.シート.太字.set(鍵, 太さ))
+  setFontWeight(weight) {
+    this.positions().forEach((key) => this.sheet.bold.set(key, weight))
     return this
   }
-  setNote(注記) {
-    this.位置().forEach((鍵) => this.シート.注記.set(鍵, 注記))
+  setNote(note) {
+    this.positions().forEach((key) => this.sheet.notes.set(key, note))
     return this
   }
 }
 
-class 偽の保護 {
-  constructor(シート) {
-    this.シート = シート
-    this.説明 = null
-    this.警告のみ = false
+class FakeProtection {
+  constructor(sheet) {
+    this.sheet = sheet
+    this.description = null
+    this.warningOnly = false
   }
-  setDescription(説明) { this.説明 = 説明; return this }
-  setWarningOnly(値) { this.警告のみ = 値; return this }
-  remove() { this.シート.保護 = this.シート.保護.filter((p) => p !== this) }
+  setDescription(description) { this.description = description; return this }
+  setWarningOnly(value) { this.warningOnly = value; return this }
+  remove() { this.sheet.protections = this.sheet.protections.filter((p) => p !== this) }
 }
 
-class 偽のシート {
-  constructor(名前) {
-    Object.assign(this, { 名前, セル: new Map(), 太字: new Map(), 注記: new Map(), 保護: [], 凍結行: 0 })
+class FakeSheet {
+  constructor(name) {
+    Object.assign(this, { name, cells: new Map(), bold: new Map(), notes: new Map(), protections: [], frozenRows: 0 })
   }
-  getName() { return this.名前 }
-  getRange(行, 列, 行数 = 1, 列数 = 1) { return new 偽の範囲(this, 行, 列, 行数, 列数) }
-  setFrozenRows(数) { this.凍結行 = 数 }
-  getProtections() { return [...this.保護] }
-  protect() { const p = new 偽の保護(this); this.保護.push(p); return p }
-  getLastRow() { return [...this.セル.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[0])), 0) }
-  getLastColumn() { return [...this.セル.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[1])), 0) }
+  getName() { return this.name }
+  getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
+  setFrozenRows(count) { this.frozenRows = count }
+  getProtections() { return [...this.protections] }
+  protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
+  getLastRow() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[0])), 0) }
+  getLastColumn() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[1])), 0) }
 }
 
-class 偽のスプレッドシート {
-  constructor(名前たち) {
-    this.シートたち = 名前たち.map((名前) => new 偽のシート(名前))
-    this.いまのシート = this.シートたち[0]
+class FakeSpreadsheet {
+  constructor(names) {
+    this.sheets = names.map((name) => new FakeSheet(name))
+    this.activeSheet = this.sheets[0]
   }
-  getSheets() { return [...this.シートたち] }
-  getSheetByName(名前) { return this.シートたち.find((s) => s.getName() === 名前) ?? null }
-  insertSheet(名前) { const s = new 偽のシート(名前); this.シートたち.push(s); return s }
-  deleteSheet(シート) { this.シートたち = this.シートたち.filter((s) => s !== シート) }
-  setActiveSheet(シート) { this.いまのシート = シート }
-  moveActiveSheet(位置) {
-    this.シートたち = this.シートたち.filter((s) => s !== this.いまのシート)
-    this.シートたち.splice(位置 - 1, 0, this.いまのシート)
+  getSheets() { return [...this.sheets] }
+  getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
+  insertSheet(name) { const s = new FakeSheet(name); this.sheets.push(s); return s }
+  deleteSheet(sheet) { this.sheets = this.sheets.filter((s) => s !== sheet) }
+  setActiveSheet(sheet) { this.activeSheet = sheet }
+  moveActiveSheet(position) {
+    this.sheets = this.sheets.filter((s) => s !== this.activeSheet)
+    this.sheets.splice(position - 1, 0, this.activeSheet)
   }
 }
 
 // ---- 読み込む ---------------------------------------------------------------
 
-const 文脈 = vm.createContext({
+const context = vm.createContext({
   SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' } },
   console: { log() {} },
 })
-for (const 名 of ['sheet-layout.js', 'build-template.js']) {
-  vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
+for (const name of ['sheet-layout.js', 'build-template.js']) {
+  vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
-const { 組み立てる } = 文脈
-const { シートの構成, 保護の説明 } = vm.runInContext('({ シートの構成, 保護の説明 })', 文脈)
+const { buildTemplateInto } = context
+const { sheetLayout, protectionNote } = vm.runInContext('({ sheetLayout, protectionNote })', context)
 
 // ---- 検査 -------------------------------------------------------------------
 
-const 落ちた = []
-const 通った = []
+const failed = []
+const passed = []
 
-function 見る(見出し, 実測, 期待) {
-  if (JSON.stringify(実測) === JSON.stringify(期待)) 通った.push(見出し)
-  else 落ちた.push({ 見出し, 実測, 期待 })
+function check(title, actual, expected) {
+  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
+  else failed.push({ title, actual, expected })
 }
 
-const 帳面 = new 偽のスプレッドシート(['シート1'])
-組み立てる(帳面)
+const book = new FakeSpreadsheet(['シート1'])
+buildTemplateInto(book)
 
-見る(
+check(
   '① 5 枚が構成の並びででき、空の「シート1」が消えた',
-  帳面.getSheets().map((s) => s.getName()),
-  シートの構成.map((c) => c.名前),
+  book.getSheets().map((s) => s.getName()),
+  sheetLayout.map((c) => c.name),
 )
 
-見る(
+check(
   '① 条件入力の 1 行目は区画の見出しで、2 行目が列名である',
   [
-    帳面.getSheetByName('条件入力').getRange(1, 1, 1, 22).getValues()[0].filter((v) => v !== ''),
-    帳面.getSheetByName('条件入力').getRange(2, 1, 1, 5).getValues()[0],
+    book.getSheetByName('条件入力').getRange(1, 1, 1, 22).getValues()[0].filter((v) => v !== ''),
+    book.getSheetByName('条件入力').getRange(2, 1, 1, 5).getValues()[0],
   ],
   [
-    シートの構成[0].区画.map((k) => k.見出し),
+    sheetLayout[0].sections.map((k) => k.heading),
     ['日付', '準備開始', '調理開始', '調理終了', '片付け開始'],
   ],
 )
 
-見る(
+check(
   '① 回答の 1 行目にフォームの 10 列が並んでいる',
-  帳面.getSheetByName('回答').getRange(1, 1, 1, 10).getValues()[0],
-  シートの構成[1].区画[0].列,
+  book.getSheetByName('回答').getRange(1, 1, 1, 10).getValues()[0],
+  sheetLayout[1].sections[0].columns,
 )
 
-見る(
+check(
   '② 保護がかかったのは生成シートの 3 枚だけである',
-  帳面.getSheets().filter((s) => s.保護.length > 0).map((s) => s.getName()),
+  book.getSheets().filter((s) => s.protections.length > 0).map((s) => s.getName()),
   ['回答', '検証結果', '指標'],
 )
 
-見る(
+check(
   '② かかり方は「警告のみ」で、説明が付いている',
-  帳面.getSheets().flatMap((s) => s.保護).map((p) => [p.警告のみ, p.説明]),
-  [[true, 保護の説明], [true, 保護の説明], [true, 保護の説明]],
+  book.getSheets().flatMap((s) => s.protections).map((p) => [p.warningOnly, p.description]),
+  [[true, protectionNote], [true, protectionNote], [true, protectionNote]],
 )
 
-const 一回目の姿 = JSON.stringify(帳面.getSheets().map((s) => [s.getName(), [...s.セル], s.凍結行, s.保護.length]))
-const 二回目の記録 = 組み立てる(帳面)
-const 二回目の姿 = JSON.stringify(帳面.getSheets().map((s) => [s.getName(), [...s.セル], s.凍結行, s.保護.length]))
+const shapeAfterFirstRun = JSON.stringify(book.getSheets().map((s) => [s.getName(), [...s.cells], s.frozenRows, s.protections.length]))
+const secondRunLog = buildTemplateInto(book)
+const shapeAfterSecondRun = JSON.stringify(book.getSheets().map((s) => [s.getName(), [...s.cells], s.frozenRows, s.protections.length]))
 
-見る('③ 2 回目を走らせても形が変わらない', 二回目の姿, 一回目の姿)
-見る(
+check('③ 2 回目を走らせても形が変わらない', shapeAfterSecondRun, shapeAfterFirstRun)
+check(
   '③ 2 回目は何も作らない（記録に「作った」が出ない）',
-  二回目の記録.filter((行) => 行.includes('作った') || 行.includes('置いた')),
+  secondRunLog.filter((line) => line.includes('作った') || line.includes('置いた')),
   [],
 )
 
-const 壊した帳面 = new 偽のスプレッドシート(['シート1'])
-組み立てる(壊した帳面)
-壊した帳面.getSheetByName('指標').getRange(1, 3, 1, 1).setValues([['合計時間（時）']])
-let 止まった = null
+const brokenBook = new FakeSpreadsheet(['シート1'])
+buildTemplateInto(brokenBook)
+brokenBook.getSheetByName('指標').getRange(1, 3, 1, 1).setValues([['合計時間（時）']])
+let stopped = null
 try {
-  組み立てる(壊した帳面)
-} catch (例外) {
-  止まった = 例外.message
+  buildTemplateInto(brokenBook)
+} catch (error) {
+  stopped = error.message
 }
 
-見る(
+check(
   '④ 見出しが構成と違うと、シート名を名指しして止まる',
-  [止まった !== null, 止まった?.includes('「指標」'), 止まった?.includes('黙って直さない')],
+  [stopped !== null, stopped?.includes('「指標」'), stopped?.includes('黙って直さない')],
   [true, true, true],
 )
-見る(
+check(
   '④ 止まったとき、書き換えられたセルを上書きしていない',
-  壊した帳面.getSheetByName('指標').getRange(1, 3, 1, 1).getValues()[0],
+  brokenBook.getSheetByName('指標').getRange(1, 3, 1, 1).getValues()[0],
   ['合計時間（時）'],
 )
 
@@ -194,16 +194,16 @@ try {
 
 console.log('組み立ての検査（src/build-template.js／偽のスプレッドシートの上）')
 console.log('')
-for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
-for (const { 見出し, 実測, 期待 } of 落ちた) {
-  console.log(`  NG   ${見出し}`)
-  console.log(`         実測: ${JSON.stringify(実測)}`)
-  console.log(`         期待: ${JSON.stringify(期待)}`)
+for (const title of passed) console.log(`  OK   ${title}`)
+for (const { title, actual, expected } of failed) {
+  console.log(`  NG   ${title}`)
+  console.log(`         実測: ${JSON.stringify(actual)}`)
+  console.log(`         期待: ${JSON.stringify(expected)}`)
 }
 console.log('')
-if (落ちた.length === 0) {
-  console.log(`結果: 全件一致（${通った.length} 件）`)
+if (failed.length === 0) {
+  console.log(`結果: 全件一致（${passed.length} 件）`)
   process.exit(0)
 }
-console.log(`結果: 不一致 ${落ちた.length} 件 ／ 一致 ${通った.length} 件`)
+console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
 process.exit(1)

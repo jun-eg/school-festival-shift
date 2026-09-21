@@ -18,43 +18,43 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
-const ここ = path.dirname(fileURLToPath(import.meta.url))
+const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 読み込む ---------------------------------------------------------------
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
-const 文脈 = vm.createContext({})
-for (const 名 of ['sheet-layout.js', 'core.js']) {
-  vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
+const context = vm.createContext({})
+for (const name of ['sheet-layout.js', 'core.js']) {
+  vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
-const { 組む, 入力の名前, 条件の名前, シートの列 } = 文脈
-const { コアの口, 出力の名前, シートの構成, 検証の種別 } = vm.runInContext(
-  '({ コアの口, 出力の名前, シートの構成, 検証の種別 })',
-  文脈,
+const { build, inputNames, conditionNames, sheetColumns } = context
+const { coreSteps, outputNames, sheetLayout, checkKind } = vm.runInContext(
+  '({ coreSteps, outputNames, sheetLayout, checkKind })',
+  context,
 )
 
-const 落ちた = []
-const 通った = []
+const failed = []
+const passed = []
 
-function 見る(見出し, 実測, 期待) {
-  if (JSON.stringify(実測) === JSON.stringify(期待)) 通った.push(見出し)
-  else 落ちた.push({ 見出し, 実測, 期待 })
+function check(title, actual, expected) {
+  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
+  else failed.push({ title, actual, expected })
 }
 
 /** 止まることを見る。止まらなければ null が返る。 */
-function 止まった理由(はたらき) {
+function whyItStopped(work) {
   try {
-    はたらき()
+    work()
     return null
-  } catch (例外) {
-    return 例外.message
+  } catch (error) {
+    return error.message
   }
 }
 
 /** 骨組みを回すのに足りるだけの入力。値は data/ の転記元と同じ表現で置く。 */
-function 骨組みの入力(上書き) {
-  const 入力 = {
+function skeletonInputs(overrides) {
+  const inputs = {
     '日ごとの営業 4 時刻': [['2025-11-01', '08:00', '10:00', '20:00', '20:00']],
     '役割と必要人数': [['', '', '', '調理', 2]],
     '調理責任者の学年': [['3年生'], ['4年生']],
@@ -66,225 +66,225 @@ function 骨組みの入力(上書き) {
     ]],
     '割り当て': [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']],
   }
-  Object.keys(上書き || {}).forEach((名前) => { 入力[名前] = 上書き[名前] })
-  return 入力
+  Object.keys(overrides || {}).forEach((name) => { inputs[name] = overrides[name] })
+  return inputs
 }
 
 // ---- ① 境目がコードの上に立っているか ---------------------------------------
 
 // 「掴まない」とコメントに書いてあるのは掴んだうちに入らないので、コメントを落としてから見る。
-function コメントを落とす(ソース) {
-  return ソース.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
-const SpreadsheetAppを掴むファイル = fs
-  .readdirSync(ここ)
-  .filter((名) => 名.endsWith('.js'))
-  .filter((名) => コメントを落とす(fs.readFileSync(path.join(ここ, 名), 'utf8')).includes('SpreadsheetApp'))
+const filesTouchingSpreadsheetApp = fs
+  .readdirSync(here)
+  .filter((name) => name.endsWith('.js'))
+  .filter((name) => stripComments(fs.readFileSync(path.join(here, name), 'utf8')).includes('SpreadsheetApp'))
   .sort()
 
-見る(
+check(
   '① SpreadsheetApp を掴むのは 3 ファイルだけである（コアの 2 つも、構造の検証も掴まない）',
-  SpreadsheetAppを掴むファイル,
+  filesTouchingSpreadsheetApp,
   ['build-template.js', 'menu.js', 'shell.js'],
 )
 
-見る(
+check(
   '① コアを読むのに SpreadsheetApp が要らなかった（この検査が文脈に置いていない）',
-  typeof 組む,
+  typeof build,
   'function',
 )
 
 // ---- ② 配列を渡し、配列を受け取る -------------------------------------------
 
-const 検証結果の列 = シートの列('検証結果')
-const 種別の列 = 検証結果の列.indexOf('種別')
+const checkResultColumns = sheetColumns('検証結果')
+const kindColumn = checkResultColumns.indexOf('種別')
 
-function 検証結果の行(種別, 内容) {
-  const 行 = 検証結果の列.map(() => '')
-  行[種別の列] = 種別
-  行[検証結果の列.indexOf('内容')] = 内容
-  return 行
+function checkResultRow(kind, detail) {
+  const row = checkResultColumns.map(() => '')
+  row[kindColumn] = kind
+  row[checkResultColumns.indexOf('内容')] = detail
+  return row
 }
 
-const 全部そろった手順 = {
-  取り込む: (回答) => 回答.map((行) => [行[1], 行[3], 行[4]]),
-  展開する: (希望) => 希望.map((行) => [行[0], '2025-11-01', '08:00', '08:30']),
-  生成する: (候補) => 候補.map((行) => ['2025-11-01', '08:00', '08:30', '調理', 行[0], '高木琴音']),
-  違反を数える: () => [検証結果の行(検証の種別.違反, '検便を通っていない')],
-  未充足を名指しする: () => [検証結果の行(検証の種別.未充足, 'あと 1 人')],
-  指標を出す: (割り当て) => 割り当て.map((行) => [行[4], 行[5], 0.5, 1, 0]),
+const allStepsIn = {
+  '取り込む': (answers) => answers.map((row) => [row[1], row[3], row[4]]),
+  '展開する': (wishes) => wishes.map((row) => [row[0], '2025-11-01', '08:00', '08:30']),
+  '生成する': (candidates) => candidates.map((row) => ['2025-11-01', '08:00', '08:30', '調理', row[0], '高木琴音']),
+  '違反を数える': () => [checkResultRow(checkKind.violation, '検便を通っていない')],
+  '未充足を名指しする': () => [checkResultRow(checkKind.unmet, 'あと 1 人')],
+  '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
 }
 
-const そろった出力 = 組む(骨組みの入力(), 全部そろった手順)
+const fullOutput = build(skeletonInputs(), allStepsIn)
 
-見る(
+check(
   '② 生成シート 3 枚ぶんの行が、行の配列として返る',
-  出力の名前.map((名前) => Array.isArray(そろった出力[名前]) && そろった出力[名前].every((行) => Array.isArray(行))),
+  outputNames.map((name) => Array.isArray(fullOutput[name]) && fullOutput[name].every((row) => Array.isArray(row))),
   [true, true, true],
 )
 
-見る(
+check(
   '② 返った行の列数が、シートの構成どおりである',
-  出力の名前.map((名前) => そろった出力[名前].map((行) => 行.length)),
-  出力の名前.map((名前) => そろった出力[名前].map(() => シートの列(名前).length)),
+  outputNames.map((name) => fullOutput[name].map((row) => row.length)),
+  outputNames.map((name) => fullOutput[name].map(() => sheetColumns(name).length)),
 )
 
-見る(
+check(
   '② 違反と未充足が、種別で分かれて同じ 1 枚に並ぶ（→ 5-4）',
-  そろった出力['検証結果'].map((行) => 行[種別の列]),
-  [検証の種別.違反, 検証の種別.未充足],
+  fullOutput['検証結果'].map((row) => row[kindColumn]),
+  [checkKind.violation, checkKind.unmet],
 )
 
-見る('② 全部そろえば、未了は 1 つも無い', そろった出力.未了, [])
+check('② 全部そろえば、未了は 1 つも無い', fullOutput.notBuilt, [])
 
-見る(
+check(
   '② 同じ入力を 2 回渡すと同じ出力が返る（決定的である → 6 の #3 の理由 ③）',
-  JSON.stringify(組む(骨組みの入力(), 全部そろった手順)),
-  JSON.stringify(そろった出力),
+  JSON.stringify(build(skeletonInputs(), allStepsIn)),
+  JSON.stringify(fullOutput),
 )
 
 // ---- ③ 骨組みのまま回す -----------------------------------------------------
 
-const 骨組みの出力 = 組む(骨組みの入力())
+const skeletonOutput = build(skeletonInputs())
 
-見る(
+check(
   '③ 入っていない段が、issue 番号つきで全部名指しされる',
-  骨組みの出力.未了.map((口) => [口.名前, 口.issue]),
-  コアの口.map((口) => [口.名前, 口.issue]),
+  skeletonOutput.notBuilt.map((step) => [step.name, step.issue]),
+  coreSteps.map((step) => [step.name, step.issue]),
 )
 
-見る(
+check(
   '③ 生成シート 3 枚は空の配列で返る（何も書かない）',
-  出力の名前.map((名前) => 骨組みの出力[名前]),
+  outputNames.map((name) => skeletonOutput[name]),
   [[], [], []],
 )
 
-見る(
+check(
   '③ 未了は、どのシートに出す段だったかを持っている（殻が上書きを避けるのに要る）',
-  骨組みの出力.未了.map((口) => 口.出す先),
-  コアの口.map((口) => 口.出す先),
+  skeletonOutput.notBuilt.map((step) => step.writesTo),
+  coreSteps.map((step) => step.writesTo),
 )
 
 // ---- ④ 段を差し替えて、先に回す ---------------------------------------------
 
-const 数える側だけ = 組む(骨組みの入力(), {
-  未充足を名指しする: () => [検証結果の行(検証の種別.未充足, '調理 が あと 1 人')],
+const countingSideOnly = build(skeletonInputs(), {
+  '未充足を名指しする': () => [checkResultRow(checkKind.unmet, '調理 が あと 1 人')],
 })
 
-見る(
+check(
   '④ 数える側だけを入れても回る（生成が無いまま 8 の 3 を先に作れる）',
-  [数える側だけ['検証結果'].length, 数える側だけ['検証結果'][0][種別の列]],
-  [1, 検証の種別.未充足],
+  [countingSideOnly['検証結果'].length, countingSideOnly['検証結果'][0][kindColumn]],
+  [1, checkKind.unmet],
 )
 
-見る(
+check(
   '④ 入れた段は未了から消え、残りだけが名指しされる',
-  数える側だけ.未了.map((口) => 口.名前),
-  コアの口.map((口) => 口.名前).filter((名前) => 名前 !== '未充足を名指しする'),
+  countingSideOnly.notBuilt.map((step) => step.name),
+  coreSteps.map((step) => step.name).filter((name) => name !== '未充足を名指しする'),
 )
 
 // ---- ④-2 友達欄は生成の側へ渡らない（→ 5-2） --------------------------------
 
-const 受け取った引数 = {}
-組む(骨組みの入力(), {
-  生成する: (候補, 条件, 固定) => { 受け取った引数.生成する = [候補, 条件, 固定]; return [] },
-  違反を数える: (割り当て, 条件) => { 受け取った引数.違反を数える = [割り当て, 条件]; return [] },
+const receivedArgs = {}
+build(skeletonInputs(), {
+  '生成する': (candidates, conditions, fixed) => { receivedArgs['生成する'] = [candidates, conditions, fixed]; return [] },
+  '違反を数える': (assignments, conditions) => { receivedArgs['違反を数える'] = [assignments, conditions]; return [] },
 })
 
-見る(
+check(
   '④-2 生成に渡るのは条件入力の 5 区画だけで、回答そのものは渡らない（→ 5-2）',
-  Object.keys(受け取った引数.生成する[1]),
-  条件の名前(),
+  Object.keys(receivedArgs['生成する'][1]),
+  conditionNames(),
 )
 
-見る(
+check(
   '④-2 生成と数える側に渡る条件の列に、友達欄が 1 つも無い（→ 5-2）',
-  シートの構成
-    .filter((構成) => 構成.名前 === '条件入力')[0]
-    .区画.flatMap((区画) => 区画.列)
-    .filter((名) => 名.includes('お友達')),
+  sheetLayout
+    .filter((layout) => layout.name === '条件入力')[0]
+    .sections.flatMap((section) => section.columns)
+    .filter((name) => name.includes('お友達')),
   [],
 )
 
-見る(
+check(
   '④-2 固定として渡るのは、前の周の割り当てシートの行である（→ 5-3）',
-  受け取った引数.生成する[2],
-  骨組みの入力()['割り当て'],
+  receivedArgs['生成する'][2],
+  skeletonInputs()['割り当て'],
 )
 
 // ---- ⑤ 黙って直さずに止まる -------------------------------------------------
 
-const 揺れたまま = 止まった理由(() => 組む(骨組みの入力({
+const stillWobbling = whyItStopped(() => build(skeletonInputs({
   '日ごとの営業 4 時刻': [['2025-11-01', new Date(1899, 11, 30, 8, 0), '10:00', '20:00', '20:00']],
 })))
 
-見る(
+check(
   '⑤ Date が混じったまま渡すと、区画と行と列を名指しして止まる',
   [
-    揺れたまま !== null,
-    揺れたまま?.includes('「日ごとの営業 4 時刻」の 1 行目 2 列目'),
-    揺れたまま?.includes('殻'),
+    stillWobbling !== null,
+    stillWobbling?.includes('「日ごとの営業 4 時刻」の 1 行目 2 列目'),
+    stillWobbling?.includes('殻'),
   ],
   [true, true, true],
 )
 
-見る(
+check(
   '⑤ null も真偽値も表現の揺れとして止まる',
   [
-    止まった理由(() => 組む(骨組みの入力({ '調理責任者の学年': [[null]] })))?.includes('表現が揃っていない'),
-    止まった理由(() => 組む(骨組みの入力({ '調理責任者の学年': [[true]] })))?.includes('表現が揃っていない'),
+    whyItStopped(() => build(skeletonInputs({ '調理責任者の学年': [[null]] })))?.includes('表現が揃っていない'),
+    whyItStopped(() => build(skeletonInputs({ '調理責任者の学年': [[true]] })))?.includes('表現が揃っていない'),
   ],
   [true, true],
 )
 
-見る(
+check(
   '⑤ 入力の名前が欠けていれば、名指しして止まる',
-  止まった理由(() => {
-    const 入力 = 骨組みの入力()
-    delete 入力['委員会の指定枠']
-    return 組む(入力)
+  whyItStopped(() => {
+    const inputs = skeletonInputs()
+    delete inputs['委員会の指定枠']
+    return build(inputs)
   })?.includes('「委員会の指定枠」'),
   true,
 )
 
-見る(
+check(
   '⑤ 入力に無い名前が渡れば、名指しして止まる（検証結果と指標は読まない → 5-4・5 の #7）',
-  止まった理由(() => 組む(骨組みの入力({ '検証結果': [] })))?.includes('「検証結果」'),
+  whyItStopped(() => build(skeletonInputs({ '検証結果': [] })))?.includes('「検証結果」'),
   true,
 )
 
-const 列数が違う = 止まった理由(() => 組む(骨組みの入力(), {
-  指標を出す: () => [['EED2349987', '高木琴音']],
+const columnCountDiffers = whyItStopped(() => build(skeletonInputs(), {
+  '指標を出す': () => [['EED2349987', '高木琴音']],
 }))
 
-見る(
+check(
   '⑤ 段が返した行の列数が構成と違えば、詰めずに名指しして止まる',
-  [列数が違う !== null, 列数が違う?.includes('「指標」'), 列数が違う?.includes('列数が構成と違う')],
+  [columnCountDiffers !== null, columnCountDiffers?.includes('「指標」'), columnCountDiffers?.includes('列数が構成と違う')],
   [true, true, true],
 )
 
-const 決めていない種別 = 止まった理由(() => 組む(骨組みの入力(), {
-  違反を数える: () => [検証結果の行('注意', '気になる')],
+const undecidedKind = whyItStopped(() => build(skeletonInputs(), {
+  '違反を数える': () => [checkResultRow('注意', '気になる')],
 }))
 
-見る(
+check(
   '⑤ 検証結果の種別が違反と未充足の外にあれば、止まる（→ 5-4）',
-  [決めていない種別 !== null, 決めていない種別?.includes('5-4')],
+  [undecidedKind !== null, undecidedKind?.includes('5-4')],
   [true, true],
 )
 
 // ---- 入力の名前が sheet-layout.js から引かれているか ------------------------
 
-見る(
+check(
   '入力の名前は、条件入力の 5 区画 ＋ 回答 ＋ 割り当てである（検証結果と指標は入らない）',
-  入力の名前(),
-  [...条件の名前(), '回答', '割り当て'],
+  inputNames(),
+  [...conditionNames(), '回答', '割り当て'],
 )
 
-見る(
+check(
   '出力の名前は、どれも シートの構成 にあるシートである',
-  出力の名前.filter((名前) => !シートの構成.some((構成) => 構成.名前 === 名前)),
+  outputNames.filter((name) => !sheetLayout.some((layout) => layout.name === name)),
   [],
 )
 
@@ -292,16 +292,16 @@ const 決めていない種別 = 止まった理由(() => 組む(骨組みの入
 
 console.log('コアの検査（src/core.js／スプレッドシート無し）')
 console.log('')
-for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
-for (const { 見出し, 実測, 期待 } of 落ちた) {
-  console.log(`  NG   ${見出し}`)
-  console.log(`         実測: ${JSON.stringify(実測)}`)
-  console.log(`         期待: ${JSON.stringify(期待)}`)
+for (const title of passed) console.log(`  OK   ${title}`)
+for (const { title, actual, expected } of failed) {
+  console.log(`  NG   ${title}`)
+  console.log(`         実測: ${JSON.stringify(actual)}`)
+  console.log(`         期待: ${JSON.stringify(expected)}`)
 }
 console.log('')
-if (落ちた.length === 0) {
-  console.log(`結果: 全件一致（${通った.length} 件）`)
+if (failed.length === 0) {
+  console.log(`結果: 全件一致（${passed.length} 件）`)
   process.exit(0)
 }
-console.log(`結果: 不一致 ${落ちた.length} 件 ／ 一致 ${通った.length} 件`)
+console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
 process.exit(1)

@@ -6,10 +6,10 @@
  * — ダイアログの中に SpreadsheetApp は無い。
  *
  * 読み書きと、値の表現を揃えるのは shell.js の仕事である。
- * ここに入ってくるのは、文字列と数値だけでできた行の配列である（→ 表現を確かめる）。
+ * ここに入ってくるのは、文字列と数値だけでできた行の配列である（→ checkRepresentation）。
  * 揺れを殻に閉じ込めないと、決定性がコアの外で崩れる（→ 6 の #8 の理由 ③）。
  *
- * ここは骨組みである。各段の中身は、それぞれの issue が入れる（→ コアの口）。
+ * ここは骨組みである。各段の中身は、それぞれの issue が入れる（→ coreSteps）。
  * 入っていない段は空の配列を返し、「まだ作っていない」を名指しで持ち帰る。黙って走らない。
  * ここに判断を新しく書かない（→ src/README.md）。
  *
@@ -19,22 +19,23 @@
 
 /**
  * コアの段と、それぞれの中身を入れる issue（docs/tech-requirements.md 8「作業の順序」）。
- * 並びは 組む が呼ぶ順である。出す先 は、その段が行を出す生成シートである（出さない段は null）。
+ * 並びは build が呼ぶ順である。writesTo は、その段が行を出す生成シートである（出さない段は null）。
+ * name の値は段の名前で、steps のキーと突き合わせる文字列である（→ build）。
  */
-const コアの口 = [
-  { 名前: '取り込む', issue: 146, 出す先: null, 何をするか: '回答の行を 1 人 1 件に畳む（規則 2 ／ 8 の 6）' },
-  { 名前: '展開する', issue: 149, 出す先: null, 何をするか: '回答文字列をその人の 30 分枠の集合にする（規則 1 ／ 8 の 7）' },
-  { 名前: '生成する', issue: 151, 出す先: '割り当て', 何をするか: '候補・条件・固定から割り当ての行を組む（5 の #6 ／ 8 の 8）' },
-  { 名前: '違反を数える', issue: 141, 出す先: '検証結果', 何をするか: '置いた人が条件を破っている所を行にする（5-4 ／ 8 の 3）' },
-  { 名前: '未充足を名指しする', issue: 142, 出す先: '検証結果', 何をするか: '人数が足りない枠を行にする（5-4 ／ 8 の 3）' },
-  { 名前: '指標を出す', issue: 154, 出す先: '指標', 何をするか: '人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7 ／ 8 の 9）' },
+const coreSteps = [
+  { name: '取り込む', issue: 146, writesTo: null, whatItDoes: '回答の行を 1 人 1 件に畳む（規則 2 ／ 8 の 6）' },
+  { name: '展開する', issue: 149, writesTo: null, whatItDoes: '回答文字列をその人の 30 分枠の集合にする（規則 1 ／ 8 の 7）' },
+  { name: '生成する', issue: 151, writesTo: '割り当て', whatItDoes: '候補・条件・固定から割り当ての行を組む（5 の #6 ／ 8 の 8）' },
+  { name: '違反を数える', issue: 141, writesTo: '検証結果', whatItDoes: '置いた人が条件を破っている所を行にする（5-4 ／ 8 の 3）' },
+  { name: '未充足を名指しする', issue: 142, writesTo: '検証結果', whatItDoes: '人数が足りない枠を行にする（5-4 ／ 8 の 3）' },
+  { name: '指標を出す', issue: 154, writesTo: '指標', whatItDoes: '人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7 ／ 8 の 9）' },
 ]
 
 /** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */
-const 出力の名前 = ['割り当て', '検証結果', '指標']
+const outputNames = ['割り当て', '検証結果', '指標']
 
 /** コアが読まないシート。生成しか書かないので、入力にならない（→ 5-4・5 の #7）。 */
-const 読まないシート = ['検証結果', '指標']
+const sheetsNotRead = ['検証結果', '指標']
 
 /**
  * コアが受け取る入力の名前。値はどれも「行の配列」である。
@@ -42,107 +43,107 @@ const 読まないシート = ['検証結果', '指標']
  * 割り当てが入っているのは、前の周の手直しを固定として積み直すためである（→ 5-3）。
  * 名前は sheet-layout.js から引く — 文字列を二重に持つと、片方が古くなる。
  */
-function 入力の名前() {
-  const 並び = []
-  シートの構成.forEach((構成) => {
-    if (読まないシート.indexOf(構成.名前) !== -1) return
-    構成.区画.forEach((区画) => 並び.push(構成.区画の見出しを置くか ? 区画.見出し : 構成.名前))
+function inputNames() {
+  const names = []
+  sheetLayout.forEach((layout) => {
+    if (sheetsNotRead.indexOf(layout.name) !== -1) return
+    layout.sections.forEach((section) => names.push(layout.hasSectionHeadings ? section.heading : layout.name))
   })
-  return 並び
+  return names
 }
 
 /** 条件入力の 5 区画の名前（→ 5-1 の #1〜#5）。生成と数える側に渡るのはここまでである。 */
-function 条件の名前() {
-  return シートの構成
-    .filter((構成) => 構成.名前 === '条件入力')[0]
-    .区画.map((区画) => 区画.見出し)
+function conditionNames() {
+  return sheetLayout
+    .filter((layout) => layout.name === '条件入力')[0]
+    .sections.map((section) => section.heading)
 }
 
 /**
  * 入力の行から、生成シート 3 枚の行を組む。
  *
- * 手順 は段の名前から関数への対応である（渡さなかった段は「まだ作っていない」になる）。
+ * steps は段の名前から関数への対応である（渡さなかった段は「まだ作っていない」になる）。
  * 差し替えで渡せる形にしてあるのは、8 の 3 が 8 の 8 より先にあるからである
  * — 数える側だけを先に入れて、生成が無いまま回せる。
  *
- * 返すもの: { 割り当て, 検証結果, 指標, 未了 }。
- * 未了 は中身の入っていない段の名指しである。どう見せるか・どこまで書くかは殻が決める。
+ * 返すもの: { 割り当て, 検証結果, 指標, notBuilt }。シート 3 枚のキーは、シート名そのものである。
+ * notBuilt は中身の入っていない段の名指しである。どう見せるか・どこまで書くかは殻が決める。
  */
-function 組む(入力, 手順) {
-  表現を確かめる(入力)
-  const 段 = 手順 || {}
-  const 未了 = []
+function build(inputs, steps) {
+  checkRepresentation(inputs)
+  const stepsToCall = steps || {}
+  const notBuilt = []
 
-  function 段を呼ぶ(名前, 引数) {
-    if (typeof 段[名前] !== 'function') {
-      未了.push(口を引く(名前))
+  function callStep(name, args) {
+    if (typeof stepsToCall[name] !== 'function') {
+      notBuilt.push(findStep(name))
       return []
     }
-    return 段[名前].apply(null, 引数)
+    return stepsToCall[name].apply(null, args)
   }
 
   // 回答をそのまま先へ流さない。取り込み（規則 2）を通った希望だけが下流へ行く。
   // 友達欄が生成の入力に現れないのは、この形の帰結である（→ 5-2）。
-  const 希望 = 段を呼ぶ('取り込む', [入力['回答']])
-  const 候補 = 段を呼ぶ('展開する', [希望, 入力['日ごとの営業 4 時刻']])
+  const wishes = callStep('取り込む', [inputs['回答']])
+  const candidates = callStep('展開する', [wishes, inputs['日ごとの営業 4 時刻']])
 
-  const 条件 = 条件を取り出す(入力)
-  const 固定 = 入力['割り当て'] // 前の周で担当者が書き換えたところ（→ 5-3）
-  const 割り当て = 段を呼ぶ('生成する', [候補, 条件, 固定])
+  const conditions = takeConditions(inputs)
+  const fixed = inputs['割り当て'] // 前の周で担当者が書き換えたところ（→ 5-3）
+  const assignments = callStep('生成する', [candidates, conditions, fixed])
 
   // 違反と未充足は別に数えて、同じ 1 枚に種別で分けて並べる（→ 5-4）。
-  const 違反 = 段を呼ぶ('違反を数える', [割り当て, 条件, 希望])
-  const 未充足 = 段を呼ぶ('未充足を名指しする', [割り当て, 条件])
-  const 指標 = 段を呼ぶ('指標を出す', [割り当て])
+  const violations = callStep('違反を数える', [assignments, conditions, wishes])
+  const unmet = callStep('未充足を名指しする', [assignments, conditions])
+  const metrics = callStep('指標を出す', [assignments])
 
-  const 出力 = { 割り当て: 割り当て, 検証結果: 違反.concat(未充足), 指標: 指標 }
-  出力を確かめる(出力)
-  出力.未了 = 未了
-  return 出力
+  const output = { '割り当て': assignments, '検証結果': violations.concat(unmet), '指標': metrics }
+  checkOutput(output)
+  output.notBuilt = notBuilt
+  return output
 }
 
 /** 入力から条件入力の 5 区画だけを取り出す（→ 5-1 の #1〜#5）。 */
-function 条件を取り出す(入力) {
-  const 条件 = {}
-  条件の名前().forEach((名前) => { 条件[名前] = 入力[名前] })
-  return 条件
+function takeConditions(inputs) {
+  const conditions = {}
+  conditionNames().forEach((name) => { conditions[name] = inputs[name] })
+  return conditions
 }
 
-/** 段の名前から コアの口 の 1 行を引く。名前が表に無ければ、そこで止まる。 */
-function 口を引く(名前) {
-  const 口 = コアの口.filter((行) => 行.名前 === 名前)[0]
-  if (!口) throw new Error(`コアの口に「${名前}」が無い（コアの口 と 組む が食い違っている）`)
-  return { 名前: 口.名前, issue: 口.issue, 出す先: 口.出す先, 何をするか: 口.何をするか }
+/** 段の名前から coreSteps の 1 行を引く。名前が表に無ければ、そこで止まる。 */
+function findStep(name) {
+  const step = coreSteps.filter((row) => row.name === name)[0]
+  if (!step) throw new Error(`コアの段に「${name}」が無い（coreSteps と build が食い違っている）`)
+  return { name: step.name, issue: step.issue, writesTo: step.writesTo, whatItDoes: step.whatItDoes }
 }
 
 /**
  * 殻が値の表現を揃えたかを、コアの入口で確かめる。
  *
- * 見るのは「文字列か数値か」だけである。日付と時刻の書き方そのものは shell.js が持つ（→ 値の表現）。
+ * 見るのは「文字列か数値か」だけである。日付と時刻の書き方そのものは shell.js が持つ（→ valueRepresentation）。
  * SpreadsheetApp から読んだ値はロケールと書式で表現が揺れる（時刻が Date で来るか文字列で来るか）。
  * 揺れたまま入ってきたら、黙って直さずに名指しで止まる（→ 6 の #8 の理由 ③）。
  */
-function 表現を確かめる(入力) {
-  if (!入力 || typeof 入力 !== 'object') throw new Error('入力が、名前と行の配列の対応になっていない')
+function checkRepresentation(inputs) {
+  if (!inputs || typeof inputs !== 'object') throw new Error('入力が、名前と行の配列の対応になっていない')
 
-  const 名前たち = 入力の名前()
-  名前たち.forEach((名前) => {
-    if (!Array.isArray(入力[名前])) throw new Error(`入力に「${名前}」の行の配列が無い`)
+  const names = inputNames()
+  names.forEach((name) => {
+    if (!Array.isArray(inputs[name])) throw new Error(`入力に「${name}」の行の配列が無い`)
   })
-  Object.keys(入力).forEach((名前) => {
-    if (名前たち.indexOf(名前) === -1) throw new Error(`入力の名前に無い「${名前}」が渡っている`)
+  Object.keys(inputs).forEach((name) => {
+    if (names.indexOf(name) === -1) throw new Error(`入力の名前に無い「${name}」が渡っている`)
   })
 
-  名前たち.forEach((名前) => {
-    入力[名前].forEach((行, 行番号) => {
-      if (!Array.isArray(行)) throw new Error(`「${名前}」の ${行番号 + 1} 行目が配列でない`)
-      行.forEach((セル, 列番号) => {
-        const 型 = typeof セル
-        if (型 === 'string' || 型 === 'number') return
+  names.forEach((name) => {
+    inputs[name].forEach((row, rowIndex) => {
+      if (!Array.isArray(row)) throw new Error(`「${name}」の ${rowIndex + 1} 行目が配列でない`)
+      row.forEach((cell, columnIndex) => {
+        const type = typeof cell
+        if (type === 'string' || type === 'number') return
         throw new Error(
-          `「${名前}」の ${行番号 + 1} 行目 ${列番号 + 1} 列目の表現が揃っていない。`
-            + `いま: ${型 === 'object' ? Object.prototype.toString.call(セル) : 型}。`
-            + '文字列か数値に揃えるのは殻の仕事である（→ shell.js の 表現を揃える）',
+          `「${name}」の ${rowIndex + 1} 行目 ${columnIndex + 1} 列目の表現が揃っていない。`
+            + `いま: ${type === 'object' ? Object.prototype.toString.call(cell) : type}。`
+            + '文字列か数値に揃えるのは殻の仕事である（→ shell.js の normalizeValue）',
         )
       })
     })
@@ -153,40 +154,40 @@ function 表現を確かめる(入力) {
  * 段が返した行が、書き込む先のシートの形に合っているかを確かめる。
  * 合わないまま書くと、担当者の画面で列がずれる。黙って詰めない。
  */
-function 出力を確かめる(出力) {
-  出力の名前.forEach((名前) => {
-    const 列 = シートの列(名前)
-    出力[名前].forEach((行, 行番号) => {
-      if (Array.isArray(行) && 行.length === 列.length) return
+function checkOutput(output) {
+  outputNames.forEach((name) => {
+    const columns = sheetColumns(name)
+    output[name].forEach((row, rowIndex) => {
+      if (Array.isArray(row) && row.length === columns.length) return
       throw new Error(
-        `「${名前}」に返された ${行番号 + 1} 行目の列数が構成と違う。`
-          + `いま: ${Array.isArray(行) ? 行.length : '配列でない'} ／ 構成: ${列.length}（${列.join(' / ')}）`,
+        `「${name}」に返された ${rowIndex + 1} 行目の列数が構成と違う。`
+          + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${columns.length}（${columns.join(' / ')}）`,
       )
     })
   })
 
-  const 種別の列 = シートの列('検証結果').indexOf('種別')
-  const 決めた種別 = Object.keys(検証の種別).map((鍵) => 検証の種別[鍵])
-  出力['検証結果'].forEach((行, 行番号) => {
-    if (決めた種別.indexOf(行[種別の列]) !== -1) return
+  const kindColumn = sheetColumns('検証結果').indexOf('種別')
+  const allowedKinds = Object.keys(checkKind).map((key) => checkKind[key])
+  output['検証結果'].forEach((row, rowIndex) => {
+    if (allowedKinds.indexOf(row[kindColumn]) !== -1) return
     throw new Error(
-      `検証結果の ${行番号 + 1} 行目の種別が「${行[種別の列]}」である。`
-        + `違反と未充足は別に数える（→ 5-4）ので、種別は ${決めた種別.join(' か ')} のどちらかである`,
+      `検証結果の ${rowIndex + 1} 行目の種別が「${row[kindColumn]}」である。`
+        + `違反と未充足は別に数える（→ 5-4）ので、種別は ${allowedKinds.join(' か ')} のどちらかである`,
     )
   })
 }
 
 /** シート 1 枚の列名を引く。割り当て・検証結果・指標はどれも区画を 1 つしか持たない。 */
-function シートの列(名前) {
-  const 構成 = シートの構成.filter((c) => c.名前 === 名前)[0]
-  if (!構成) throw new Error(`シートの構成に「${名前}」が無い`)
-  return 構成.区画[0].列
+function sheetColumns(name) {
+  const layout = sheetLayout.filter((c) => c.name === name)[0]
+  if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
+  return layout.sections[0].columns
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    コアの口, 出力の名前, 読まないシート, 入力の名前, 条件の名前,
-    組む, 条件を取り出す, 口を引く, 表現を確かめる, 出力を確かめる, シートの列,
+    coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames,
+    build, takeConditions, findStep, checkRepresentation, checkOutput, sheetColumns,
   }
 }

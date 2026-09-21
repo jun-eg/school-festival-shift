@@ -9,181 +9,181 @@
 //   ③ 行を消しても、生成シートを上書きしても、列をまとめて消しても名指しする（→ #8 の 3 つの壊し方）
 //   ④ 黙って直した箇所が 0 である（セルが 1 つも変わっていない）
 //   ⑤ 読むのはシートごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
-//   ⑥ 崩れていれば 構造を確かめる が止まり、崩れている箇所を全部文にして持っている
+//   ⑥ 崩れていれば checkStructure が止まり、崩れている箇所を全部文にして持っている
 //
 // これは契約であって実装ではない。何も書き換えない。
-// 崩れた状態で生成が走らないことは src/shell.test.mjs が見る（走らせる が最初に呼ぶ）。
+// 崩れた状態で生成が走らないことは src/shell.test.mjs が見る（run が最初に呼ぶ）。
 
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
-const ここ = path.dirname(fileURLToPath(import.meta.url))
+const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 読むだけの偽のスプレッドシート -----------------------------------------
 // 構造の検証は読むだけである。だから、この偽のシートには setValues が無い。
 // 書こうとしたら、そこで落ちる（「黙って直さない」を、道具の側で確かめている）。
 
-const 往復 = { 読み: 0 }
+const roundTrips = { reads: 0 }
 
-class 偽の範囲 {
-  constructor(シート, 行, 列, 行数, 列数) {
-    Object.assign(this, { シート, 行, 列, 行数, 列数 })
+class FakeRange {
+  constructor(sheet, row, column, rowCount, columnCount) {
+    Object.assign(this, { sheet, row, column, rowCount, columnCount })
   }
   getValues() {
-    往復.読み += 1
-    const 表 = []
-    for (let r = this.行; r < this.行 + this.行数; r++) {
-      const 行 = []
-      for (let c = this.列; c < this.列 + this.列数; c++) 行.push(this.シート.セル.get(`${r},${c}`) ?? '')
-      表.push(行)
+    roundTrips.reads += 1
+    const table = []
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      const row = []
+      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
+      table.push(row)
     }
-    return 表
+    return table
   }
 }
 
-class 偽のシート {
+class FakeSheet {
   // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
-  constructor(名前) {
-    Object.assign(this, { 名前, セル: new Map(), 最大行: 1000, 最大列: 26 })
+  constructor(name) {
+    Object.assign(this, { name, cells: new Map(), maxRows: 1000, maxColumns: 26 })
   }
-  getName() { return this.名前 }
-  getRange(行, 列, 行数 = 1, 列数 = 1) {
+  getName() { return this.name }
+  getRange(row, column, rowCount = 1, columnCount = 1) {
     // 本物は範囲外を取ると例外を投げる。構造の検証がそこへ行かないことを、ここで確かめている
-    if (列 + 列数 - 1 > this.最大列) throw new Error(`範囲外（${this.名前} の ${列 + 列数 - 1} 列目）`)
-    if (行 + 行数 - 1 > this.最大行) throw new Error(`範囲外（${this.名前} の ${行 + 行数 - 1} 行目）`)
-    return new 偽の範囲(this, 行, 列, 行数, 列数)
+    if (column + columnCount - 1 > this.maxColumns) throw new Error(`範囲外（${this.name} の ${column + columnCount - 1} 列目）`)
+    if (row + rowCount - 1 > this.maxRows) throw new Error(`範囲外（${this.name} の ${row + rowCount - 1} 行目）`)
+    return new FakeRange(this, row, column, rowCount, columnCount)
   }
-  getMaxRows() { return this.最大行 }
-  getMaxColumns() { return this.最大列 }
+  getMaxRows() { return this.maxRows }
+  getMaxColumns() { return this.maxColumns }
   getLastColumn() {
-    return [...this.セル.entries()]
-      .filter(([, 値]) => 値 !== '')
-      .reduce((最大, [鍵]) => Math.max(最大, Number(鍵.split(',')[1])), 0)
+    return [...this.cells.entries()]
+      .filter(([, value]) => value !== '')
+      .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
   }
-  置く(行, 列, 値) { this.セル.set(`${行},${列}`, 値); return this }
+  put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
   /** 担当者が列をまとめて消した状態にする（その列より右が消える）。 */
-  列を削る(最大列) {
-    this.最大列 = 最大列
-    this.セル = new Map(
-      [...this.セル.entries()].filter(([鍵]) => Number(鍵.split(',')[1]) <= 最大列),
+  cutColumnsTo(maxColumns) {
+    this.maxColumns = maxColumns
+    this.cells = new Map(
+      [...this.cells.entries()].filter(([key]) => Number(key.split(',')[1]) <= maxColumns),
     )
     return this
   }
   /** 担当者が行をまとめて消した状態にする（その行より下が消える）。 */
-  行を削る(最大行) {
-    this.最大行 = 最大行
-    this.セル = new Map(
-      [...this.セル.entries()].filter(([鍵]) => Number(鍵.split(',')[0]) <= 最大行),
+  cutRowsTo(maxRows) {
+    this.maxRows = maxRows
+    this.cells = new Map(
+      [...this.cells.entries()].filter(([key]) => Number(key.split(',')[0]) <= maxRows),
     )
     return this
   }
   /** 担当者が列を 1 つ挿した状態にする（その列から右が 1 つずれる）。 */
-  列を挿す(挿す列) {
-    this.セル = new Map(
-      [...this.セル.entries()].map(([鍵, 値]) => {
-        const [行, 列] = 鍵.split(',').map(Number)
-        return [`${行},${列 < 挿す列 ? 列 : 列 + 1}`, 値]
+  insertColumn(at) {
+    this.cells = new Map(
+      [...this.cells.entries()].map(([key, value]) => {
+        const [row, column] = key.split(',').map(Number)
+        return [`${row},${column < at ? column : column + 1}`, value]
       }),
     )
     return this
   }
   /** 担当者が行を 1 つ消した状態にする（その行から下が 1 つ上がる）。 */
-  行を消す(消す行) {
-    this.セル = new Map(
-      [...this.セル.entries()]
-        .filter(([鍵]) => Number(鍵.split(',')[0]) !== 消す行)
-        .map(([鍵, 値]) => {
-          const [行, 列] = 鍵.split(',').map(Number)
-          return [`${行 < 消す行 ? 行 : 行 - 1},${列}`, 値]
+  deleteRow(at) {
+    this.cells = new Map(
+      [...this.cells.entries()]
+        .filter(([key]) => Number(key.split(',')[0]) !== at)
+        .map(([key, value]) => {
+          const [row, column] = key.split(',').map(Number)
+          return [`${row < at ? row : row - 1},${column}`, value]
         }),
     )
     return this
   }
   /** シートの中身を丸ごと消した状態にする（生成シートの上書き）。 */
-  空にする() { this.セル = new Map(); return this }
+  clear() { this.cells = new Map(); return this }
 }
 
-class 偽のスプレッドシート {
-  constructor(シートたち) { this.シートたち = シートたち }
-  getSheetByName(名前) { return this.シートたち.find((s) => s.getName() === 名前) ?? null }
-  写し() { return JSON.stringify(this.シートたち.map((s) => [s.名前, [...s.セル.entries()].sort()])) }
+class FakeSpreadsheet {
+  constructor(sheets) { this.sheets = sheets }
+  getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
+  snapshot() { return JSON.stringify(this.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])) }
 }
 
 // ---- 読み込む ---------------------------------------------------------------
-// 構造の検証が使う 見出しの行数 と 表現を揃える は shell.js にあるので、一緒に読む。
+// 構造の検証が使う headerRowCount と normalizeValue は shell.js にあるので、一緒に読む。
 // SpreadsheetApp は文脈に置いていない — 掴むのは shell.js の 1 行だけで、そこは通らない。
 
-const 文脈 = vm.createContext({})
-for (const 名 of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
-  vm.runInContext(fs.readFileSync(path.join(ここ, 名), 'utf8'), 文脈, { filename: 名 })
+const context = vm.createContext({})
+for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
+  vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { 崩れを名指しする, 構造を確かめる, 崩れを文にする } = 文脈
-const { シートの構成 } = vm.runInContext('({ シートの構成 })', 文脈)
+const { nameBreakages, checkStructure, breakageToText } = context
+const { sheetLayout } = vm.runInContext('({ sheetLayout })', context)
 
-const 落ちた = []
-const 通った = []
+const failed = []
+const passed = []
 
-function 見る(見出し, 実測, 期待) {
-  if (JSON.stringify(実測) === JSON.stringify(期待)) 通った.push(見出し)
-  else 落ちた.push({ 見出し, 実測, 期待 })
+function check(title, actual, expected) {
+  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
+  else failed.push({ title, actual, expected })
 }
 
-function 止まった理由(はたらき) {
+function whyItStopped(work) {
   try {
-    はたらき()
+    work()
     return null
-  } catch (例外) {
-    return 例外.message
+  } catch (error) {
+    return error.message
   }
 }
 
-/** シートの構成どおりに見出しを置いた、空の 5 枚を作る。 */
-function 空のテンプレート() {
-  const シートたち = シートの構成.map((構成) => {
-    const シート = new 偽のシート(構成.名前)
-    構成.区画.forEach((区画) => {
-      if (構成.区画の見出しを置くか) シート.置く(1, 区画.開始列, 区画.見出し)
-      const 列名の行 = 構成.区画の見出しを置くか ? 2 : 1
-      区画.列.forEach((列名, i) => シート.置く(列名の行, 区画.開始列 + i, 列名))
+/** sheetLayout どおりに見出しを置いた、空の 5 枚を作る。 */
+function emptyTemplate() {
+  const sheets = sheetLayout.map((layout) => {
+    const sheet = new FakeSheet(layout.name)
+    layout.sections.forEach((section) => {
+      if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
+      const columnNameRow = layout.hasSectionHeadings ? 2 : 1
+      section.columns.forEach((columnName, i) => sheet.put(columnNameRow, section.startColumn + i, columnName))
     })
-    return シート
+    return sheet
   })
-  return new 偽のスプレッドシート(シートたち)
+  return new FakeSpreadsheet(sheets)
 }
 
-function 名指しの行(帳面) {
-  return 崩れを名指しする(帳面).map(崩れを文にする)
+function namedLines(book) {
+  return nameBreakages(book).map(breakageToText)
 }
 
 // ---- ① 崩れていなければ 0 箇所 ----------------------------------------------
 
-見る('① 構成どおりに並んでいれば、崩れは 0 箇所である', 名指しの行(空のテンプレート()), [])
+check('① 構成どおりに並んでいれば、崩れは 0 箇所である', namedLines(emptyTemplate()), [])
 
 // 担当者が書く行を足しても、見出しだけを見ているので崩れない
-const 行が増えた帳面 = 空のテンプレート()
-行が増えた帳面.getSheetByName('条件入力').置く(3, 1, '2025-11-01').置く(4, 1, '2025-11-02')
-行が増えた帳面.getSheetByName('割り当て').置く(2, 1, '2025-11-01')
-見る('① 担当者がデータの行を書き足しても崩れない（見るのは見出しの行だけである）', 名指しの行(行が増えた帳面), [])
+const bookWithMoreRows = emptyTemplate()
+bookWithMoreRows.getSheetByName('条件入力').put(3, 1, '2025-11-01').put(4, 1, '2025-11-02')
+bookWithMoreRows.getSheetByName('割り当て').put(2, 1, '2025-11-01')
+check('① 担当者がデータの行を書き足しても崩れない（見るのは見出しの行だけである）', namedLines(bookWithMoreRows), [])
 
 // ---- ② シートを消す／列を挿す／見出しを書き換える ---------------------------
 
-const 消えた帳面 = 空のテンプレート()
-消えた帳面.シートたち = 消えた帳面.シートたち.filter((s) => s.getName() !== '回答')
+const bookMissingASheet = emptyTemplate()
+bookMissingASheet.sheets = bookMissingASheet.sheets.filter((s) => s.getName() !== '回答')
 
-見る(
+check(
   '② シートを 1 枚消すと、そのシートを名指しする',
-  名指しの行(消えた帳面),
+  namedLines(bookMissingASheet),
   ['シート「回答」が無い'],
 )
 
-const 列が挿された帳面 = 空のテンプレート()
-列が挿された帳面.getSheetByName('割り当て').列を挿す(2)
+const bookWithInsertedColumn = emptyTemplate()
+bookWithInsertedColumn.getSheetByName('割り当て').insertColumn(2)
 
-見る(
+check(
   '② 列を 1 つ挿すと、ずれた列名と、右へ押し出された見出しを名指しする',
-  名指しの行(列が挿された帳面),
+  namedLines(bookWithInsertedColumn),
   [
     '「割り当て」の 1 行目 1 列目から 6 列 が構成と違う。'
       + 'いま: 日 / （空） / 開始 / 終了 / 役割 / 学籍番号 ／ 構成: 日 / 開始 / 終了 / 役割 / 学籍番号 / 氏名',
@@ -192,15 +192,15 @@ const 列が挿された帳面 = 空のテンプレート()
 )
 
 // 条件入力は 5 区画が横に並ぶので、1 つ挿すと右の区画まで全部ずれる
-const 条件に列が挿された = 空のテンプレート()
-条件に列が挿された.getSheetByName('条件入力').列を挿す(2)
-const 条件の崩れ = 崩れを名指しする(条件に列が挿された)
+const conditionsWithInsertedColumn = emptyTemplate()
+conditionsWithInsertedColumn.getSheetByName('条件入力').insertColumn(2)
+const conditionBreakages = nameBreakages(conditionsWithInsertedColumn)
 
-見る(
+check(
   '② 横に並んだ 5 区画のどれがずれたかも、区画ごとに名指しする',
   [
-    条件の崩れ.every((崩れ) => 崩れ.シート === '条件入力' && 崩れ.行 >= 1 && 崩れ.列 >= 1),
-    崩れを文にする(条件の崩れ[0]),
+    conditionBreakages.every((breakage) => breakage.sheet === '条件入力' && breakage.row >= 1 && breakage.column >= 1),
+    breakageToText(conditionBreakages[0]),
   ],
   [
     true,
@@ -209,12 +209,12 @@ const 条件の崩れ = 崩れを名指しする(条件に列が挿された)
   ],
 )
 
-const 見出しが違う帳面 = 空のテンプレート()
-見出しが違う帳面.getSheetByName('検証結果').置く(1, 1, '区分')
+const bookWithChangedHeading = emptyTemplate()
+bookWithChangedHeading.getSheetByName('検証結果').put(1, 1, '区分')
 
-見る(
+check(
   '② 見出しを 1 つ書き換えると、その場所と、いまの中身と構成を並べて名指しする',
-  名指しの行(見出しが違う帳面),
+  namedLines(bookWithChangedHeading),
   [
     '「検証結果」の 1 行目 1 列目から 9 列 が構成と違う。'
       + 'いま: 区分 / 日 / 開始 / 終了 / 役割 / 学籍番号 / 氏名 / 内容 / あと何人'
@@ -224,21 +224,21 @@ const 見出しが違う帳面 = 空のテンプレート()
 
 // ---- ③ 行を消す／生成シートを上書きする -------------------------------------
 
-const 行が消えた帳面 = 空のテンプレート()
-行が消えた帳面.getSheetByName('条件入力').行を消す(1)
+const bookWithDeletedRow = emptyTemplate()
+bookWithDeletedRow.getSheetByName('条件入力').deleteRow(1)
 
-見る(
+check(
   '③ 見出しの行を 1 つ消すと、区画の見出しの場所を名指しする（行の削除）',
-  名指しの行(行が消えた帳面)[0],
+  namedLines(bookWithDeletedRow)[0],
   '「条件入力」の 1 行目 1 列目 が構成と違う。いま: 日付 ／ 構成: 日ごとの営業 4 時刻',
 )
 
-const 上書きされた帳面 = 空のテンプレート()
-上書きされた帳面.getSheetByName('指標').空にする()
+const overwrittenBook = emptyTemplate()
+overwrittenBook.getSheetByName('指標').clear()
 
-見る(
+check(
   '③ 生成シートを上書きして見出しが消えても名指しする（黙って置き直さない）',
-  名指しの行(上書きされた帳面),
+  namedLines(overwrittenBook),
   [
     '「指標」の 1 行目 1 列目から 5 列 が構成と違う。'
       + 'いま: （空） / （空） / （空） / （空） / （空） ／ 構成: 学籍番号 / 氏名 / 合計時間 / シフト回数 / 準備回数',
@@ -247,12 +247,12 @@ const 上書きされた帳面 = 空のテンプレート()
 
 // 列をまとめて消されると、構成の要る列数そのものが無くなる。
 // 読む範囲をシートの外に取れば範囲外の例外になるので、読む前に名指しする
-const 列が削られた帳面 = 空のテンプレート()
-列が削られた帳面.getSheetByName('割り当て').列を削る(4)
+const bookWithCutColumns = emptyTemplate()
+bookWithCutColumns.getSheetByName('割り当て').cutColumnsTo(4)
 
-見る(
+check(
   '③ 列をまとめて消されても、範囲外で落ちずに列数を名指しする',
-  名指しの行(列が削られた帳面),
+  namedLines(bookWithCutColumns),
   [
     'シート「割り当て」の列が 4 列しかない（構成は 6 列である）',
     '「割り当て」の 1 行目 1 列目から 6 列 が構成と違う。'
@@ -261,65 +261,65 @@ const 列が削られた帳面 = 空のテンプレート()
 )
 
 // 条件入力は 2 行目までが見出しである。行が 1 行しか残っていなければ、列名の行そのものが無い
-const 行が削られた帳面 = 空のテンプレート()
-行が削られた帳面.getSheetByName('条件入力').行を削る(1)
+const bookWithCutRows = emptyTemplate()
+bookWithCutRows.getSheetByName('条件入力').cutRowsTo(1)
 
-見る(
+check(
   '③ 行をまとめて消されても、範囲外で落ちずに列名の行を名指しする',
-  名指しの行(行が削られた帳面)[0],
+  namedLines(bookWithCutRows)[0],
   '「条件入力」の 2 行目 1 列目から 5 列 が構成と違う。'
     + 'いま: （空） / （空） / （空） / （空） / （空） ／ 構成: 日付 / 準備開始 / 調理開始 / 調理終了 / 片付け開始',
 )
 
 // ---- ④ 黙って直していない ---------------------------------------------------
 
-const 崩れたまま残る帳面 = 空のテンプレート()
-崩れたまま残る帳面.getSheetByName('検証結果').置く(1, 1, '区分')
-崩れたまま残る帳面.getSheetByName('割り当て').列を挿す(2)
-const 照らす前の写し = 崩れたまま残る帳面.写し()
-崩れを名指しする(崩れたまま残る帳面)
+const bookLeftBroken = emptyTemplate()
+bookLeftBroken.getSheetByName('検証結果').put(1, 1, '区分')
+bookLeftBroken.getSheetByName('割り当て').insertColumn(2)
+const snapshotBeforeChecking = bookLeftBroken.snapshot()
+nameBreakages(bookLeftBroken)
 
-見る(
+check(
   '④ 照らしたあとも、セルが 1 つも変わっていない（黙って直した箇所が 0 である）',
-  崩れたまま残る帳面.写し(),
-  照らす前の写し,
+  bookLeftBroken.snapshot(),
+  snapshotBeforeChecking,
 )
 
 // ---- ⑤ 読むのはシートごとに 1 回 --------------------------------------------
 
-往復.読み = 0
-崩れを名指しする(空のテンプレート())
+roundTrips.reads = 0
+nameBreakages(emptyTemplate())
 
-見る('⑤ 読むのはシートごとに 1 回である（5 枚で 5 回）', 往復.読み, シートの構成.length)
+check('⑤ 読むのはシートごとに 1 回である（5 枚で 5 回）', roundTrips.reads, sheetLayout.length)
 
-往復.読み = 0
-崩れを名指しする(消えた帳面)
+roundTrips.reads = 0
+nameBreakages(bookMissingASheet)
 
-見る('⑤ 無いシートは読まない（4 枚で 4 回）', 往復.読み, シートの構成.length - 1)
+check('⑤ 無いシートは読まない（4 枚で 4 回）', roundTrips.reads, sheetLayout.length - 1)
 
 // ---- ⑥ 崩れていれば止まる ---------------------------------------------------
 
-見る(
+check(
   '⑥ 崩れていなければ、構造を確かめる は 0 箇所を返して通す',
-  構造を確かめる(空のテンプレート()),
+  checkStructure(emptyTemplate()),
   [],
 )
 
-const 止まった = 止まった理由(() => 構造を確かめる(列が挿された帳面))
+const stopped = whyItStopped(() => checkStructure(bookWithInsertedColumn))
 
-見る(
+check(
   '⑥ 崩れていれば止まり、箇所数と「黙って直さない」と戻し方を名指しする',
   [
-    止まった?.startsWith('シートの構造が 2 箇所崩れているので、生成を走らせない。'),
-    止まった?.includes('黙って直さない'),
-    止まった?.includes('テンプレートをもう 1 回コピーして条件を入れ直す'),
+    stopped?.startsWith('シートの構造が 2 箇所崩れているので、生成を走らせない。'),
+    stopped?.includes('黙って直さない'),
+    stopped?.includes('テンプレートをもう 1 回コピーして条件を入れ直す'),
   ],
   [true, true, true],
 )
 
-見る(
+check(
   '⑥ 止まったときの文に、崩れている箇所の行が全部入っている',
-  名指しの行(列が挿された帳面).filter((行) => !止まった.includes(行)),
+  namedLines(bookWithInsertedColumn).filter((line) => !stopped.includes(line)),
   [],
 )
 
@@ -327,16 +327,16 @@ const 止まった = 止まった理由(() => 構造を確かめる(列が挿さ
 
 console.log('構造の検証の検査（src/verify-structure.js／読むだけの偽のスプレッドシートの上）')
 console.log('')
-for (const 見出し of 通った) console.log(`  OK   ${見出し}`)
-for (const { 見出し, 実測, 期待 } of 落ちた) {
-  console.log(`  NG   ${見出し}`)
-  console.log(`         実測: ${JSON.stringify(実測)}`)
-  console.log(`         期待: ${JSON.stringify(期待)}`)
+for (const title of passed) console.log(`  OK   ${title}`)
+for (const { title, actual, expected } of failed) {
+  console.log(`  NG   ${title}`)
+  console.log(`         実測: ${JSON.stringify(actual)}`)
+  console.log(`         期待: ${JSON.stringify(expected)}`)
 }
 console.log('')
-if (落ちた.length === 0) {
-  console.log(`結果: 全件一致（${通った.length} 件）`)
+if (failed.length === 0) {
+  console.log(`結果: 全件一致（${passed.length} 件）`)
   process.exit(0)
 }
-console.log(`結果: 不一致 ${落ちた.length} 件 ／ 一致 ${通った.length} 件`)
+console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
 process.exit(1)
