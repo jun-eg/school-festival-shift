@@ -608,4 +608,4 @@ node src/build-form.test.mjs
 | **コアの段の残り 1 つの中身**（指標を出す。→「コアと殻の境目」の段の表） | [#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
 | **本物の Google フォームで、正規表現とエラーメッセージの文言（句点の揺れ ◎ を含む）が設定できるか**（**繋ぎ方と作り方は入った** → 上の「フォームは定義から作る」） | [#145](https://github.com/jun-eg/school-festival-shift/issues/145)（→ 6-1 の #1。**外れたら「完成品の複製」に切り替える**） |
 | **指標に実際に何行書くか**（**割り当て・検証結果の中身は入った** — 生成と、違反・未充足の両方である） | [#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
-| **生成が実機で実行時間の上限に当たらないか**（**手元では前回のモック 36 人・88 枠で 1 秒に満たない**） | [#152](https://github.com/jun-eg/school-festival-shift/issues/152)（→ 6-1 の #2） |
+| **崩したシートで構造の検証が実機でも名指しして止まるか**（**崩さずに 1 周通るほうは、生成を実機で走らせたときに見た** → [`real-device-log.md`](real-device-log.md) の項目 14） | [`real-device-log.md`](real-device-log.md)（**崩す操作をしたときに見る**） |
