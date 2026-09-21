@@ -5,6 +5,7 @@
 //
 // 見るものは 5 つある。
 //   ① 規則 2 の 3 つを踏む（学籍番号でまとめる／タイムスタンプで畳む／採るのは後から来た行）
+//      — まとめるときの学籍番号は大文字に揃っている（大文字・小文字に意味は無い ◎ → 3 の規則 2 の ①）
 //   ② data/前回の希望データ-モック.csv の 50 行が 39 件になり、学籍番号の重複が 0 である（→ 仕様 #4）
 //   ③ 返るのは型 #6 だけである（タイムスタンプも氏名も友達欄も乗らない → 5-1 の #6・5-2）
 //   ④ 1 行に決まらない行・揃っていない行は、黙って選ばずに名指しして止まる
@@ -128,6 +129,24 @@ check(
     answerRow(later, 'LTR2569911', laterAnswers, { grade: '2年生', canCook: 'はい' }),
   ]).map((wish) => [wish.grade, wish.canCook]),
   [['2年生', true]],
+)
+
+check(
+  '① 大文字・小文字だけ違う学籍番号は、同じ人として 1 件に畳まれる（大文字・小文字に意味は無い ◎）',
+  takeIn([
+    answerRow(early, 'LTR2569911', earlyAnswers),
+    answerRow(later, 'ltr2569911', laterAnswers),
+  ]).length,
+  1,
+)
+
+check(
+  '① 畳んだ 1 件の学籍番号は大文字である（識別キーの形は 1 つである → 3 の規則 2 の ①）',
+  takeIn([
+    answerRow(early, 'ltr2569911', earlyAnswers),
+    answerRow(later, 'Ltr2569911', laterAnswers),
+  ]).map((wish) => [wish.studentId, wish.answers]),
+  [['LTR2569911', laterAnswers]],
 )
 
 check(
@@ -291,15 +310,6 @@ check(
   '④ タイムスタンプの表現が揃っていない行で止まる（黙って解釈し直さない）',
   whyItStopped(() => takeIn([answerRow('2025/10/20 21:50:43', 'LTR2569911', earlyAnswers)]))
     ?.includes('「回答」の 1 行目（シートの 2 行目）の「タイムスタンプ」'),
-  true,
-)
-
-check(
-  '④ 大文字・小文字だけ違う学籍番号は、黙ってまとめずに止まる（同じ人かどうかは記録に無い）',
-  whyItStopped(() => takeIn([
-    answerRow(early, 'LTR2569911', earlyAnswers),
-    answerRow(later, 'ltr2569911', laterAnswers),
-  ]))?.includes('大文字・小文字だけ違う'),
   true,
 )
 

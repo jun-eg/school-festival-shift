@@ -12,6 +12,9 @@
  * 黙って直さない。揃っていない値は、区画・行・列を名指しして止まる
  * （「満たせない枠は黙って埋めない」→ 5 の #6 と同じ扱いである）。
  *
+ * 例外が 1 つある。学籍番号は大文字に揃えて型に乗せる（→ readStudentId・3 の規則 2 の ①）。
+ * 直しているのではなく、大文字・小文字に意味が無い ◎ ので、識別キーの形を 1 つに決めている。
+ *
  * SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
@@ -291,6 +294,7 @@ function toWishes(rows) {
  * 回答 1 行を型にする。
  * 型に乗るのは 学籍番号・学年・調理担当ですか？・日ごとの回答文字列 4 つだけで、
  * 氏名も友達欄もタイムスタンプも乗らない（→ columnsOutsideWish）。
+ * 学籍番号は大文字で乗る（→ readStudentId・3 の規則 2 の ①）。
  *
  * 名前で取るのは前の 6 列だけである。後ろ 4 列は列名が毎年変わる（→ 4-1）ので位置で取り、
  * 型には並びのまま乗せる — 何日目かは、条件入力の「日ごとの営業時刻」の 4 行と同じ並びである
@@ -302,13 +306,7 @@ function toWish(row, rowIndex) {
   const columns = section.columns
   checkRowWidth(source, section, row, rowIndex)
 
-  const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
-  if (!studentIdPattern.test(studentId)) {
-    throw new Error(
-      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が形式と違う。`
-        + '10 桁の英数字である（→ 4-1 の #1）',
-    )
-  }
+  const studentId = readStudentId(source, columns, row, rowIndex)
 
   const grade = readText(source, columns, row, rowIndex, wishColumns.grade)
   if (grades.indexOf(grade) === -1) {
@@ -425,6 +423,26 @@ function readText(source, columns, row, rowIndex, column, blankAllowed) {
   return text
 }
 
+/**
+ * 学籍番号のセル。大文字に揃えて返す（→ 3 の規則 2 の ①）。
+ *
+ * 学籍番号の大文字・小文字に意味は無い ◎（2026-09-22。→ docs/interviews/02-作る側.md）ので、
+ * `eed2349987` と `EED2349987` は同じ人である。揃えるのは読むこの 1 箇所で、
+ * 以降は素の等値で比べる（→ take-in.js の畳み込み・count-violations.js の照合）。
+ *
+ * 形式を見るのはここである（→ 4-1 の #1）。10 桁の英数字でなければ名指しして止まる。
+ */
+function readStudentId(source, columns, row, rowIndex) {
+  const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
+  if (!studentIdPattern.test(studentId)) {
+    throw new Error(
+      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が形式と違う。`
+        + '10 桁の英数字である（→ 4-1 の #1）',
+    )
+  }
+  return studentId.toUpperCase()
+}
+
 /** 日付のセル。YYYY-MM-DD である（→ shell.js の valueRepresentation）。 */
 function readDate(source, columns, row, rowIndex, columnName, blankAllowed) {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
@@ -477,6 +495,6 @@ if (typeof module !== 'undefined') {
     slotMinutes, grades, cookAnswers, prepCleanupItems, studentIdPattern,
     wishColumns, columnsOutsideWish, inputTypes,
     toType, conditionTypes, toDays, cutSlots, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish,
-    dayAnswerColumns, answerSection, conditionSection, eachFilledRow, whereIs,
+    dayAnswerColumns, answerSection, conditionSection, eachFilledRow, whereIs, readStudentId,
   }
 }
