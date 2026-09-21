@@ -1,0 +1,461 @@
+/**
+ * 入力の型 — docs/tech-requirements.md 5-1 の 6 種類（issue #140 ／ 8 の 4）。
+ *
+ * 殻が読んだ行の配列を、6 種類の型に直す。ここが通った先には、6 種類の外の値が 1 つも無い
+ * （→ 5 の #1）。友達欄が割り当ての材料にならない（→ 5-2）のも、氏名が型に入らないのも、
+ * 「型に無いものは型に無い」というだけのことである。
+ *
+ * ここは判断を新しく書かない。型の実体は 5-1 が、規則は 3 が、列の並びは sheet-layout.js が持つ。
+ * 値の表現（YYYY-MM-DD ／ HH:MM ／ 数）を揃えるのは殻の仕事で、ここに来るのは揃った行である
+ * （→ core.js の checkRepresentation）。
+ *
+ * 黙って直さない。揃っていない値は、区画・行・列を名指しして止まる
+ * （「満たせない枠は黙って埋めない」→ 5 の #6 と同じ扱いである）。
+ *
+ * SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
+ * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
+ */
+
+/** 枠の刻み幅（→ 5-1 の #1・規則 1 の ①）。 */
+const slotMinutes = 30
+
+/** 学年の選択肢。フォームのラジオボタン 4 つの転記である（→ 4-1 の #3）。 */
+const grades = ['1年生', '2年生', '3年生', '4年生']
+
+/** `調理担当ですか？` の選択肢（→ 4-1 の #4）。規則 5 が見るのはこの値である。 */
+const cookAnswers = { はい: true, いいえ: false }
+
+/** 準備・片付けのルールの区画に書く項目（→ 5-1 の #5・規則 3）。いまは境目 1 つだけである。 */
+const prepCleanupItems = { noonBoundary: '午前と午後の境目' }
+
+/** 学籍番号の形式。フォームの正規表現の転記である（→ 4-1 の #1）。識別キーはこれである ◎。 */
+const studentIdPattern = /^[A-Za-z0-9]{10}$/
+
+/**
+ * 型 #6（希望）が回答シートのどの列から来るか（→ 5-1 の #6）。
+ * 日ごとの回答文字列 4 つは、ここにも columnsOutsideWish にも無い残りの列である。
+ */
+const wishColumns = { studentId: '学籍番号', grade: '学年', canCook: '調理担当ですか？' }
+
+/**
+ * 回答シートにあるが、型 #6 に入らない列。
+ *   タイムスタンプ … 規則 2 の畳み込みのキーで、畳んだ後の 1 件には残らない（→ 5-1 の #6）
+ *   氏名           … 表示のための列である。割り当て・指標の氏名をどこから埋めるかは #151／#154 が決める
+ *   一緒に組みたいお友達 … 割り当ての材料にしない（→ 5-2）
+ */
+const columnsOutsideWish = ['タイムスタンプ', '氏名', '一緒に組みたいお友達']
+
+/**
+ * 6 種類の型（→ 5-1）。並びは 5-1 の表の #1〜#6 と同じである。
+ *
+ *   key    … コアが条件を持つときのキー（→ core.js の takeConditions）
+ *   source … その型に直す行がどこから来るか。区画の見出し、またはシートの名前である
+ *   build  … 行の配列をその型に直す関数
+ *   fields … その型のどこかに現れてよい名前の全部。ここに無い名前が型に出たら、それは 6 種類の外である
+ *
+ * 型 #6 だけ、build を呼ぶのが core.js の build の入口ではない — 規則 2 の畳み込み（取り込む ／ #146）を
+ * 通ってから 1 人 1 件になるので、呼ぶのはその段である。
+ *
+ * rowIndex は、どの型でも「その区画（シート）の中の何行目か」である。見出しの行は数に入らない。
+ * 名指しの文には、シートの行番号も併せて出す（→ whereIs）。
+ */
+const inputTypes = [
+  {
+    number: 1,
+    name: '枠',
+    key: 'days',
+    build: toDays,
+    source: '日ごとの営業時刻',
+    fields: ['date', 'prepStart', 'cookStart', 'cookEnd', 'cleanupStart', 'cleanupEnd', 'slots', 'start', 'end'],
+  },
+  {
+    number: 2,
+    name: '役割と必要人数',
+    key: 'roleNeeds',
+    build: toNeeds,
+    source: '役割と必要人数',
+    fields: ['date', 'start', 'end', 'role', 'count'],
+  },
+  {
+    number: 3,
+    name: '調理責任者の学年条件',
+    key: 'cookLeaderGrades',
+    build: toCookLeaderGrades,
+    source: '調理責任者の学年',
+    fields: [],
+  },
+  {
+    number: 4,
+    name: '委員会の指定枠',
+    key: 'committeeNeeds',
+    build: toNeeds,
+    source: '委員会の指定枠',
+    fields: ['date', 'start', 'end', 'role', 'count'],
+  },
+  {
+    number: 5,
+    name: '準備・片付けのルール',
+    key: 'prepCleanupRule',
+    build: toPrepCleanupRule,
+    source: '準備・片付けのルール',
+    fields: ['noonBoundary'],
+  },
+  {
+    number: 6,
+    name: '希望',
+    key: 'wishes',
+    build: toWishes,
+    source: '回答',
+    fields: ['studentId', 'grade', 'canCook', 'answers', 'question', 'text'],
+  },
+]
+
+/**
+ * 行の配列を、その型に直す。どの区画から来た行かは型のほうが持っている（→ inputTypes の source）ので、
+ * 呼ぶ側は型 1 つと行を渡すだけでよい。
+ */
+function toType(type, rows) {
+  return type.build(rows, type.source)
+}
+
+/**
+ * 条件入力の 5 区画（型 #1〜#5）。build の入口で行から直すのはここまでである
+ * （→ core.js の takeConditions）。型 #6 は規則 2 の畳み込みを通ってからなので、ここに入らない。
+ */
+function conditionTypes() {
+  return inputTypes.filter((type) => type.source !== '回答')
+}
+
+/**
+ * 型 #1（枠）— 日ごとの営業時刻と、そこから刻んだ 30 分枠の列（→ 5-1 の #1）。
+ *
+ * 刻むのは時刻と時刻のあいだごとである。枠が 準備開始／調理開始／調理終了／片付け開始 をまたがないので、
+ * 「その枠は準備の帯か」が枠の側で決まる。
+ * 30 分に足りない端は枠にならない — 規則を足していない。営業時刻から刻んだ枠しか存在しない、
+ * というだけである（→ 3 の境界値の表「営業時間の外へ伸びた区間」と同じ形）。
+ */
+function toDays(rows, source) {
+  const columns = sectionColumns(source)
+  const days = []
+
+  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+    const day = {
+      date: readDate(source, columns, row, rowIndex, '日付'),
+      prepStart: readTime(source, columns, row, rowIndex, '準備開始'),
+      cookStart: readTime(source, columns, row, rowIndex, '調理開始'),
+      cookEnd: readTime(source, columns, row, rowIndex, '調理終了'),
+      cleanupStart: readTime(source, columns, row, rowIndex, '片付け開始'),
+      cleanupEnd: readTime(source, columns, row, rowIndex, '片付け終了'),
+    }
+    if (days.some((seen) => seen.date === day.date)) {
+      throw new Error(`${whereIs(source, rowIndex)}の「${day.date}」が、すでに上の行にある（1 日 1 行である）`)
+    }
+    checkAscending(source, rowIndex, day)
+    day.slots = cutSlots(day)
+    days.push(day)
+  })
+
+  return days
+}
+
+/** 時刻が早い順に並んでいるかを見る。逆に書かれた日は、刻む向きが決まらない。 */
+function checkAscending(source, rowIndex, day) {
+  const order = ['準備開始', '調理開始', '調理終了', '片付け開始', '片付け終了']
+  const times = [day.prepStart, day.cookStart, day.cookEnd, day.cleanupStart, day.cleanupEnd]
+
+  for (let i = 1; i < times.length; i++) {
+    if (toMinutes(times[i - 1]) <= toMinutes(times[i])) continue
+    throw new Error(
+      `${whereIs(source, rowIndex)}の時刻が早い順でない。`
+        + `「${order[i - 1]}」が ${times[i - 1]} で、「${order[i]}」が ${times[i]} である`,
+    )
+  }
+}
+
+/** 1 日ぶんの 30 分枠を刻む。時刻と時刻のあいだごとに、頭から 30 分ずつ取る。 */
+function cutSlots(day) {
+  const boundaries = [day.prepStart, day.cookStart, day.cookEnd, day.cleanupStart, day.cleanupEnd]
+  const slots = []
+
+  for (let i = 1; i < boundaries.length; i++) {
+    const bandEnd = toMinutes(boundaries[i])
+    for (let start = toMinutes(boundaries[i - 1]); start + slotMinutes <= bandEnd; start += slotMinutes) {
+      slots.push({ start: toTimeText(start), end: toTimeText(start + slotMinutes) })
+    }
+  }
+  return slots
+}
+
+/**
+ * 型 #2（役割と必要人数）と 型 #4（委員会の指定枠）— (日・時間帯・役割名・人数) の行の集合。
+ *
+ * 2 つを同じ形にしてあるのは、指定枠を別扱いにしないためである（→ 5-1 の「#2 と #4 を同じ形式にした理由」）。
+ * 空の欄は「絞らない」である — 日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）。
+ * 役割名が #2 に無い名前でもよいのは #4 だけだが、それは名前を照らす側（生成 ／ #151）の話で、型は同じである。
+ */
+function toNeeds(rows, source) {
+  const columns = sectionColumns(source)
+  const needs = []
+
+  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+    const need = {
+      date: readDate(source, columns, row, rowIndex, '日', true),
+      start: readTime(source, columns, row, rowIndex, '開始', true),
+      end: readTime(source, columns, row, rowIndex, '終了', true),
+      role: readText(source, columns, row, rowIndex, '役割名'),
+      count: readCount(source, columns, row, rowIndex, '人数'),
+    }
+    if ((need.start === '') !== (need.end === '')) {
+      throw new Error(`${whereIs(source, rowIndex)}の時間帯が片側しか無い（両方書くか、両方空ける）`)
+    }
+    if (need.start !== '' && toMinutes(need.end) <= toMinutes(need.start)) {
+      throw new Error(`${whereIs(source, rowIndex)}の終了 ${need.end} が、開始 ${need.start} より後になっていない`)
+    }
+    needs.push(need)
+  })
+
+  return needs
+}
+
+/**
+ * 型 #3（調理責任者の学年条件）— 学年の集合（→ 5-1 の #3・規則 4）。
+ * 同じ学年が 2 行あっても集合は 1 つである。どの学年を可とするかだけを持ち、人の学年は型 #6 が持つ。
+ */
+function toCookLeaderGrades(rows, source) {
+  const columns = sectionColumns(source)
+  const chosen = []
+
+  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+    const grade = readText(source, columns, row, rowIndex, '学年')
+    if (grades.indexOf(grade) === -1) {
+      throw new Error(
+        `${whereIs(source, rowIndex)}の「${grade}」が学年でない。`
+          + `フォームの選択肢は ${grades.join(' / ')} である（→ 4-1 の #3）`,
+      )
+    }
+    if (chosen.indexOf(grade) === -1) chosen.push(grade)
+  })
+
+  return chosen
+}
+
+/**
+ * 型 #5（準備・片付けのルール）— 規則 3 のうち、入力で来るのは境目 1 つだけである（→ 5-1 の #5）。
+ * ①〜⑤ は規則そのもの（→ 3 の規則 3）で、⑥ の線は決まっていない（→ 9 の △ 5）。
+ *
+ * 空のまま走らせても、ここでは止まらない。境目が要るのは規則 3 を適用する段（→ #151）で、
+ * 入っていないことを名指しするのはそちらである。
+ */
+function toPrepCleanupRule(rows, source) {
+  const columns = sectionColumns(source)
+  const rule = { noonBoundary: '' }
+
+  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+    const item = readText(source, columns, row, rowIndex, '項目')
+    if (item !== prepCleanupItems.noonBoundary) {
+      throw new Error(
+        `${whereIs(source, rowIndex)}の項目「${item}」は決めていない。`
+          + `いま書けるのは ${prepCleanupItems.noonBoundary} だけである（→ 5-1 の #5）`,
+      )
+    }
+    if (rule.noonBoundary !== '') {
+      throw new Error(`${whereIs(source, rowIndex)}の「${item}」が、すでに上の行にある`)
+    }
+    rule.noonBoundary = readTime(source, columns, row, rowIndex, '値')
+  })
+
+  return rule
+}
+
+/**
+ * 型 #6（希望）— 回答の行を、1 行 1 件の型にする（→ 5-1 の #6）。
+ *
+ * 呼ぶのは取り込む段（#146）である。1 人に複数行あるうちどれを採るか（規則 2 の畳み込み。
+ * キーは学籍番号 ＋ タイムスタンプ ◎）は、ここではなくその段が決める — ここがやるのは形を直すことだけである。
+ * 畳み込みに要るタイムスタンプは型に乗らないので、採る 1 行を選ぶのは行のうちである。
+ */
+function toWishes(rows) {
+  const wishes = []
+  eachFilledRow('回答', answerColumns(), rows, (row, rowIndex) => { wishes.push(toWish(row, rowIndex)) })
+  return wishes
+}
+
+/**
+ * 回答 1 行を型にする。
+ * 型に乗るのは 学籍番号・学年・調理担当ですか？・日ごとの回答文字列 4 つだけで、
+ * 氏名も友達欄もタイムスタンプも乗らない（→ columnsOutsideWish）。
+ */
+function toWish(row, rowIndex) {
+  const source = '回答'
+  const columns = answerColumns()
+  checkRowWidth(source, columns, row, rowIndex)
+
+  const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
+  if (!studentIdPattern.test(studentId)) {
+    throw new Error(
+      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が形式と違う。`
+        + '10 桁の英数字である（→ 4-1 の #1）',
+    )
+  }
+
+  const grade = readText(source, columns, row, rowIndex, wishColumns.grade)
+  if (grades.indexOf(grade) === -1) {
+    throw new Error(
+      `${whereIs(source, rowIndex)}の学年「${grade}」が選択肢の外である。`
+        + `${grades.join(' / ')} である（→ 4-1 の #3）`,
+    )
+  }
+
+  const cookAnswer = readText(source, columns, row, rowIndex, wishColumns.canCook)
+  if (!Object.prototype.hasOwnProperty.call(cookAnswers, cookAnswer)) {
+    throw new Error(
+      `${whereIs(source, rowIndex)}の${wishColumns.canCook}「${cookAnswer}」が選択肢の外である。`
+        + `${Object.keys(cookAnswers).join(' / ')} である（→ 4-1 の #4・規則 5）`,
+    )
+  }
+
+  return {
+    studentId: studentId,
+    grade: grade,
+    canCook: cookAnswers[cookAnswer],
+    answers: dayQuestions().map((question) => ({
+      question: question,
+      text: readText(source, columns, row, rowIndex, question, true),
+    })),
+  }
+}
+
+/** 日ごとの回答文字列 4 つが、回答シートのどの列か（→ 4-1 の #6〜#9）。 */
+function dayQuestions() {
+  const named = columnsOutsideWish.concat(Object.keys(wishColumns).map((key) => wishColumns[key]))
+  return answerColumns().filter((name) => named.indexOf(name) === -1)
+}
+
+/** 回答シートの列の並び。列の実体は 4-1 である。 */
+function answerColumns() {
+  return sheetLayout.filter((layout) => layout.name === '回答')[0].sections[0].columns
+}
+
+/** 条件入力の区画 1 つの列の並び。 */
+function sectionColumns(heading) {
+  const section = sheetLayout
+    .filter((layout) => layout.name === '条件入力')[0]
+    .sections.filter((candidate) => candidate.heading === heading)[0]
+  if (!section) throw new Error(`条件入力の区画に「${heading}」が無い`)
+  return section.columns
+}
+
+/**
+ * 中身のある行だけを、区画の中の行番号つきで渡す。
+ *
+ * 途中の空の行は読み飛ばす（担当者が区画のあいだに行を空けることはある）が、番号は詰めない。
+ * 詰めると、名指しの「N 行目」が担当者のシートの行を指さなくなる（→ shell.js の readSection）。
+ */
+function eachFilledRow(source, columns, rows, use) {
+  rows.forEach((row, rowIndex) => {
+    checkRowWidth(source, columns, row, rowIndex)
+    if (row.every((cell) => cell === '')) return
+    use(row, rowIndex)
+  })
+}
+
+/**
+ * 崩れている場所を名指しする文の前半。
+ * 区画の中の行番号と、担当者のシートの行番号を両方出す — 担当者が直すのはシートの上である。
+ */
+function whereIs(source, rowIndex) {
+  return `「${source}」の ${rowIndex + 1} 行目（シートの ${rowIndex + 1 + headerRowsOf(source)} 行目）`
+}
+
+/** 見出しが何行あるか。区画の見出しを置くシートは 2 行、置かないシートは 1 行である（→ shell.js の headerRowCount）。 */
+function headerRowsOf(source) {
+  const layout = sheetLayout.filter((candidate) => (
+    candidate.name === source || candidate.sections.some((section) => section.heading === source)
+  ))[0]
+  if (!layout) throw new Error(`シートの構成に「${source}」が無い`)
+  return layout.hasSectionHeadings ? 2 : 1
+}
+
+/**
+ * 行の列数が構成どおりかを見る。ずれたまま読むと、隣の列を別の項目として読むことになる。
+ * 名前が verify-structure.js の checkColumnCount と別なのは、Apps Script が .gs で
+ * 1 つのグローバルを共有するからである（→ build-template.js の同じ注意）。
+ */
+function checkRowWidth(source, columns, row, rowIndex) {
+  if (Array.isArray(row) && row.length === columns.length) return
+  throw new Error(
+    `${whereIs(source, rowIndex)}の列数が構成と違う。`
+      + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${columns.length}（${columns.join(' / ')}）`,
+  )
+}
+
+/** 1 セルを列の名前で取る。 */
+function cellOf(source, columns, row, rowIndex, columnName) {
+  const at = columns.indexOf(columnName)
+  if (at === -1) throw new Error(`「${source}」の構成に「${columnName}」の列が無い`)
+  return { value: row[at], where: `${whereIs(source, rowIndex)}の「${columnName}」` }
+}
+
+/** 文字列のセル。空を許すかどうかだけを外から決める。 */
+function readText(source, columns, row, rowIndex, columnName, blankAllowed) {
+  const cell = cellOf(source, columns, row, rowIndex, columnName)
+  const text = typeof cell.value === 'number' ? String(cell.value) : cell.value
+  if (text === '' && !blankAllowed) throw new Error(`${cell.where}が空である`)
+  return text
+}
+
+/** 日付のセル。YYYY-MM-DD である（→ shell.js の valueRepresentation）。 */
+function readDate(source, columns, row, rowIndex, columnName, blankAllowed) {
+  const cell = cellOf(source, columns, row, rowIndex, columnName)
+  if (cell.value === '' && blankAllowed) return ''
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cell.value)) {
+    throw new Error(`${cell.where}が YYYY-MM-DD でない。いま: ${showBlankValue(cell.value)}`)
+  }
+  return cell.value
+}
+
+/** 時刻のセル。HH:MM である（→ shell.js の valueRepresentation）。 */
+function readTime(source, columns, row, rowIndex, columnName, blankAllowed) {
+  const cell = cellOf(source, columns, row, rowIndex, columnName)
+  if (cell.value === '' && blankAllowed) return ''
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cell.value)) {
+    throw new Error(`${cell.where}が HH:MM でない。いま: ${showBlankValue(cell.value)}`)
+  }
+  return cell.value
+}
+
+/** 人数のセル。数のまま来る（→ shell.js の normalizeValue）。 */
+function readCount(source, columns, row, rowIndex, columnName) {
+  const cell = cellOf(source, columns, row, rowIndex, columnName)
+  if (typeof cell.value !== 'number' || !isFinite(cell.value) || Math.floor(cell.value) !== cell.value || cell.value < 1) {
+    throw new Error(`${cell.where}が 1 以上の整数でない。いま: ${showBlankValue(cell.value)}`)
+  }
+  return cell.value
+}
+
+/** HH:MM を分にする。刻むのも、前後を見るのも分で行う。 */
+function toMinutes(time) {
+  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+}
+
+/** 分を HH:MM に戻す。24:00 を越える値は作らない（時刻が早い順であることを先に見ている）。 */
+function toTimeText(minutes) {
+  const hour = Math.floor(minutes / 60)
+  const minute = minutes - hour * 60
+  return `${hour < 10 ? '0' : ''}${hour}:${minute < 10 ? '0' : ''}${minute}`
+}
+
+/** 空のセルは、文の中で見えないと場所が読めない（→ verify-structure.js の showBlank）。 */
+function showBlankValue(value) {
+  return value === '' ? '（空）' : value
+}
+
+// Node から読むためだけの口。Apps Script では module が無いので通らない。
+if (typeof module !== 'undefined') {
+  module.exports = {
+    slotMinutes, grades, cookAnswers, prepCleanupItems, studentIdPattern,
+    wishColumns, columnsOutsideWish, inputTypes,
+    toType, conditionTypes, toDays, cutSlots, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish,
+    dayQuestions, answerColumns, sectionColumns, eachFilledRow, whereIs,
+  }
+}

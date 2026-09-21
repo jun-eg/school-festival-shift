@@ -165,14 +165,15 @@ function checkRange(layout, headerRows, row, startColumn, expectedNames, breakag
  * 列を 1 つ挿すと、右へずれた見出しがここに落ちてくる。
  */
 function checkUnknownColumns(layout, headerRows, breakages) {
-  const sectionColumns = {}
+  // 名前が input-types.js の sectionColumns と別なのは、.gs が 1 つのグローバルを共有するからである
+  const usedColumns = {}
   layout.sections.forEach((section) => {
-    for (let i = 0; i < section.columns.length; i++) sectionColumns[section.startColumn + i] = true
+    for (let i = 0; i < section.columns.length; i++) usedColumns[section.startColumn + i] = true
   })
 
   headerRows.forEach((rowValues, i) => {
     rowValues.forEach((cell, j) => {
-      if (cell === '' || sectionColumns[j + 1]) return
+      if (cell === '' || usedColumns[j + 1]) return
       breakages.push({
         sheet: layout.name,
         kind: breakageKind.unknownColumn,
