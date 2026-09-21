@@ -249,10 +249,11 @@ function prepCleanupDetail(day, boundary) {
  */
 function readAssignments(rows, conditions) {
   const source = '割り当て'
-  const columns = sheetColumns(source)
+  const section = sheetSection(source)
+  const columns = section.columns
   const placed = []
 
-  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+  eachFilledRow(source, section, rows, (row, rowIndex) => {
     const one = {
       date: readDate(source, columns, row, rowIndex, '日'),
       start: readTime(source, columns, row, rowIndex, '開始'),

@@ -3,12 +3,17 @@
 //
 //   使い方: node src/form-definition.test.mjs
 //
-// 見るものは 5 つある。
-//   ① 4-1 の表と 1 行ずつ突き合わせて差分が 0（設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢）
+// 見るものは 6 つある。
+//   ① 前回の日付と営業時刻を入れたとき、4-1 の表と 1 行ずつ突き合わせて差分が 0
+//      （設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。→ 仕様 #2 の判定）
 //   ② 正規表現が 3 箇所で、希望時間の 4 設問は同じ 1 本である（→ 4-2）
 //   ③ エラーメッセージの句点の揺れ ◎ を揃えずに写している（→ 4-3）
 //   ④ 説明文が、記録にある例 3 つと営業時間を持っている（→ 4-2）
 //   ⑤ 入る側から数え直すと 6 項目である（→ 5 の #3）。締切は定義に無い（→ 4-1）
+//   ⑦ 今年の日付を入れれば題も営業時間も今年のものになり、4 行でなければ作らずに止まる（→ 4-1・4-2）
+//
+// 定義そのものは題も営業時間も持たない（→ 4-1・4-2）。持つのはラベル 4 つと、
+// 日付・帯からそれを組む口である。だから①〜④は「入力を入れた後の形」を見る。
 //
 // 加えて、data/前回の希望データ-モック.csv の 50 行を正規表現と選択肢に通す。
 // 定義が前回の回答を 1 件も弾かないことは、ここでしか数えていない。
@@ -29,11 +34,49 @@ const context = vm.createContext({})
 vm.runInContext(fs.readFileSync(path.join(here, 'form-definition.js'), 'utf8'), context, {
   filename: 'form-definition.js',
 })
-const { wishTimeDescription, entrantItemNames } = context
-const { formItems, formItemKind, wishTimePattern, wishTimeExamples } = vm.runInContext(
-  '({ formItems, formItemKind, wishTimePattern, wishTimeExamples })',
+const { formItemsFor, wishTimeDescription, entrantItemNames } = context
+const { formItems, formItemKind, wishTimePattern, wishTimeLabels, wishTimeExamples } = vm.runInContext(
+  '({ formItems, formItemKind, wishTimePattern, wishTimeLabels, wishTimeExamples })',
   context,
 )
+
+// ---- 前回の日付と営業時刻（→ 仕様 #2 の判定） -------------------------------
+//
+// 日付は 2025-11-01〜04（→ data/前回の確定シフト.md）。
+// 5 時刻の置き方は 7「前回の 5 時刻は記録に無い」と同じである — 始まりの 4 つをその日の営業開始に、
+// 片付け終了を営業終了に置く。記録にあるのは説明文の営業時間 ◎ の 1 本の帯だけだからである。
+// この 4 行を入れて 4-1 の表が出ることが、入力から組む側が壊れていないことの判定である。
+
+const lastYear = [
+  ['2025-11-01', '08:00', '21:00'],
+  ['2025-11-02', '08:00', '20:00'],
+  ['2025-11-03', '08:00', '20:00'],
+  ['2025-11-04', '08:00', '15:00'],
+].map(([date, open, close]) => ({
+  date,
+  prepStart: open,
+  cookStart: open,
+  cookEnd: open,
+  cleanupStart: open,
+  cleanupEnd: close,
+}))
+
+/** 今年の側。日付も営業時間も前回と 1 つも重ならない 4 日である。 */
+const thisYear = [
+  ['2026-10-29', '09:00', '22:00'],
+  ['2026-10-30', '09:30', '19:00'],
+  ['2026-10-31', '09:30', '19:30'],
+  ['2026-11-01', '10:00', '16:00'],
+].map(([date, open, close]) => ({
+  date,
+  prepStart: open,
+  cookStart: open,
+  cookEnd: open,
+  cleanupStart: open,
+  cleanupEnd: close,
+}))
+
+const lastYearItems = formItemsFor(lastYear)
 
 const failed = []
 const passed = []
@@ -78,27 +121,37 @@ function asTableRow(item) {
   }
 }
 
-check('① 4-1 の表と 1 行ずつ突き合わせて、差分が 0', formItems.map(asTableRow), tableInRequirements)
+check(
+  '① 前回の日付と営業時刻を入れると、4-1 の表と 1 行ずつ突き合わせて差分が 0（→ 仕様 #2）',
+  lastYearItems.map(asTableRow),
+  tableInRequirements,
+)
 
 check(
   '① 設問は 9 つ、画像アイテムは 1 つである',
   [
-    formItems.filter((item) => item.kind !== formItemKind.image).length,
-    formItems.filter((item) => item.kind === formItemKind.image).length,
+    lastYearItems.filter((item) => item.kind !== formItemKind.image).length,
+    lastYearItems.filter((item) => item.kind === formItemKind.image).length,
   ],
   [9, 1],
 )
 
 check(
   '① 画像アイテムは設問ではないので、# を持たない',
-  formItems.filter((item) => item.kind === formItemKind.image).map((item) => item.number),
+  lastYearItems.filter((item) => item.kind === formItemKind.image).map((item) => item.number),
   [undefined],
+)
+
+check(
+  '① 定義そのものは、題も営業時間も 1 つも持たない（今年の入力から出る → 4-1・4-2）',
+  formItems.filter((item) => item.title || item.businessHours).map((item) => item.title),
+  ['学籍番号', '氏名', '学年', '調理担当ですか？', '調理名簿', '一緒に組みたいお友達'],
 )
 
 // ---- ② 正規表現は 3 箇所で、希望時間は 1 本である（→ 4-2） ------------------
 
-const itemsWithPattern = formItems.filter((item) => item.pattern)
-const wishTimeItems = formItems.filter((item) => item.kind === formItemKind.paragraph)
+const itemsWithPattern = lastYearItems.filter((item) => item.pattern)
+const wishTimeItems = lastYearItems.filter((item) => item.kind === formItemKind.paragraph)
 
 check(
   '② 正規表現を持つのは 3 箇所である（学籍番号・友達欄・希望時間）',
@@ -141,7 +194,7 @@ check(
 
 check(
   '③ エラーメッセージを持つのは希望時間 4 設問だけである（記録に無い文言を発明していない）',
-  formItems.filter((item) => item.errorMessage).length,
+  lastYearItems.filter((item) => item.errorMessage).length,
   4,
 )
 
@@ -196,13 +249,13 @@ check(
 
 check(
   '⑤ 画像アイテムは入る側が答えるものではない（回答として回収されない ◎）',
-  formItems.filter((item) => item.kind === formItemKind.image).map((item) => item.entrantItem),
+  lastYearItems.filter((item) => item.kind === formItemKind.image).map((item) => item.entrantItem),
   [null],
 )
 
 check(
   '⑤ 締切が定義に無い（毎回決める入力で、フォーム側は締切で閉じない ◎ → 4-1）',
-  formItems.filter((item) => /締切/.test(item.title)).length,
+  lastYearItems.filter((item) => /締切/.test(item.title)).length,
   0,
 )
 
@@ -229,9 +282,9 @@ const answerHeader = answerRows[0]
 const answers = answerRows.slice(1)
 
 check(
-  '⑥ 前回の希望データ（モック）の見出しが、タイムスタンプ ＋ 設問 9 つの並びと同じである',
+  '⑥ 前回の希望データ（モック）の見出しが、前回の日付で組んだ題 9 つ ＋ タイムスタンプと同じである',
   answerHeader,
-  ['タイムスタンプ', ...formItems.filter((item) => item.kind !== formItemKind.image).map((item) => item.title)],
+  ['タイムスタンプ', ...lastYearItems.filter((item) => item.kind !== formItemKind.image).map((item) => item.title)],
 )
 
 /** 列の並びは見出しと同じである（上の検査が見ている）。 */
@@ -241,7 +294,7 @@ function columnOf(title) {
 
 const rejected = []
 answers.forEach((row, index) => {
-  formItems.forEach((item) => {
+  lastYearItems.forEach((item) => {
     if (item.kind === formItemKind.image) return
     const value = row[columnOf(item.title)]
     if (item.pattern && value !== '' && !new RegExp(item.pattern).test(value)) {
@@ -258,6 +311,70 @@ check(
   '⑥ 前回の回答 50 行を、正規表現も選択肢も必須も 1 件も弾かない',
   [answers.length, rejected],
   [50, []],
+)
+
+// ---- ⑦ 今年の日付を入れると、今年のものになる（→ 4-1・4-2） ----------------
+
+const thisYearItems = formItemsFor(thisYear)
+const thisYearWishItems = thisYearItems.filter((item) => item.kind === formItemKind.paragraph)
+
+check(
+  '⑦ 題の日付が今年のものになり、ラベル 4 つは転記のまま動かない ◎',
+  thisYearWishItems.map((item) => item.title),
+  ['10月29日(準備日)', '10月30日(学祭1日目)', '10月31日(学祭2日目)', '11月1日(片付け)'],
+)
+
+check(
+  '⑦ 説明文の営業時間が、その日の 準備開始〜片付け終了 になる（帯は 1 日の端から端まで）',
+  thisYearWishItems.map((item) => item.businessHours),
+  ['9:00-22:00', '9:30-19:00', '9:30-19:30', '10:00-16:00'],
+)
+
+check(
+  '⑦ 組み上がった説明文に、今年の営業時間が入り、前回の値が 1 つも残っていない',
+  thisYearWishItems.map((item) => {
+    const text = wishTimeDescription(item)
+    return [text.includes(item.businessHours), /8:00-(21|20|15):00/.test(text)]
+  }),
+  [[true, false], [true, false], [true, false], [true, false]],
+)
+
+check(
+  '⑦ 希望時間の 4 設問以外は、今年の入力で 1 文字も動かない（残り 5 設問 ＋ 画像アイテム）',
+  thisYearItems.filter((item) => item.kind !== formItemKind.paragraph),
+  lastYearItems.filter((item) => item.kind !== formItemKind.paragraph),
+)
+
+check(
+  '⑦ ラベル 4 つは定義側の固定である ◎（学祭は例年この 4 日 → 4-1）',
+  wishTimeLabels,
+  ['準備日', '学祭1日目', '学祭2日目', '片付け'],
+)
+
+/** 止まることを見る。止まらなければ null が返る。 */
+function whyItStopped(work) {
+  try {
+    work()
+    return null
+  } catch (error) {
+    return error.message
+  }
+}
+
+const stoppedOnEmpty = whyItStopped(() => formItemsFor([]))
+check(
+  '⑦ 「日ごとの営業時刻」が空なら、区画を名指しして止まる（→ 2 の止まる箇所 9）',
+  [stoppedOnEmpty?.includes('「日ごとの営業時刻」が空である'), stoppedOnEmpty?.includes('4 日ぶん入れて')],
+  [true, true],
+)
+
+check(
+  '⑦ 4 行でなければ、何行あるかを名指しして止まる（3 行でも 5 行でも）',
+  [thisYear.slice(0, 3), thisYear.concat(thisYear[0])].map((days) => {
+    const stopped = whyItStopped(() => formItemsFor(days))
+    return [stopped?.includes(`${days.length} 行である`), stopped?.includes('準備日 / 学祭1日目 / 学祭2日目 / 片付け')]
+  }),
+  [[true, true], [true, true]],
 )
 
 // ---- 結果 -------------------------------------------------------------------

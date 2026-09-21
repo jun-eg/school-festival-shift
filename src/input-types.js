@@ -33,12 +33,15 @@ const studentIdPattern = /^[A-Za-z0-9]{10}$/
 
 /**
  * 型 #6（希望）が回答シートのどの列から来るか（→ 5-1 の #6）。
- * 日ごとの回答文字列 4 つは、ここにも columnsOutsideWish にも無い残りの列である。
+ *
+ * ここに名前で書けるのは、列名が毎年同じ列だけである。
+ * 日ごとの回答文字列 4 つは列名が毎年変わる（列名＝設問の題である → 4-1）ので、
+ * 名前ではなく位置で当てる（→ dayAnswerColumns）。
  */
 const wishColumns = { studentId: '学籍番号', grade: '学年', canCook: '調理担当ですか？' }
 
 /**
- * 回答シートにあるが、型 #6 に入らない列。
+ * 回答シートに名前で並んでいるが、型 #6 に入らない列。
  *   タイムスタンプ … 規則 2 の畳み込みのキーで、畳んだ後の 1 件には残らない（→ 5-1 の #6）
  *   氏名           … 表示のための列である。割り当て・指標の氏名をどこから埋めるかは #151／#154 が決める
  *   一緒に組みたいお友達 … 割り当ての材料にしない（→ 5-2）
@@ -106,7 +109,7 @@ const inputTypes = [
     key: 'wishes',
     build: toWishes,
     source: '回答',
-    fields: ['studentId', 'grade', 'canCook', 'answers', 'question', 'text'],
+    fields: ['studentId', 'grade', 'canCook', 'answers'],
   },
 ]
 
@@ -135,10 +138,11 @@ function conditionTypes() {
  * というだけである（→ 3 の境界値の表「営業時間の外へ伸びた区間」と同じ形）。
  */
 function toDays(rows, source) {
-  const columns = sectionColumns(source)
+  const section = conditionSection(source)
+  const columns = section.columns
   const days = []
 
-  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+  eachFilledRow(source, section, rows, (row, rowIndex) => {
     const day = {
       date: readDate(source, columns, row, rowIndex, '日付'),
       prepStart: readTime(source, columns, row, rowIndex, '準備開始'),
@@ -194,10 +198,11 @@ function cutSlots(day) {
  * 役割名が #2 に無い名前でもよいのは #4 だけだが、それは名前を照らす側（生成 ／ #151）の話で、型は同じである。
  */
 function toNeeds(rows, source) {
-  const columns = sectionColumns(source)
+  const section = conditionSection(source)
+  const columns = section.columns
   const needs = []
 
-  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+  eachFilledRow(source, section, rows, (row, rowIndex) => {
     const need = {
       date: readDate(source, columns, row, rowIndex, '日', true),
       start: readTime(source, columns, row, rowIndex, '開始', true),
@@ -222,10 +227,11 @@ function toNeeds(rows, source) {
  * 同じ学年が 2 行あっても集合は 1 つである。どの学年を可とするかだけを持ち、人の学年は型 #6 が持つ。
  */
 function toCookLeaderGrades(rows, source) {
-  const columns = sectionColumns(source)
+  const section = conditionSection(source)
+  const columns = section.columns
   const chosen = []
 
-  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+  eachFilledRow(source, section, rows, (row, rowIndex) => {
     const grade = readText(source, columns, row, rowIndex, '学年')
     if (grades.indexOf(grade) === -1) {
       throw new Error(
@@ -247,10 +253,11 @@ function toCookLeaderGrades(rows, source) {
  * 入っていないことを名指しするのはそちらである。
  */
 function toPrepCleanupRule(rows, source) {
-  const columns = sectionColumns(source)
+  const section = conditionSection(source)
+  const columns = section.columns
   const rule = { noonBoundary: '' }
 
-  eachFilledRow(source, columns, rows, (row, rowIndex) => {
+  eachFilledRow(source, section, rows, (row, rowIndex) => {
     const item = readText(source, columns, row, rowIndex, '項目')
     if (item !== prepCleanupItems.noonBoundary) {
       throw new Error(
@@ -276,7 +283,7 @@ function toPrepCleanupRule(rows, source) {
  */
 function toWishes(rows) {
   const wishes = []
-  eachFilledRow('回答', answerColumns(), rows, (row, rowIndex) => { wishes.push(toWish(row, rowIndex)) })
+  eachFilledRow('回答', answerSection(), rows, (row, rowIndex) => { wishes.push(toWish(row, rowIndex)) })
   return wishes
 }
 
@@ -284,11 +291,16 @@ function toWishes(rows) {
  * 回答 1 行を型にする。
  * 型に乗るのは 学籍番号・学年・調理担当ですか？・日ごとの回答文字列 4 つだけで、
  * 氏名も友達欄もタイムスタンプも乗らない（→ columnsOutsideWish）。
+ *
+ * 名前で取るのは前の 6 列だけである。後ろ 4 列は列名が毎年変わる（→ 4-1）ので位置で取り、
+ * 型には並びのまま乗せる — 何日目かは、条件入力の「日ごとの営業時刻」の 4 行と同じ並びである
+ * （設問をその 4 行から組んでいるからである → form-definition.js の formItemsFor）。
  */
 function toWish(row, rowIndex) {
   const source = '回答'
-  const columns = answerColumns()
-  checkRowWidth(source, columns, row, rowIndex)
+  const section = answerSection()
+  const columns = section.columns
+  checkRowWidth(source, section, row, rowIndex)
 
   const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
   if (!studentIdPattern.test(studentId)) {
@@ -318,31 +330,33 @@ function toWish(row, rowIndex) {
     studentId: studentId,
     grade: grade,
     canCook: cookAnswers[cookAnswer],
-    answers: dayQuestions().map((question) => ({
-      question: question,
-      text: readText(source, columns, row, rowIndex, question, true),
-    })),
+    answers: dayAnswerColumns().map((at) => readText(source, columns, row, rowIndex, at, true)),
   }
 }
 
-/** 日ごとの回答文字列 4 つが、回答シートのどの列か（→ 4-1 の #6〜#9）。 */
-function dayQuestions() {
-  const named = columnsOutsideWish.concat(Object.keys(wishColumns).map((key) => wishColumns[key]))
-  return answerColumns().filter((name) => named.indexOf(name) === -1)
+/**
+ * 日ごとの回答文字列 4 つが、回答シートの何列目か（0 から数える。→ 4-1 の #6〜#9・5-1 の #6）。
+ * 構成が名前を持っている列の後ろに、毎年名前が変わる列が並ぶ（→ sheet-layout.js の「回答」）。
+ */
+function dayAnswerColumns() {
+  const section = answerSection()
+  const positions = []
+  for (let i = 0; i < (section.yearlyColumns || 0); i++) positions.push(section.columns.length + i)
+  return positions
 }
 
-/** 回答シートの列の並び。列の実体は 4-1 である。 */
-function answerColumns() {
-  return sheetLayout.filter((layout) => layout.name === '回答')[0].sections[0].columns
+/** 回答シートの区画。並びの実体は 4-1 である（後ろ 4 列は名前を持たない → sheet-layout.js）。 */
+function answerSection() {
+  return sheetLayout.filter((layout) => layout.name === '回答')[0].sections[0]
 }
 
-/** 条件入力の区画 1 つの列の並び。 */
-function sectionColumns(heading) {
+/** 条件入力の区画 1 つ。 */
+function conditionSection(heading) {
   const section = sheetLayout
     .filter((layout) => layout.name === '条件入力')[0]
     .sections.filter((candidate) => candidate.heading === heading)[0]
   if (!section) throw new Error(`条件入力の区画に「${heading}」が無い`)
-  return section.columns
+  return section
 }
 
 /**
@@ -351,9 +365,9 @@ function sectionColumns(heading) {
  * 途中の空の行は読み飛ばす（担当者が区画のあいだに行を空けることはある）が、番号は詰めない。
  * 詰めると、名指しの「N 行目」が担当者のシートの行を指さなくなる（→ shell.js の readSection）。
  */
-function eachFilledRow(source, columns, rows, use) {
+function eachFilledRow(source, section, rows, use) {
   rows.forEach((row, rowIndex) => {
-    checkRowWidth(source, columns, row, rowIndex)
+    checkRowWidth(source, section, row, rowIndex)
     if (row.every((cell) => cell === '')) return
     use(row, rowIndex)
   })
@@ -378,27 +392,34 @@ function headerRowsOf(source) {
 
 /**
  * 行の列数が構成どおりかを見る。ずれたまま読むと、隣の列を別の項目として読むことになる。
+ * 見るのは区画の幅であって、列名の数ではない（→ sheet-layout.js の sectionWidth）
+ * — 「回答」の後ろ 4 列のように、位置だけ取ってある列があるからである。
  * 名前が verify-structure.js の checkColumnCount と別なのは、Apps Script が .gs で
  * 1 つのグローバルを共有するからである（→ build-template.js の同じ注意）。
  */
-function checkRowWidth(source, columns, row, rowIndex) {
-  if (Array.isArray(row) && row.length === columns.length) return
+function checkRowWidth(source, section, row, rowIndex) {
+  const width = sectionWidth(section)
+  if (Array.isArray(row) && row.length === width) return
   throw new Error(
     `${whereIs(source, rowIndex)}の列数が構成と違う。`
-      + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${columns.length}（${columns.join(' / ')}）`,
+      + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${width}（${sectionColumnsText(section)}）`,
   )
 }
 
-/** 1 セルを列の名前で取る。 */
-function cellOf(source, columns, row, rowIndex, columnName) {
-  const at = columns.indexOf(columnName)
-  if (at === -1) throw new Error(`「${source}」の構成に「${columnName}」の列が無い`)
-  return { value: row[at], where: `${whereIs(source, rowIndex)}の「${columnName}」` }
+/**
+ * 1 セルを取る。列の名前で取るのは、構成が名前を持っている列だけである。
+ * 名前が毎年変わる列は、何列目か（0 から数える）を渡して位置で取る（→ dayAnswerColumns）。
+ */
+function cellOf(source, columns, row, rowIndex, column) {
+  const at = typeof column === 'number' ? column : columns.indexOf(column)
+  if (at === -1) throw new Error(`「${source}」の構成に「${column}」の列が無い`)
+  const which = typeof column === 'number' ? `${at + 1} 列目` : `「${column}」`
+  return { value: row[at], where: `${whereIs(source, rowIndex)}の${which}` }
 }
 
 /** 文字列のセル。空を許すかどうかだけを外から決める。 */
-function readText(source, columns, row, rowIndex, columnName, blankAllowed) {
-  const cell = cellOf(source, columns, row, rowIndex, columnName)
+function readText(source, columns, row, rowIndex, column, blankAllowed) {
+  const cell = cellOf(source, columns, row, rowIndex, column)
   const text = typeof cell.value === 'number' ? String(cell.value) : cell.value
   if (text === '' && !blankAllowed) throw new Error(`${cell.where}が空である`)
   return text
@@ -456,6 +477,6 @@ if (typeof module !== 'undefined') {
     slotMinutes, grades, cookAnswers, prepCleanupItems, studentIdPattern,
     wishColumns, columnsOutsideWish, inputTypes,
     toType, conditionTypes, toDays, cutSlots, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish,
-    dayQuestions, answerColumns, sectionColumns, eachFilledRow, whereIs,
+    dayAnswerColumns, answerSection, conditionSection, eachFilledRow, whereIs,
   }
 }

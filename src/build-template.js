@@ -45,7 +45,14 @@ function buildTemplateInto(spreadsheet) {
   return log
 }
 
-/** 区画ごとに、見出しの行と列名の行を置く。中身が違うときは上書きせずに止まる。 */
+/**
+ * 区画ごとに、見出しの行と列名の行を置く。中身が違うときは上書きせずに止まる。
+ *
+ * 置くのは構成が名前を持っている列だけである。「回答」の後ろ 4 列は空のままになる
+ * — 列名は設問の題そのもので、題は今年の入力から出る（→ 4-1）。テンプレートを作る時点では
+ * まだ決まっていない。この 4 列が埋まるのは、フォームを作ったときである
+ * （テンプレートの「回答」はそこで捨てられ、フォームが作ったシートに置き換わる → build-form.js）。
+ */
 function putHeaders(sheet, layout, log) {
   const columnNameRow = layout.hasSectionHeadings ? 2 : 1
 

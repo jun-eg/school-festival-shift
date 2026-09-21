@@ -210,17 +210,22 @@ function checkOutput(output) {
   })
 }
 
-/** シート 1 枚の列名を引く。割り当て・検証結果・指標はどれも区画を 1 つしか持たない。 */
-function sheetColumns(name) {
+/** シート 1 枚の区画を引く。割り当て・検証結果・指標はどれも区画を 1 つしか持たない。 */
+function sheetSection(name) {
   const layout = sheetLayout.filter((c) => c.name === name)[0]
   if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
-  return layout.sections[0].columns
+  return layout.sections[0]
+}
+
+/** シート 1 枚の列名を引く。 */
+function sheetColumns(name) {
+  return sheetSection(name).columns
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
     coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames, builtInSteps,
-    build, takeConditions, findStep, checkRepresentation, checkOutput, sheetColumns,
+    build, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
   }
 }

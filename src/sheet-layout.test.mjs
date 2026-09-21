@@ -5,8 +5,10 @@
 //
 // 見るものは 2 つある。
 //   ① docs/tech-requirements.md と issue #135 が決めた形（5 枚・担当者が書く側・保護する側・列）
-//   ② 回答シートの列が、data/前回の希望データ-モック.csv の見出しと一致するか
-//      — 回答シートの列はフォームの設問（4-1）の転記なので、記録と突き合わせられる
+//   ② 回答シートの並びが、data/前回の希望データ-モック.csv の見出しと当たるか
+//      — 回答シートの列はフォームの設問（4-1）の転記だが、後ろ 4 列の列名は毎年変わる（設問の題だからである）。
+//        構成が名前で持つのは前の 6 列だけなので、名前で突き合わせるのもそこまでで、
+//        後ろ 4 列は数と位置だけを見る
 //
 // これは契約であって実装ではない。何も書き換えない。
 // 実際の Google スプレッドシートの上での挙動（保護・コピー）はここでは分からない（→ src/README.md）。
@@ -20,7 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.dirname(here)
 const require = createRequire(import.meta.url)
 
-const { sheetLayout, checkKind } = require('./sheet-layout.js')
+const { sheetLayout, checkKind, sectionWidth } = require('./sheet-layout.js')
 
 const failed = []
 const passed = []
@@ -81,7 +83,7 @@ for (const layout of sheetLayout) {
   byStartColumn.forEach((section, i) => {
     const next = byStartColumn[i + 1]
     // 区画のあいだは 1 列以上空ける（下に行を足しても隣の区画とぶつからないため）
-    if (next && section.startColumn + section.columns.length >= next.startColumn) {
+    if (next && section.startColumn + sectionWidth(section) >= next.startColumn) {
       overlaps.push(`${layout.name}: ${section.heading} と ${next.heading}`)
     }
   })
@@ -129,10 +131,33 @@ const csvHeadings = fs
   .trim()
   .split(',')
 
+const answerSection = sheetLayout[1].sections[0]
+
 check(
-  '回答シートの列が、前回の希望データ（記録）の見出しと一致する',
-  sheetLayout[1].sections[0].columns,
-  csvHeadings,
+  '回答シートの並びが、タイムスタンプ ＋ 設問 9 つの 10 列である（→ 4-1・5-1 の #6）',
+  sectionWidth(answerSection),
+  csvHeadings.length,
+)
+
+check(
+  '構成が名前で持つ前の 6 列が、前回の希望データ（記録）の見出しの頭 6 列と一致する',
+  answerSection.columns,
+  csvHeadings.slice(0, answerSection.columns.length),
+)
+
+check(
+  '後ろ 4 列は構成が名前を持たない（列名は設問の題そのもので毎年変わる → 4-1）',
+  [
+    answerSection.yearlyColumns,
+    answerSection.columns.filter((name) => /月|日/.test(name)),
+  ],
+  [4, []],
+)
+
+check(
+  '名前を持たない列があるのは「回答」だけである',
+  sheetLayout.filter((s) => s.sections.some((k) => k.yearlyColumns)).map((s) => s.name),
+  ['回答'],
 )
 
 // ---- 結果 ------------------------------------------------------------------
