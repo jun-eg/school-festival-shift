@@ -7,7 +7,10 @@
 //   ① 型は 5-1 の 6 種類だけで、その外にある名前が型のどこにも現れない（→ 5 の #1・5-2）
 //   ② 枠が営業時刻から刻まれる。30 分に足りない端は枠にならない（→ 5-1 の #1・規則 1 の ①）
 //   ③ 揃っていない値は、黙って直さずに区画・行・列を名指しして止まる
-//   ④ data/ のモック 5 本が型に乗る（→ 7 の M1 ①。乗らなかった行を数える）
+//   ④ data/ の希望データのモックが型 #6 に乗る（→ 7 の M1 ②の足がかり）
+//
+// 確定シフトのモック 4 本が型に乗るか（→ 7 の M1 ①。乗らなかった行を数える）は、ここでは数えない。
+// 判定の側（scripts/M1①の判定.mjs）が持つ — 二重に持つと片方が古くなる。
 //
 // これは契約であって実装ではない。何も書き換えない。
 
@@ -241,7 +244,7 @@ check(
   true,
 )
 
-// ---- ④ data/ のモックが型に乗る（→ 7 の M1 ①・②） --------------------------
+// ---- ④ data/ の希望データのモックが型に乗る（→ 7 の M1 ②の足がかり） --------
 
 /** 引用符の中のコンマを割らないだけの CSV の読み。友達欄が引用符付きで入っている。 */
 function readCsv(text) {
@@ -273,66 +276,6 @@ check(
   '④ 前回の希望データ 50 行が、1 行残らず型 #6 に乗った（→ 7 の M1 ②の足がかり）',
   [wishes.length, wishes.filter((one) => one.answers.length !== 4).length],
   [50, 0],
-)
-
-// 前回の 5 時刻は記録に無い。記録にあるのは、設問の説明文に書かれた営業時間 ◎ だけである（→ 4-2）。
-// それを 1 本の帯として刻み、確定シフトの区間がその枠に乗るかだけを見る。
-const lastYear = [
-  ['2025-11-01', '08:00', '08:00', '08:00', '08:00', '21:00'],
-  ['2025-11-02', '08:00', '08:00', '08:00', '08:00', '20:00'],
-  ['2025-11-03', '08:00', '08:00', '08:00', '08:00', '20:00'],
-  ['2025-11-04', '08:00', '08:00', '08:00', '08:00', '15:00'],
-]
-const lastYearDays = toType(inputTypes[0], lastYear)
-
-/** 区間が、その日の 30 分枠に分かれるか（分かれなければ乗らなかった行である）。 */
-function ridesOnSlots(assignment) {
-  const day = lastYearDays.filter((one) => one.date === assignment.date)[0]
-  if (!day) return false
-  const inside = day.slots.filter((slot) => slot.start >= assignment.start && slot.end <= assignment.end)
-  return inside.length > 0
-    && inside[0].start === assignment.start
-    && inside[inside.length - 1].end === assignment.end
-}
-
-const assignments = []
-for (const name of ['01', '02', '03', '04']) {
-  const shift = JSON.parse(fs.readFileSync(path.join(dataDir, `前回の確定シフト-モック-${name}.json`), 'utf8'))
-  shift.results.forEach((person) => {
-    person.assigned.forEach((one) => {
-      assignments.push({ memberId: person.memberId, date: one.date, start: one.start, end: one.end, role: one.role })
-    })
-  })
-}
-
-check(
-  '④ 前回の確定シフト 4 本の行数が、記録どおり 171 である（→ data/前回の確定シフト.md）',
-  assignments.length,
-  171,
-)
-
-const offTheType = assignments.filter((one) => !ridesOnSlots(one))
-
-check(
-  '④ 型に乗らなかった行は、30 分に乗らない クリーンパトロール 3 行だけである（→ 7 の「型に乗せるときに向きが要るのは 1 つだけ」）',
-  offTheType.map((one) => `${one.date} ${one.start}-${one.end} ${one.role}`),
-  ['2025-11-03 12:00-12:40 クリーンパトロール', '2025-11-03 12:00-12:40 クリーンパトロール', '2025-11-03 12:00-12:40 クリーンパトロール'],
-)
-
-check(
-  '④ その 3 行も、指定枠と同じ向き（重なる枠を取る）なら 12:00 と 12:30 の 2 枠に乗る。M1 ① の「乗らなかった行」は 0 である',
-  offTheType.filter((one) => {
-    const day = lastYearDays.filter((candidate) => candidate.date === one.date)[0]
-    const overlapping = day.slots.filter((slot) => slot.start < one.end && slot.end > one.start)
-    return overlapping.length !== 2 || overlapping[0].start !== '12:00' || overlapping[1].start !== '12:30'
-  }).length,
-  0,
-)
-
-check(
-  '④ 学籍番号は、確定シフト側も 10 桁の英数字である（識別キーが 2 つの記録をまたぐ → 7）',
-  assignments.filter((one) => !/^[A-Za-z0-9]{10}$/.test(one.memberId)).length,
-  0,
 )
 
 // ---- 結果 ------------------------------------------------------------------
