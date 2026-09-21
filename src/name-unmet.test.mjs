@@ -4,7 +4,8 @@
 //   使い方: node src/name-unmet.test.mjs
 //
 // 見るものは 5 つある。
-//   ① 数えるもとは 2 つで、切り方が希望と逆向きである（重なる枠すべて → 5-4・3 の境界値の表）
+//   ① 数えるもとは 2 つで、切り方が希望と逆向きである（重なる枠すべて → 5-4・3 の境界値の表）。
+//     時間帯を空けた行が効くのは、その日の 調理開始〜調理終了 の帯である（→ 5-1 の #2・issue #210）
 //   ② 必要人数（5-1 の #2）と指定枠（規則 6）の不足が、どちらも名指しで出る（→ issue #142 の受け入れ条件）
 //   ③ 名指しされていない未充足が 0 件である。埋めずに残し、あと何人を出す（→ 5-4）
 //   ④ 数えられない需要は、黙って落とさずに名指しして止まる
@@ -80,6 +81,14 @@ function placed(date, start, role, who) {
   return [date, start, end, role, who.id, who.name]
 }
 
+/**
+ * その日の調理帯（`調理開始`〜`調理終了`）の 30 分枠。時間帯を空けた需要が効く先である（→ 5-1 の #2）。
+ * 枠は時刻をまたがないので、帯の中かどうかは枠の側で決まる（→ 5-1 の #1）。
+ */
+function cookSlots(day) {
+  return day.slots.filter((slot) => slot.start >= day.cookStart && slot.end <= day.cookEnd)
+}
+
 /** 未充足を数える。行を差し替えるだけで、条件は同じものを使う。 */
 function unmetOf(rows, given) {
   return nameUnmet(rows, (given || {}).conditions || conditions)
@@ -134,12 +143,42 @@ check(
   [['12:00', 'クリーンパトロール', 1]],
 )
 
+// 時間帯を空けた 1 行。全枠ではなく、その日の調理帯（この置き方では 09:00-15:00）に効く。
+const blankTime = unmetOf([], {
+  conditions: takeConditions(conditionRows({ '役割と必要人数': [['', '', '', '呼び込み', 1]] })),
+})
+
 check(
-  '① 日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）',
+  '① 時間帯を空けた行は、その日の 調理開始〜調理終了 の帯に効く（全枠ではない → 5-1 の #2）',
+  blankTime.length,
+  conditions.days.reduce((count, day) => count + cookSlots(day).length, 0),
+)
+
+check(
+  '① 時間帯を空けた行は、準備帯にも片付け帯にも立たない（営業していない帯に店の需要を立てない）',
+  blankTime.filter((row) => row[columns.indexOf('開始')] < '09:00' || row[columns.indexOf('開始')] >= '15:00'),
+  [],
+)
+
+check(
+  '① 日を空けた行は全日に効く（日の欄の読みは動かない → 5-1 の #2）',
+  [...new Set(blankTime.map((row) => row[columns.indexOf('日')]))],
+  dates,
+)
+
+// 調理帯が 0 枠の日（前回の 2025-11-01 のような準備日）。日ごとに書き分けなくても、帯の側で決まる。
+check(
+  '① 調理帯が 0 枠の日には、時間帯を空けた行の需要が立たない（準備日・片付け日 → issue #210）',
   unmetOf([], {
-    conditions: takeConditions(conditionRows({ '役割と必要人数': [['', '', '', '呼び込み', 1]] })),
-  }).length,
-  conditions.days.reduce((count, day) => count + day.slots.length, 0),
+    conditions: takeConditions(conditionRows({
+      '日ごとの営業時刻': [
+        [dates[0], '08:00', '09:00', '15:00', '15:00', '17:00'],
+        [dates[1], '08:00', '17:00', '17:00', '17:00', '17:00'],
+      ],
+      '役割と必要人数': [['', '', '', '呼び込み', 1]],
+    })),
+  }).filter((row) => row[columns.indexOf('日')] === dates[1]),
+  [],
 )
 
 // ---- ② 必要人数と指定枠の不足が、どちらも名指しで出る -----------------------
@@ -247,9 +286,9 @@ check(
     everySlotUnmet.filter((row) => row[columns.indexOf('日')] === dates[1]).length,
   ],
   [
-    conditions.days.reduce((count, day) => count + day.slots.length, 0),
+    conditions.days.reduce((count, day) => count + cookSlots(day).length, 0),
     true,
-    conditions.days[1].slots.length,
+    cookSlots(conditions.days[1]).length,
   ],
 )
 
@@ -283,6 +322,17 @@ check(
 )
 
 // ---- ④ 数えられない需要は、名指しして止まる ---------------------------------
+
+check(
+  '④ 時間帯を空けた行でも、どの日も調理帯が 0 枠なら名指しして止まる（→ issue #210）',
+  whyItStopped(() => unmetOf([], {
+    conditions: takeConditions(conditionRows({
+      '日ごとの営業時刻': dates.map((date) => [date, '08:00', '17:00', '17:00', '17:00', '17:00']),
+      '役割と必要人数': [['', '', '', '呼び込み', 1]],
+    })),
+  }))?.includes('30 分枠に 1 つも重ならない'),
+  true,
+)
 
 check(
   '④ 日ごとの営業時刻に無い日の需要は、名指しして止まる（黙って落とさない）',

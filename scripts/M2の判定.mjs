@@ -192,17 +192,22 @@ function 案の不足() {
   const 置いた = 置いた人数()
   const 不足 = []
   let 需要のべ = 0
+  // どのもとが人数を決めたかで分けた内訳（ラベルは src/name-unmet.js の unmetSources が持つ）。
+  // 「全枠に効く」から「その日の調理帯に効く」に変わったぶんが、ここに出る（→ 宣言・issue #210）。
+  const のべの内訳 = {}
   let 需要の枠に置いた = 0
   const 超過 = []
 
   条件.days.forEach((一日) => {
     一日.slots.forEach((枠) => {
       役割の並び.forEach((役割) => {
-        const 要る = requiredAt(需要, 一日.date, 枠, 役割)
+        const 要る = requiredAt(需要, 一日, 枠, 役割)
         if (要る.count === 0) return
         const 鍵 = 枠の鍵(一日.date, 枠.start, 枠.end, 役割)
         const 置いた人数 = 置いた[鍵] || 0
         需要のべ += 要る.count
+        const もと = 要る.sources.join(' ／ ')
+        のべの内訳[もと] = (のべの内訳[もと] || 0) + 要る.count
         需要の枠に置いた += Math.min(置いた人数, 要る.count)
         if (置いた人数 > 要る.count) {
           超過.push({ 鍵: 鍵, 要る: 要る.count, 置いた: 置いた人数 })
@@ -214,7 +219,7 @@ function 案の不足() {
     })
   })
 
-  return { 不足: 不足, 需要のべ: 需要のべ, 需要の枠に置いた: 需要の枠に置いた, 超過: 超過 }
+  return { 不足: 不足, 需要のべ: 需要のべ, のべの内訳: のべの内訳, 需要の枠に置いた: 需要の枠に置いた, 超過: 超過 }
 }
 
 const 案 = 案の不足()
@@ -291,6 +296,7 @@ const 実際 = {
   '枠': 日ごと.reduce((合計, 一日) => 合計 + 一日.slots.length, 0),
   '日ごとの枠': 日ごと.map((一日) => 一日.slots.length),
   '需要のべ': 案.需要のべ,
+  '需要のべの内訳': 案.のべの内訳,
 }
 const 外れた入力 = Object.keys(実際).filter((名) => JSON.stringify(実際[名]) !== JSON.stringify(期待[名]))
 

@@ -168,7 +168,7 @@ function demandUnits(needs, days, people, conditions) {
     day.slots.forEach((slot, slotIndex) => {
       order.forEach((role, roleIndex) => {
         if (prepCleanupRoles().indexOf(role) !== -1) return
-        const required = requiredAt(needs, day.date, slot, role).count // → name-unmet.js
+        const required = requiredAt(needs, day, slot, role).count // → name-unmet.js
         if (required === 0) return
         const able = people.filter((person) => canStandAt(person, day, slot, role, conditions))
         units.push({
@@ -442,7 +442,7 @@ function prepOrCleanupFor(board, needs, person, day, state) {
 /** その帯のうち、まだ人数が足りていない枠（→ name-unmet.js と同じ数え方である）。 */
 function wantedBandSlots(board, needs, person, day, role) {
   return freeBandSlots(person, day, role).filter((slot) => (
-    requiredAt(needs, day.date, slot, role).count > placedCount(board, day.date, slot, role)
+    requiredAt(needs, day, slot, role).count > placedCount(board, day.date, slot, role)
   ))
 }
 
