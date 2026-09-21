@@ -28,7 +28,7 @@
 const coreSteps = [
   { name: '取り込む', issue: 146, writesTo: null, whatItDoes: '回答の行を 1 人 1 件に畳む（規則 2 ／ 8 の 6）' },
   { name: '展開する', issue: 149, writesTo: null, whatItDoes: '回答文字列をその人の 30 分枠の集合にする（規則 1 ／ 8 の 7）' },
-  { name: '生成する', issue: 151, writesTo: '割り当て', whatItDoes: '候補・条件・固定から割り当ての行を組む（5 の #6 ／ 8 の 8）' },
+  { name: '生成する', issue: 151, writesTo: '割り当て', whatItDoes: '候補・条件・希望から割り当ての行を組む（5 の #6 ／ 8 の 8）' },
   { name: '違反を数える', issue: 141, writesTo: '検証結果', whatItDoes: '置いた人が条件を破っている所を行にする（5-4 ／ 8 の 3）' },
   { name: '未充足を名指しする', issue: 142, writesTo: '検証結果', whatItDoes: '人数が足りない枠を行にする（5-4 ／ 8 の 3）' },
   { name: '指標を出す', issue: 154, writesTo: '指標', whatItDoes: '人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7 ／ 8 の 9）' },
@@ -51,6 +51,9 @@ function builtInSteps() {
   if (typeof expand !== 'function') {
     throw new Error('expand.js が貼られていない（「展開する」の中身がそこにある → issue #149）')
   }
+  if (typeof generate !== 'function') {
+    throw new Error('generate.js が貼られていない（「生成する」の中身がそこにある → issue #151）')
+  }
   if (typeof countViolations !== 'function') {
     throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
   }
@@ -60,6 +63,7 @@ function builtInSteps() {
   return {
     '取り込む': takeIn,
     '展開する': expand,
+    '生成する': generate,
     '違反を数える': countViolations,
     '未充足を名指しする': nameUnmet,
   }
@@ -128,8 +132,10 @@ function build(inputs, steps) {
   const wishes = callStep('取り込む', [inputs['回答']])
   const candidates = callStep('展開する', [wishes, conditions.days])
 
+  // 生成にも希望が渡る。規則 4 の学年と規則 5 の調理可否は候補に乗っていない（→ #149）ので、
+  // 型 #6 を見ないと、違反を作らずに置くかどうかが決まらない（→ generate.js の canStandAt）。
   const fixed = inputs['割り当て'] // 前の周で担当者が書き換えたところ（→ 5-3）
-  const assignments = callStep('生成する', [candidates, conditions, fixed])
+  const assignments = callStep('生成する', [candidates, conditions, wishes, fixed])
 
   // 違反と未充足は別に数えて、同じ 1 枚に種別で分けて並べる（→ 5-4）。
   // 数える側に候補も渡る。規則 1 の違反（希望の時間の外）は、展開した枠と照らさないと見えない。

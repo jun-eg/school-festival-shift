@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -92,7 +92,7 @@ const filesTouchingSpreadsheetApp = fs
   .sort()
 
 check(
-  '① SpreadsheetApp を掴むのは 4 ファイルだけである（コアの 7 つも、構造の検証も掴まない）',
+  '① SpreadsheetApp を掴むのは 4 ファイルだけである（コアの 8 つも、構造の検証も掴まない）',
   filesTouchingSpreadsheetApp,
   ['build-form.js', 'build-template.js', 'menu.js', 'shell.js'],
 )
@@ -181,13 +181,15 @@ check(
 )
 
 check(
-  '③ 中身が入っている段は、未了に出ない（4 つ → take-in.js ／ expand.js ／ count-violations.js ／ name-unmet.js）',
+  '③ 中身が入っている段は、未了に出ない'
+    + '（5 つ → take-in.js ／ expand.js ／ generate.js ／ count-violations.js ／ name-unmet.js）',
   [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
-  [['取り込む', '展開する', '違反を数える', '未充足を名指しする'], []],
+  [['取り込む', '展開する', '生成する', '違反を数える', '未充足を名指しする'], []],
 )
 
 check(
-  '③ 生成の段が入っていないので、割り当てと指標は空の配列で返る（何も書かない）',
+  '③ 指標の段が入っていないので、指標は空の配列で返る（何も書かない）。'
+    + '割り当ても空である — この 1 人は 調理担当ですか？ が いいえ で、調理の枠に置けない（→ 規則 5）',
   [skeletonOutput['割り当て'], skeletonOutput['指標']],
   [[], []],
 )
@@ -234,7 +236,10 @@ check(
 const receivedArgs = {}
 build(skeletonInputs(), {
   '展開する': (wishes, days) => { receivedArgs['展開する'] = [wishes, days]; return [] },
-  '生成する': (candidates, conditions, fixed) => { receivedArgs['生成する'] = [candidates, conditions, fixed]; return [] },
+  '生成する': (candidates, conditions, wishes, fixed) => {
+    receivedArgs['生成する'] = [candidates, conditions, wishes, fixed]
+    return []
+  },
   '違反を数える': (assignments, conditions) => { receivedArgs['違反を数える'] = [assignments, conditions]; return [] },
 })
 
@@ -272,8 +277,16 @@ check(
 
 check(
   '④-2 固定として渡るのは、前の周の割り当てシートの行である（→ 5-3）',
-  receivedArgs['生成する'][2],
+  receivedArgs['生成する'][3],
   skeletonInputs()['割り当て'],
+)
+
+// 規則 4 の学年と規則 5 の調理可否は候補に乗っていない（→ #149）ので、生成にも型 #6 が渡る。
+// 渡るのは取り込みを通った型であって、回答の行ではない（友達欄も氏名も乗らない → 5-2・5-1 の #6）。
+check(
+  '④-2 生成に希望が渡る。渡るのは型 #6 であって、回答の行ではない（→ 5-1 の #6・5-2）',
+  Object.keys(receivedArgs['生成する'][2][0]),
+  inputTypes.filter((type) => type.source === '回答')[0].fields,
 )
 
 // ---- ⑤ 黙って直さずに止まる -------------------------------------------------
