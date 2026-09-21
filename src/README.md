@@ -13,6 +13,7 @@
 | [`input-types.js`](input-types.js) | **入力の型 6 種類だけ**（→ 5-1）。行の配列を型に直し、揃っていない値を名指しして止める（**揃えるのは学籍番号の大文字・小文字だけ** → `readStudentId`） | **コア** |
 | [`core.js`](core.js) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`coreSteps`）と、段をつなぐ 1 本（`build`）と、中身が入っている段（`builtInSteps`） | **コア** |
 | [`take-in.js`](take-in.js) | **回答の行を 1 人 1 件に畳む**（→ 3 の規則 2。`取り込む` の段の中身）。**採る向き（後から来た行 → ADR design-doc-0006）を名前で持つ** | **コア** |
+| [`expand.js`](expand.js) | **回答文字列をその人の 30 分枠の集合にする**（→ 3 の規則 1。`展開する` の段の中身）。**境界値と特別扱いの 4 つを名前で持つ**（`wishBoundaries`） | **コア** |
 | [`count-violations.js`](count-violations.js) | **置いた人が条件を破っている所を行にする**（→ 5-4。`違反を数える` の段の中身）。**数える 5 つと、数えない ⑥ を名前で持つ** | **コア** |
 | [`name-unmet.js`](name-unmet.js) | **人数が足りない枠を行にする**（→ 5-4。`未充足を名指しする` の段の中身）。**数えるもと 2 つ（必要人数・委員会の指定枠）を名前で持つ** | **コア** |
 | [`form-definition.js`](form-definition.js) | **フォームの定義一式だけ**（→ 4-1〜4-3。設問 9 つ ＋ 画像アイテム 1 つ・正規表現 3 箇所・エラーメッセージの句点の揺れ ◎） | **コア** |
@@ -75,7 +76,7 @@
 **コアは配列を受けて配列を返す純粋な関数で、`SpreadsheetApp` に触るのは読み書きの殻だけである**（→ 6 の #8）。
 **値の表現を揃えるのも殻の仕事である。**
 
-| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`take-in.js`](take-in.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`sheet-layout.js`](sheet-layout.js)・[`form-definition.js`](form-definition.js)） | 殻（[`shell.js`](shell.js)） |
+| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`take-in.js`](take-in.js)・[`expand.js`](expand.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`sheet-layout.js`](sheet-layout.js)・[`form-definition.js`](form-definition.js)） | 殻（[`shell.js`](shell.js)） |
 | --- | --- | --- |
 | **受け取るもの** | **文字列と数値だけでできた行の配列** | スプレッドシート |
 | **返すもの** | 生成シート 3 枚ぶんの**行の配列** | — |
@@ -130,7 +131,7 @@
 （時刻が `HH:MM` でない／時刻が早い順でない／人数が 1 以上の整数でない／学年が選択肢の外／学籍番号が 10 桁英数字でない、など）。
 **値の表現を揃えるのは殻**（→ 上の表）で、**型に乗るかを見るのはここ**である。
 
-### 段は 6 つで、中身は 3 つ入っている
+### 段は 6 つで、中身は 4 つ入っている
 
 **`build` が呼ぶ順である**（→ 8「作業の順序」）。**入っていない段は空の配列を返し、名指しで持ち帰る。黙って走らない。**
 **入っている段は `builtInSteps` が持つ** — **入っているのに「まだ作っていない」と名指しすると、`notBuilt` が嘘になる。**
@@ -138,7 +139,7 @@
 | 段 | 何をするか | 入れる issue |
 | --- | --- | --- |
 | `取り込む` | 回答の行を 1 人 1 件に畳む（規則 2。**採るのは後から来た行である**） | **入っている**（[`take-in.js`](take-in.js) ／ [#146](https://github.com/jun-eg/school-festival-shift/issues/146)） |
-| `展開する` | 回答文字列をその人の 30 分枠の集合にする（規則 1。**枠は型 #1 で渡る**） | [#149](https://github.com/jun-eg/school-festival-shift/issues/149) |
+| `展開する` | 回答文字列をその人の 30 分枠の集合にする（規則 1。**枠は型 #1 で渡る**） | **入っている**（[`expand.js`](expand.js) ／ [#149](https://github.com/jun-eg/school-festival-shift/issues/149)） |
 | `生成する` | 候補・条件・固定から割り当ての行を組む（5 の #6） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151) |
 | `違反を数える` | 置いた人が条件を破っている所を行にする（5-4） | **入っている**（[`count-violations.js`](count-violations.js) ／ [#141](https://github.com/jun-eg/school-festival-shift/issues/141)） |
 | `未充足を名指しする` | 人数が足りない枠を行にする（5-4） | **入っている**（[`name-unmet.js`](name-unmet.js) ／ [#142](https://github.com/jun-eg/school-festival-shift/issues/142)） |
@@ -161,8 +162,8 @@
 **ファイルを貼る順に依存しない。** Apps Script は `.gs` を 1 つずつ順に評価するので、
 **他のファイルの値をファイルの最上位で使うと、並び順で壊れる。**`core.js` も `shell.js` も
 `verify-structure.js` も、[`sheet-layout.js`](sheet-layout.js) を見るのは関数の中だけにしてある。
-**貼り忘れは名指しで止まる** — `builtInSteps` は [`take-in.js`](take-in.js) と [`count-violations.js`](count-violations.js) と
-[`name-unmet.js`](name-unmet.js) のどれが無くても、
+**貼り忘れは名指しで止まる** — `builtInSteps` は [`take-in.js`](take-in.js) と [`expand.js`](expand.js) と
+[`count-violations.js`](count-violations.js) と [`name-unmet.js`](name-unmet.js) のどれが無くても、
 **段を「まだ作っていない」に混ぜずに、貼られていないことを名指しする。**
 
 ### 取り込む側は、後から来た行を採る
@@ -192,6 +193,38 @@
 （2026-09-22 → [`docs/interviews/02-作る側.md`](../docs/interviews/02-作る側.md)）ので、
 **学籍番号は読むときに大文字へ揃えて型 #6 に乗る**（→ [`input-types.js`](input-types.js) の `readStudentId`）。
 **揃えるのはその 1 箇所だけで、ここも [`count-violations.js`](count-violations.js) も素の等値で比べる。**
+
+### 展開する側は、完全に含まれる枠だけを取る
+
+**[`expand.js`](expand.js) が持つ**（→ 3 の規則 1 ／ [#149](https://github.com/jun-eg/school-festival-shift/issues/149)）。
+**1 人 1 件の希望（型 #6）と、その年の枠（型 #1）を受けて、その人がその日に入れる候補の枠を返す。**
+
+| 規則 1 | 何をするか |
+| --- | --- |
+| **①** | **その日の営業 5 時刻から 30 分枠を刻む** — **刻むのは型 #1 のほうである**（→ [`input-types.js`](input-types.js) の `cutSlots`）。ここは刻み終わった枠を受けるだけで、枠を作り直さない |
+| **②** | **回答文字列を `,` で区切って区間に分ける**（通す形は 4-2 の正規表現と同じである → `wishIntervalPattern`） |
+| **③** | **区間に完全に含まれる枠だけを取る**（**重なるだけの枠は取らない**） |
+| **④** | **複数区間は和集合を取る**（並びは、その日の枠の並びのままである） |
+
+**出るのは候補であって、割り当てではない**（→ 仕様 #5）。**役割も人数も、ここでは 1 つも決まらない。**
+**候補からどの枠へ置くかは生成が持つ**（→ [#151](https://github.com/jun-eg/school-festival-shift/issues/151)。規則 1 の ⑤）。
+**1 人 1 日に 1 件を返す** — **候補が 0 枠の日も件として返る**（日が消えるのではない）。
+
+**境界値と特別扱いは 3 の表が持つ。**[`expand.js`](expand.js) は名前で持つだけである（`wishBoundaries`）。
+
+| 入力の形 | どうなるか |
+| --- | --- |
+| **`00:00-00:00`** | **候補は空集合。時刻として展開しない**（③ に入る前に落とす） |
+| **営業時間の外へ伸びた区間** | **外側は落ちる。弾かない** — ① で刻んだ枠しか存在しないので、③ が落とす |
+| **区間の端に半分だけかかる枠** | **候補に入れない** — ③ が「完全に含まれる枠だけ」だからである |
+| **終端 ≤ 始端の区間** | **候補を作らず、名指しして止まる**（黙って解釈しない） |
+
+**4 つのうち 3 つは、規則を足さなくてもそうなる。****足しているものが 1 つも無い**のが、この形の要である。
+**切り方が逆向きなのは委員会の指定枠だけで、そちらは数える側が持つ**（**重なる枠を取る** → [`name-unmet.js`](name-unmet.js)）。
+
+**回答の日ごとの列と、条件入力の「日ごとの営業時刻」の行は、上から順に 1 対 1 で当てる**（→ 4-1）。
+**数が食い違えば、前から当てずに名指しして止まる** —
+**どの回答がどの日かが決まらない**（→ [`form-definition.js`](form-definition.js) の `checkDaysForForm` と同じ理由である）。
 
 ### 違反を数える側は、5 つを数えて ⑥ を数えない
 
@@ -500,13 +533,14 @@
 | **ファイル名が 1 対 1 で対応する** | **貼った名前がそのまま付く**ので、リポジトリの `.js` と Apps Script の `.gs` が名前で突き合わせられる（**日本語の名前でもそのまま通った** → [`real-device-log.md`](real-device-log.md)。**いまは英字である** → [#175](https://github.com/jun-eg/school-festival-shift/issues/175)） |
 
 **却下ではない** — clasp を使いたい実装者が使うのは構わない。**手順の原本がどちらかを決めただけである。**
-**`src/` のファイルが増えたら、この判断は見直す。****4 つから 13 になったが、動かしていない**
+**`src/` のファイルが増えたら、この判断は見直す。****4 つから 14 になったが、動かしていない**
 （`core.js` と `shell.js` → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)、
 `verify-structure.js` → [#138](https://github.com/jun-eg/school-festival-shift/issues/138)、
 `input-types.js` → [#140](https://github.com/jun-eg/school-festival-shift/issues/140)、
 `count-violations.js` → [#141](https://github.com/jun-eg/school-festival-shift/issues/141)、
 `name-unmet.js` → [#142](https://github.com/jun-eg/school-festival-shift/issues/142)、
 `take-in.js` → [#146](https://github.com/jun-eg/school-festival-shift/issues/146)、
+`expand.js` → [#149](https://github.com/jun-eg/school-festival-shift/issues/149)、
 `form-definition.js` と `build-form.js` ＋ `form-picker.html` → [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）
 — **貼る回数はまだ手で追える**し、**貼るのが 1 回だけであることも、インストールが 0 であることも変わっていない。**
 **clasp の導入を担当者に要求することは、どちらにしても無い。**
@@ -518,6 +552,7 @@ node src/sheet-layout.test.mjs
 node src/input-types.test.mjs
 node src/core.test.mjs
 node src/take-in.test.mjs
+node src/expand.test.mjs
 node src/count-violations.test.mjs
 node src/name-unmet.test.mjs
 node src/form-definition.test.mjs
@@ -536,6 +571,7 @@ node src/build-form.test.mjs
 | [`input-types.test.mjs`](input-types.test.mjs) | **型が 6 種類だけであること／枠が営業時刻から刻まれること／揃っていない値で止まること／学籍番号が大文字で型に乗ること／日ごとの回答文字列を位置で当てること**（見出しが今年の題に変わっても同じ並びで乗るか）**。****[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) をそのまま食わせる** — 50 行が型 #6 に乗るか。**確定シフト 4 本が型に乗るか（→ M1 ①）は、ここでは数えない** — 判定の手（[`scripts/M1①の判定.mjs`](../scripts/M1①の判定.mjs)）が持つ | 25 |
 | [`core.test.mjs`](core.test.mjs) | **スプレッドシートを 1 つも作らずにコアを走らせる。**`SpreadsheetApp` を掴むファイルの一覧／配列を渡して配列が返るか／入っていない段が名指しで返るか／段を差し替えて先に回せるか／**条件が 5-1 の型で段に渡るか**／**表現の揺れ・列数の違い・決めていない種別で止まるか**／**中身が入っている段が未了に出ないか** | 28 |
 | [`take-in.test.mjs`](take-in.test.mjs) | **規則 2 の 3 つを踏むか**（学籍番号でまとめる／タイムスタンプで畳む／**採るのは後から来た行**）**／[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の全 50 行 ◎ が 39 人 ◎ になり、学籍番号の重複が 0 か**（→ 仕様 #4）／**畳まれるのが出し直し 11 行 ◎ か**／**返るのが型 #6 だけか**（タイムスタンプも氏名も友達欄も乗らない）／**大文字・小文字だけ違う学籍番号が 1 件に畳まれ、残るのが大文字か**／**キーで 1 行に決まらない 2 行・揃っていないタイムスタンプで止まるか**／**コアの段として繋がっているか** | 28 |
+| [`expand.test.mjs`](expand.test.mjs) | **規則 1 の順序を踏むか**（刻んだ枠を受ける／`,` で区切る／**完全に含まれる枠だけ**／**和集合**）**／境界値と特別扱いの 4 つがそのとおりに出るか**（`00:00-00:00` は空集合／営業時間の外は落ちる／端に半分だけかかる枠は入らない／**終端 ≤ 始端は名指しして止まる**）**／[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 39 人が記録どおりに展開されるか**（**終端 ≤ 始端の 3 人で止まり、残る 36 人 × 4 日が 144 件・のべ 1191 枠**）**／出るのが候補であって割り当てでないか**（**役割が付いていない** → 仕様 #5）**／書式・日数の食い違いで止まるか／コアの段として繋がっているか** | 37 |
 | [`count-violations.test.mjs`](count-violations.test.mjs) | **数えるのは 5 つで ⑥ を数えないこと／違反を 1 件ずつ仕込むとそれぞれが名指しで出ること／未充足を 1 件も混ぜないこと／割り当ての学籍番号が小文字でもその人の希望に繋がること／判定できない行で止まること／コアの段として繋がっていること** | 32 |
 | [`name-unmet.test.mjs`](name-unmet.test.mjs) | **数えるもとは 2 つで、切り方が希望と逆向きであること／必要人数と指定枠の不足がどちらも名指しで出ること／名指しされていない未充足が 0 件であること／数えられない需要で止まること／コアの段として繋がっていること** | 28 |
 | [`form-definition.test.mjs`](form-definition.test.mjs) | **前回の日付と営業時刻を入れた定義を、4-1〜4-3 の表と 1 行ずつ突き合わせて差分が 0 か**（設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。**→ 仕様 #2 の判定**）／**正規表現が 3 箇所で希望時間の 4 設問は同じ 1 本か**／**句点の揺れ ◎ を揃えずに写しているか**／**説明文が例 3 つと営業時間を持つか**／**入る側から数え直すと 6 項目か**／**今年の日付を入れれば題も営業時間も今年のものになり、空・4 行でないときは組まずに止まるか**。**[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 50 行を通し、正規表現も選択肢も必須も 1 件も弾かないことを見る** | 26 |
@@ -544,7 +580,7 @@ node src/build-form.test.mjs
 | [`build-template.test.mjs`](build-template.test.mjs) | **偽のスプレッドシートの上で組み立てを走らせる。**5 枚できるか（**「回答」に置くのは構成が名前で持つ 6 列だけである** — 後ろ 4 列は題が決まってから埋まる）／保護が 3 枚に警告のみでかかるか／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか** | 9 |
 | [`build-form.test.mjs`](build-form.test.mjs) | **偽のフォームと偽のスプレッドシートの上でフォームを作る。**定義の順に置かれるか（必須・選択肢・正規表現・文言ごと）／**選んだ画像が画像アイテムに入るか**／**回答先がこのスプレッドシート自身に向くか**／**フォームが作った回答シートが構成の「回答」になるか**（見出し・位置・保護・5 枚のまま）／**2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まるか**／**題と営業時間が条件入力の「日ごとの営業時刻」から出るか**（前回の値で 4 の表、今年の値で今年のもの）**・空／4 行でない／早い順でない ときにフォームを 1 つも作らずに止まるか** | 34 |
 
-**この 11 本で分かるのは、手元で回る範囲だけである。**
+**この 12 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
 [`real-device-log.md`](real-device-log.md) が持つ。ここに二重に書かない。**
 
@@ -554,7 +590,7 @@ node src/build-form.test.mjs
 
 **ここのファイルを触ったら、[`scripts/M1②の判定.mjs`](../scripts/M1②の判定.mjs) も走らせる** —
 **フォームを配ってから型が出てくるまでの経路に担当者の手が入るか（M1 ②）は、経路のファイルが動けば動く。**
-**この 11 本と見ているものが違う** — **検査は 1 本ずつの契約を、判定は 12 本をつないだ 1 本の経路を見る**
+**この 12 本と見ているものが違う** — **検査は 1 本ずつの契約を、判定は 13 本をつないだ 1 本の経路を見る**
 （→ [`scripts/README.md`](../scripts/README.md)）。
 
 ## ここで決めていないこと

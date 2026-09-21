@@ -40,6 +40,7 @@
       "src/input-types.js",
       "src/core.js",
       "src/take-in.js",
+      "src/expand.js",
       "src/count-violations.js",
       "src/name-unmet.js",
       "src/shell.js",
@@ -54,7 +55,7 @@
   "偽で置き換えるもの": [
     {
       "何": "FormApp ／ SpreadsheetApp ／ Utilities ／ HtmlService",
-      "なぜ偽でよいか": "数えるのは「人の手が入った箇所」であって、Google の上で通るかではない。偽で置き換えているのは Google 側の器だけで、src/ の 12 ファイルは 1 行も書き直していない。",
+      "なぜ偽でよいか": "数えるのは「人の手が入った箇所」であって、Google の上で通るかではない。偽で置き換えているのは Google 側の器だけで、src/ の 13 ファイルは 1 行も書き直していない。",
       "本物で見たのはどこか": "src/real-device-log.md の項目 10〜12（2026-09-22 の実機）。正規表現とエラーメッセージが入ったこと・setDestination が 3 スコープで通り回答シートが 1 枚で見出しが 10 列と一致したこと・選んだ画像が画像アイテムに入ったことは、そちらが持つ。ここに写さない。"
     }
   ],

@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -52,10 +52,18 @@ function whyItStopped(work) {
   }
 }
 
-/** 骨組みを回すのに足りるだけの入力。値は data/ の転記元と同じ表現で置く。 */
+/**
+ * 骨組みを回すのに足りるだけの入力。値は data/ の転記元と同じ表現で置く。
+ * 日は 4 行である — 回答の日ごとの列 4 つと上から順に 1 対 1 で当たる（→ 4-1・規則 1）。
+ */
 function skeletonInputs(overrides) {
   const inputs = {
-    '日ごとの営業時刻': [['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00']],
+    '日ごとの営業時刻': [
+      ['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00'],
+      ['2025-11-02', '08:00', '10:00', '18:00', '18:00', '20:00'],
+      ['2025-11-03', '08:00', '10:00', '18:00', '18:00', '20:00'],
+      ['2025-11-04', '08:00', '10:00', '18:00', '18:00', '20:00'],
+    ],
     '役割と必要人数': [['', '', '', '調理', 2]],
     '調理責任者の学年': [['3年生'], ['4年生']],
     '委員会の指定枠': [],
@@ -173,9 +181,9 @@ check(
 )
 
 check(
-  '③ 中身が入っている段は、未了に出ない（3 つ → take-in.js ／ count-violations.js ／ name-unmet.js）',
+  '③ 中身が入っている段は、未了に出ない（4 つ → take-in.js ／ expand.js ／ count-violations.js ／ name-unmet.js）',
   [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
-  [['取り込む', '違反を数える', '未充足を名指しする'], []],
+  [['取り込む', '展開する', '違反を数える', '未充足を名指しする'], []],
 )
 
 check(
@@ -192,7 +200,7 @@ check(
     skeletonOutput['検証結果'].length,
     skeletonOutput['検証結果'].map((row) => row[kindColumn]).filter((kind) => kind !== checkKind.unmet),
   ],
-  [24, []],
+  [96, []],
 )
 
 check(
