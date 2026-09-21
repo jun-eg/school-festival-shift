@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -84,7 +84,7 @@ const filesTouchingSpreadsheetApp = fs
   .sort()
 
 check(
-  '① SpreadsheetApp を掴むのは 4 ファイルだけである（コアの 6 つも、構造の検証も掴まない）',
+  '① SpreadsheetApp を掴むのは 4 ファイルだけである（コアの 7 つも、構造の検証も掴まない）',
   filesTouchingSpreadsheetApp,
   ['build-form.js', 'build-template.js', 'menu.js', 'shell.js'],
 )
@@ -173,9 +173,9 @@ check(
 )
 
 check(
-  '③ 中身が入っている段は、未了に出ない（数える側 2 つ → count-violations.js ／ name-unmet.js）',
+  '③ 中身が入っている段は、未了に出ない（3 つ → take-in.js ／ count-violations.js ／ name-unmet.js）',
   [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
-  [['違反を数える', '未充足を名指しする'], []],
+  [['取り込む', '違反を数える', '未充足を名指しする'], []],
 )
 
 check(
