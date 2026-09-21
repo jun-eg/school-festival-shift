@@ -35,3 +35,8 @@ git switch main && git pull
 
 **Claude Code の worktree 機能は、人がその場で頼むか、この `CLAUDE.md` のような指示があるときにしか使われない。**
 **毎回口で言うのをやめるために、ここに書いてある。**
+
+## 実機のスプレッドシートに貼る前に
+
+**クリップボードに UTF-16LE の BOM（`printf '\xff\xfe'`）を自分で付けない。** **`clip.exe` はそれを 1 文字目として渡すので、
+貼った先頭のセルだけが日時にならず、しかもセルにも数式バーにも見えない**（→ [issue #203](https://github.com/jun-eg/school-festival-shift/issues/203)）。
