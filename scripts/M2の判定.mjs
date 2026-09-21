@@ -26,6 +26,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 営業時刻の行, 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
@@ -43,11 +44,11 @@ for (const 相対 of 宣言.入力.実装) {
 const {
   build, builtInSteps, coreSteps, takeIn, expand, toDays, formatDateTime, takeConditions,
   readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind,
-  violationRules, violationsNotCounted,
+  violationRules, violationsNotCounted, ruleRoles,
 } = vm.runInContext(
   '({ build, builtInSteps, coreSteps, takeIn, expand, toDays, formatDateTime, takeConditions,'
     + ' readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind,'
-    + ' violationRules, violationsNotCounted })',
+    + ' violationRules, violationsNotCounted, ruleRoles })',
   文脈,
 )
 
@@ -77,12 +78,9 @@ function 回答シートの行にする(行) {
   return [formatDateTime(new Date(年, 月 - 1, 日, 時, 分, 秒))].concat(行.slice(1))
 }
 
-/** 条件入力の「日ごとの営業時刻」の 4 行（→ 宣言の「入力」）。 */
-function 営業時刻の行() {
-  return Object.entries(宣言.入力.条件入力.日ごとの営業時刻)
-    .filter(([鍵]) => /^\d{4}-\d{2}-\d{2}$/.test(鍵))
-    .map(([日, 時刻]) => [日].concat(時刻))
-}
+// 条件入力の「日ごとの営業時刻」は、data/ の前回の確定シフトから毎回算出する
+// （→ scripts/前回の5時刻.mjs ／ 宣言の「前回の 5 時刻の置き方」）。この手は刻み方も時刻も持たない。
+const 時刻の検め = 前回の5時刻を検める()
 
 /** 回答の行から、コアに渡す入力の一式を組む。回答以外は宣言のままである。 */
 function 入力一式(回答の行) {
@@ -221,6 +219,27 @@ function 案の不足() {
 
 const 案 = 案の不足()
 
+/**
+ * 置いた行を役割ごとに数える（→ issue #209 の受け入れ条件「準備 の割り当てが出る」）。
+ *
+ * 並びは需要の役割 ＋ 規則 3 が置く 2 つ（準備・片付け）である。0 件の役割も落とさずに出す —
+ * 出なかったことが読めないと、「出ないなら理由が名指しで残っている」を満たせない。
+ */
+const 置いた役割 = (() => {
+  const 役割の列 = sheetColumns('割り当て').indexOf('役割')
+  const 数え = {}
+  出力['割り当て'].forEach((行) => {
+    const 役割 = String(行[役割の列])
+    数え[役割] = (数え[役割] || 0) + 1
+  })
+  const 並び = 役割の並び.slice()
+  Object.keys(ruleRoles).forEach((鍵) => {
+    if (並び.indexOf(ruleRoles[鍵]) === -1) 並び.push(ruleRoles[鍵])
+  })
+  Object.keys(数え).forEach((役割) => { if (並び.indexOf(役割) === -1) 並び.push(役割) })
+  return 並び.map((役割) => ({ 役割: 役割, 件数: 数え[役割] || 0 }))
+})()
+
 /** 検証結果の未充足の行を、(日・枠・役割) で引ける形にする。 */
 const 名指し = {}
 未充足の行.forEach((行) => {
@@ -312,6 +331,22 @@ function 主処理() {
   console.log(`      展開で止まった人: ${止まる人.join(' / ')}（終端 ≤ 始端。外してから組んだ → 宣言）`)
 
   console.log('')
+  console.log('日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/前回の5時刻.mjs）')
+  時刻の検め.算出.forEach((一日) => {
+    const 帯 = `準備 ${一日.帯の枠['準備']} ／ 調理 ${一日.帯の枠['調理']} ／ 片付け ${一日.帯の枠['片付け']}`
+    console.log(`      ${一日.日}  ${一日.時刻.join(' ')}  全 ${一日.全枠} 枠 = ${帯}`)
+  })
+  時刻の検め.確かめた.forEach((一つ) => {
+    console.log(`  ${一つ.合否 ? 'OK ' : 'NG '}  ${一つ.何}`)
+  })
+  if (時刻の検め.外れ.length === 0) {
+    console.log('  OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
+  } else {
+    時刻の検め.外れ.forEach((一つ) => console.log(`  NG   5 時刻が期待と違う: ${一つ}`))
+  }
+  console.log('       値の出どころ（どの行から出たか）は node scripts/前回の5時刻.mjs が出す')
+
+  console.log('')
   console.log('数えに入らないもの（入っていないことを隠さない → docs/tech-requirements.md 5-4 の但し書き）')
   violationsNotCounted.forEach((一つ) => {
     console.log(`  ・${一つ.rule}（${一つ.what}）… 違反に数えていない`)
@@ -328,6 +363,10 @@ function 主処理() {
   console.log('組んだ案')
   console.log(`  割り当ての行: ${出力['割り当て'].length}`)
   console.log(`  需要のべ ${案.需要のべ} ＝ 需要の枠に置いた ${案.需要の枠に置いた} ＋ あと何人 ${あと何人の合計}`)
+  console.log(`  役割ごと: ${置いた役割.map((一つ) => `${一つ.役割} ${一つ.件数}`).join(' ／ ')}`)
+  置いた役割.filter((一つ) => 一つ.件数 === 0).forEach((一つ) => {
+    console.log(`       ${一つ.役割} は 0 件である。その帯が 1 枠も無い日しか無いか、置ける人が残らなかった（→ 5-5・帯の内訳を上に出してある）`)
+  })
 
   const 違反 = 違反の内訳()
   console.log('')
@@ -394,12 +433,14 @@ function 主処理() {
   const 線を外した = 違反の行.length !== 宣言.合格の線.違反
     || 名指しされていない未充足 !== 宣言.合格の線.名指しされていない未充足
     || 空の名指し.length !== 0
-  const 判定できない = 外れた入力.length !== 0 || 揃わなかった突き合わせ.length !== 0 || 本文に無い言葉.length !== 0
+  const 判定できない = 外れた入力.length !== 0 || 時刻の検め.落ちた
+    || 揃わなかった突き合わせ.length !== 0 || 本文に無い言葉.length !== 0
 
   if (判定できない) {
     console.log('')
     console.log('判定できない（件数の合否より先に、入力と突き合わせを見る → 宣言）')
     if (外れた入力.length > 0) console.log(`  ・入力が期待と違う: ${外れた入力.join(' / ')} — ${期待.ここが外れたら}`)
+    if (時刻の検め.落ちた) console.log(`  ・算出した 5 時刻が検めを落ちた（→ node scripts/前回の5時刻.mjs で分かれ道が出る）— ${時刻の検め.ここが外れたら}`)
     if (揃わなかった突き合わせ.length > 0) console.log(`  ・突き合わせが揃わない: ${揃わなかった突き合わせ.map((一つ) => 一つ.何).join(' / ')} — ${宣言.突き合わせ.揃わなかったら}`)
     if (本文に無い言葉.length > 0) console.log(`  ・本文に載っていない言葉がある: ${本文に無い言葉.join(' / ')}`)
   }

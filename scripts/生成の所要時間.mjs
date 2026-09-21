@@ -19,6 +19,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 営業時刻の行, 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
@@ -64,12 +65,9 @@ function 回答シートの行にする(行) {
   return [formatDateTime(new Date(年, 月 - 1, 日, 時, 分, 秒))].concat(行.slice(1))
 }
 
-/** 条件入力の「日ごとの営業時刻」の 4 行（→ 宣言の「入力」）。 */
-function 営業時刻の行() {
-  return Object.entries(宣言.入力.条件入力.日ごとの営業時刻)
-    .filter(([鍵]) => /^\d{4}-\d{2}-\d{2}$/.test(鍵))
-    .map(([日, 時刻]) => [日].concat(時刻))
-}
+// 条件入力の「日ごとの営業時刻」は、data/ の前回の確定シフトから毎回算出する
+// （→ scripts/前回の5時刻.mjs ／ 宣言の「前回の 5 時刻の置き方」）。この手は刻み方も時刻も持たない。
+const 時刻の検め = 前回の5時刻を検める()
 
 /** 回答の行から、コアに渡す入力の一式を組む。回答以外は宣言のままである。 */
 function 入力一式(回答の行) {
@@ -222,7 +220,20 @@ Object.keys(実際).forEach((名) => {
   console.log(`    ${印} ${名}: ${JSON.stringify(実際[名])}（期待 ${JSON.stringify(期待[名])}）`)
 })
 console.log(`         展開で止まった人: ${止まる人.join(' / ')}（終端 ≤ 始端。外してから 1 周させた → 宣言）`)
-console.log(`         需要のべ: ${期待.需要のべ}（枠 ${期待.枠} × 1 枠 ${期待.需要のべ / 期待.枠} 人 ◎ → 6 の #3 の理由 ②）\n`)
+console.log(`         需要のべ: ${期待.需要のべ}（枠 ${期待.枠} × 1 枠 ${期待.需要のべ / 期待.枠} 人 ◎ → 6 の #3 の理由 ②）`)
+
+console.log('\n  日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/前回の5時刻.mjs）')
+時刻の検め.算出.forEach((一日) => {
+  const 帯 = `準備 ${一日.帯の枠['準備']} ／ 調理 ${一日.帯の枠['調理']} ／ 片付け ${一日.帯の枠['片付け']}`
+  console.log(`         ${一日.日}  ${一日.時刻.join(' ')}  全 ${一日.全枠} 枠 = ${帯}`)
+})
+時刻の検め.確かめた.forEach((一つ) => console.log(`    ${一つ.合否 ? 'OK  ' : 'NG  '} ${一つ.何}`))
+if (時刻の検め.外れ.length === 0) {
+  console.log('    OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
+} else {
+  時刻の検め.外れ.forEach((一つ) => console.log(`    NG   5 時刻が期待と違う: ${一つ}`))
+}
+console.log('')
 
 console.log(`  段ごとの中央値（${宣言.回す回数} 回）`)
 coreSteps.forEach((段) => {
@@ -249,6 +260,11 @@ if (外れた入力.length > 0) {
   console.log('  時間の値より先に、入力が 6 の #3 の理由 ② の規模と同じかを見る（→ 宣言の「入力の期待値」）\n')
 }
 
+if (時刻の検め.落ちた) {
+  console.log('  算出した 5 時刻が検めを落ちた（→ node scripts/前回の5時刻.mjs で分かれ道が出る）')
+  console.log(`  ${時刻の検め.ここが外れたら}\n`)
+}
+
 if (越えた) {
   console.log(`  判定: 上限に当たった（中央値 ${秒で(中央)} ＞ ${上限} 秒）`)
   console.log(`  ${宣言.上限に当たったら.この手が決めないこと}`)
@@ -262,4 +278,4 @@ if (越えた) {
 }
 console.log('')
 
-process.exit(越えた || 外れた入力.length > 0 ? 1 : 0)
+process.exit(越えた || 外れた入力.length > 0 || 時刻の検め.落ちた ? 1 : 0)
