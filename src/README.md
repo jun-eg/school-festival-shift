@@ -330,9 +330,10 @@
 
 **ここで確かめられるのは手順だけである**（→ 下の「確かめ方」の 2 本）。
 **本物の Google フォームで正規表現とエラーメッセージ（句点の揺れ ◎）が設定できるか**は
-**6-1 の #1 の前提そのもの**で、[#145](https://github.com/jun-eg/school-festival-shift/issues/145) が判定する。
-**外れたらフォームを「完成品の複製」に切り替える**（→ 6 の #6 の却下側）。
-**`setDestination` が下のスコープで通るか**も実機で分かる（→ [`real-device-log.md`](real-device-log.md)）。
+**6-1 の #1 の前提そのもの**で、[#145](https://github.com/jun-eg/school-festival-shift/issues/145) が判定した
+（**2026-09-22 の実機。結果は [`real-device-log.md`](real-device-log.md) の項目 10 が持つ。ここに写さない**）。
+**外れていれば、フォームを「完成品の複製」に切り替えることになっていた**（→ 6 の #6 の却下側）。
+**`setDestination` が下のスコープで通るか**も実機で分かる（同上の項目 11）。
 
 ## メニューは 1 つである
 
