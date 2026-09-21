@@ -26,7 +26,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const { countViolations, takeConditions, toWishes, build, sheetColumns } = context
@@ -421,6 +421,8 @@ const output = build({
   '取り込む': () => wishes,
   '展開する': () => candidatesOf(),
   '生成する': () => bothSidesRows(),
+  // ここで見るのは違反の側だけである。未充足は別に数える側が持つ（→ 5-4・name-unmet.test.mjs）
+  '未充足を名指しする': () => [],
 })
 
 check(
