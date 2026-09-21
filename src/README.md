@@ -20,7 +20,7 @@
 | [`menu.js`](menu.js) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`） | **殻** |
 | [`appsscript.json`](appsscript.json) | マニフェスト。**要求する権限スコープを手で 1 つだけ書いてある**（→ 下の「要求するのは 1 スコープである」） | — |
 | `*.test.mjs` | **手元で回す検査。**Apps Script には上げない（`.claspignore` で外してある） | — |
-| [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、手元の検査 175 件との対応も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
+| [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、手元の検査 171 件との対応も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
 
 **コアの側は `SpreadsheetApp` を 1 度も掴まない**（→ 6 の #8・下の「コアと殻の境目」）。
 
