@@ -114,7 +114,8 @@ function writeOutputs(spreadsheet, output) {
 
 /**
  * Apps Script から呼ぶ入口。SpreadsheetApp を名指しするのは、このファイルのこの 1 行だけである。
- * メニューから呼ぶのは issue #151（生成）で、そこで steps を渡す。
+ * メニューの「生成」がここを押す（→ menu.js の runGeneration ／ issue #151）。
+ * steps を渡さなければ、中身が入っている段だけが走る（→ core.js の builtInSteps）。
  */
 function runOnActiveSpreadsheet(steps) {
   return run(SpreadsheetApp.getActive(), steps)
@@ -124,7 +125,7 @@ function runOnActiveSpreadsheet(steps) {
  * 構造を確かめる → 読む → コアを呼ぶ → 書く。殻の側の 1 本である。
  * スプレッドシートは引数で受ける — 手元の検査で偽のスプレッドシートを渡せるようにするためである。
  * steps はコアの段（→ core.js の coreSteps）で、入っている段だけを渡す。
- * 返すのは notBuilt — 担当者に何と言うかは、メニューから呼ぶ側（issue #151）が決める。
+ * 返すのは notBuilt — 担当者に何と言うかは、メニューから呼ぶ側が決める（→ menu.js の runGeneration）。
  *
  * 構造が崩れていれば、1 行も読まずに名指しして止まる（→ verify-structure.js）。
  * notBuilt と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、

@@ -28,7 +28,7 @@ const dataDir = path.join(here, '..', 'data')
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 // shell.js を読むのは、モックの CSV を回答シートに貼ったときの表現に揃えるためである（→ ③）。
 
-const coreFiles = ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js']
+const coreFiles = ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js']
 
 function load(files) {
   const context = vm.createContext({})

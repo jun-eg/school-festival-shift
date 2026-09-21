@@ -88,7 +88,7 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns, builtInSteps } = context
@@ -278,12 +278,11 @@ check(
     .map((step) => `${step.name}#${step.issue}`),
 )
 
-// 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）
+// 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）。
+// いま欠けているのは 指標を出す（→ #154）だけで、残る 5 段は中身が入っている（→ core.js の builtInSteps）。
 const partialBook = filledBook()
 roundTrips.writes = 0
-run(partialBook, {
-  '指標を出す': () => [],
-})
+run(partialBook, {})
 
 check(
   '⑤ 段が 1 つでも欠けていれば、残りが入っていても 1 枚も書かない',
