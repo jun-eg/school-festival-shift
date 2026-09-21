@@ -141,9 +141,9 @@ check(
 )
 
 check(
-  '① 回答の 1 行目にフォームの 10 列が並んでいる',
+  '① 回答の 1 行目に、構成が名前で持つ 6 列だけが並んでいる',
   book.getSheetByName('回答').getRange(1, 1, 1, 10).getValues()[0],
-  sheetLayout[1].sections[0].columns,
+  [...sheetLayout[1].sections[0].columns, '', '', '', ''],
 )
 
 check(

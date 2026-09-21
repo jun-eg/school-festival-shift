@@ -62,6 +62,9 @@ function readInputs(spreadsheet) {
 /**
  * 区画 1 つぶんの行を読む。
  *
+ * 読む幅は区画の幅である（→ sheet-layout.js の sectionWidth）。「回答」の後ろ 4 列のように
+ * 構成が名前を持たない列も、位置は取ってあるので同じだけ読む（→ 4-1・input-types.js）。
+ *
  * 下の空の行を落とすのは、条件入力の 5 区画を横に並べてある（→ src/README.md）からである。
  * 行数の違う区画が同じ最終行まで読まれるので、短いほうの下は空の行で埋まる。
  *
@@ -75,7 +78,7 @@ function readSection(sheet, layout, section) {
   if (lastRow <= headerRows) return []
 
   const rows = sheet
-    .getRange(headerRows + 1, section.startColumn, lastRow - headerRows, section.columns.length)
+    .getRange(headerRows + 1, section.startColumn, lastRow - headerRows, sectionWidth(section))
     .getValues()
     .map((row) => row.map(normalizeValue))
 
@@ -97,7 +100,7 @@ function writeOutputs(spreadsheet, output) {
   outputNames.forEach((name) => {
     const layout = findLayout(name)
     const sheet = findSheet(spreadsheet, name)
-    const columnCount = layout.sections[0].columns.length
+    const columnCount = sectionWidth(layout.sections[0])
     const headerRows = headerRowCount(layout)
     const lastRow = sheet.getLastRow()
 

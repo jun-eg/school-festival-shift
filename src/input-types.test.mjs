@@ -29,7 +29,7 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { toType, conditionTypes, toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish, dayQuestions } = context
+const { toType, conditionTypes, toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish, dayAnswerColumns } = context
 const { inputTypes, slotMinutes } = vm.runInContext('({ inputTypes, slotMinutes })', context)
 
 const failed = []
@@ -104,9 +104,33 @@ check(
 )
 
 check(
-  '① 日ごとの回答文字列は、フォームの設問 4 つである（→ 4-1 の #6〜#9）',
-  wish.answers.map((answer) => answer.question),
-  dayQuestions(),
+  '① 日ごとの回答文字列は、後ろ 4 列を位置で取った並びである（列名は見ない → 4-1・5-1 の #6）',
+  [dayAnswerColumns(), wish.answers],
+  [[6, 7, 8, 9], ['8:00-21:00', '8:00-20:00', '8:00-22:00', '8:00-15:00']],
+)
+
+// 名前で当てる側と、位置で当てる側の境目が動いていないことを見る。
+// 構成が名前で持つ 6 列は、型に乗る 3 つ（wishColumns）と乗らない 3 つ（columnsOutsideWish）で
+// ちょうど埋まる。どちらかが動けば、後ろ 4 列の位置もずれる。
+check(
+  '① 名前で当てる 6 列が、型に乗る 3 つと乗らない 3 つでちょうど埋まる（残りが位置の側である）',
+  vm.runInContext(
+    'answerSection().columns.filter((name) => '
+      + 'columnsOutsideWish.indexOf(name) === -1 '
+      + '&& Object.keys(wishColumns).map((key) => wishColumns[key]).indexOf(name) === -1)',
+    context,
+  ),
+  [],
+)
+
+// 列名が毎年変わっても、型に乗る中身は位置で決まる（→ 4-1「取り込みは列名ではなく位置で当てる」）。
+check(
+  '① 見出しが今年の題に変わっても、同じ位置の値が同じ順で型に乗る',
+  toWish([
+    '2026-10-30 16:31:09', 'EED2349987', '高木琴音', '3年生', 'いいえ', 'ARH2348890',
+    '9:00-22:00', '9:30-19:00', '9:30-19:30', '10:00-16:00',
+  ], 0).answers,
+  ['9:00-22:00', '9:30-19:00', '9:30-19:30', '10:00-16:00'],
 )
 
 check(
@@ -267,9 +291,12 @@ const answerHeader = answerRows[0]
 const wishes = toType(inputTypes[5], answerRows.slice(1))
 
 check(
-  '④ 前回の希望データ（モック）の見出しが、回答シートの列と同じである',
-  answerHeader,
-  vm.runInContext('answerColumns()', context),
+  '④ 前回の希望データ（モック）の見出しが、構成の並びと当たる（名前で見るのは前の 6 列だけである）',
+  [answerHeader.length, answerHeader.slice(0, 6)],
+  [
+    vm.runInContext('sectionWidth(answerSection())', context),
+    vm.runInContext('answerSection().columns', context),
+  ],
 )
 
 check(

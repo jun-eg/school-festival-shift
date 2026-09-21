@@ -23,6 +23,10 @@
  * 行が増えたり減ったりするのが仕様である（→ 5-1・5-3）。
  * 列数は見出しの行で見る（区画の右端より右や、区画のあいだに中身があれば名指しする）。
  *
+ * 名前で突き合わせるのは、構成が名前を持っている列だけである。
+ * 「回答」の後ろ 4 列（希望時間 4 設問）は列名が毎年変わる（→ 4-1・sheet-layout.js）ので、
+ * 当てるのは位置だけである — 何と書いてあるかは見ない。
+ *
  * スプレッドシートは引数で受ける。SpreadsheetApp を名指しするのは shell.js の 1 行だけである。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
@@ -129,7 +133,11 @@ function readHeaderRows(sheet, layout) {
     .map((row) => row.map((cell) => String(normalizeValue(cell))))
 }
 
-/** 区画ごとに、見出しのセルと列名の並びを突き合わせる。並びは 1 件にまとめて名指しする。 */
+/**
+ * 区画ごとに、見出しのセルと列名の並びを突き合わせる。並びは 1 件にまとめて名指しする。
+ * 突き合わせるのは section.columns — 構成が名前を持っている列だけである。
+ * 「回答」の後ろ 4 列は、位置が取ってあるだけで名前を持たない（→ 上の注意）ので、ここに来ない。
+ */
 function checkSections(layout, headerRows, breakages) {
   const columnNameRow = headerRowCount(layout)
 
@@ -165,10 +173,10 @@ function checkRange(layout, headerRows, row, startColumn, expectedNames, breakag
  * 列を 1 つ挿すと、右へずれた見出しがここに落ちてくる。
  */
 function checkUnknownColumns(layout, headerRows, breakages) {
-  // 名前が input-types.js の sectionColumns と別なのは、.gs が 1 つのグローバルを共有するからである
+  // 名前が input-types.js の conditionSection と別なのは、.gs が 1 つのグローバルを共有するからである
   const usedColumns = {}
   layout.sections.forEach((section) => {
-    for (let i = 0; i < section.columns.length; i++) usedColumns[section.startColumn + i] = true
+    for (let i = 0; i < sectionWidth(section); i++) usedColumns[section.startColumn + i] = true
   })
 
   headerRows.forEach((rowValues, i) => {
@@ -186,9 +194,9 @@ function checkUnknownColumns(layout, headerRows, breakages) {
   })
 }
 
-/** 区画の右端の列。構成が要る列数である。 */
+/** 区画の右端の列。構成が要る列数である（名前を持たない列も数に入る → sheet-layout.js の sectionWidth）。 */
 function sectionRightEdge(layout) {
-  return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + section.columns.length - 1), 0)
+  return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + sectionWidth(section) - 1), 0)
 }
 
 /** 読んだ見出しの行から 1 セル取る。読んだ範囲の外は空として扱う（列を消された側である）。 */

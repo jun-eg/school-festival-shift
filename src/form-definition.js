@@ -9,9 +9,11 @@
  * 作る側は build-form.js が持つ。
  *
  * 締切はここに含まれない（→ 4-1）。毎回決める入力で、フォーム側は締切で閉じない ◎。
- * 説明文に書かれた営業時間は前回の値であって既定ではない（→ 4-2）。
- *   日ごとの 4 時刻は毎年変わる ◎ ので、生成が使う営業時刻は条件入力シートから来る（→ 5-1 の #1）。
- *   ここの値をそちらの既定に流用しない。
+ *
+ * 希望時間 4 設問の題と説明文の営業時間だけは、ここが値を持たない（→ 4-1・4-2）。
+ *   題の日付も営業時間も今年の入力から出る（→ 条件入力の「日ごとの営業時刻」1 か所・5-1 の #1）。
+ *   ここが持つのはラベル 4 つ（転記 ◎）と、日付・帯から題と説明文を組む口である（→ formItemsFor）。
+ *   4-1・4-2 の表にある `11月1日(準備日)` や `8:00-21:00` は前回の値であって、既定ではない。
  */
 
 /** 4-1 の「形式」の列。値がそのまま表の言葉である。 */
@@ -27,6 +29,15 @@ const wishTimePattern =
   '^(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d'
   + '(?:,(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d)*$'
 
+/**
+ * 4-1. 希望時間 4 設問のラベル。定義側が固定で持つ ◎。
+ *
+ * 学祭は例年この 4 日である ◎（2026-09-21 → docs/interviews/02-作る側.md）。
+ * 毎年変わるのは日付のほうだけで、日数と並びは変わらない ◎ ので、ここは転記のままでよい。
+ * 上から順に、条件入力の「日ごとの営業時刻」の 4 行と 1 対 1 で当てる（→ formItemsFor）。
+ */
+const wishTimeLabels = ['準備日', '学祭1日目', '学祭2日目', '片付け']
+
 /** 4-2. 設問の説明文に書かれた例 ◎。3 つとも記録にある。 */
 const wishTimeExamples = [
   { label: '例1', value: '10:00-15:00' },
@@ -38,11 +49,12 @@ const wishTimeExamples = [
  * 4-1 の表そのもの。上から順にフォームへ並ぶ。
  *
  *   number       4-1 の # の列（画像アイテムは設問ではないので持たない）
+ *   title        4-1 の「項目」。希望時間 4 設問だけは持たない — 今年の入力から組む（→ formItemsFor）
+ *   label        希望時間 4 設問のラベル ◎（→ wishTimeLabels）。題はこれと今年の日付で組む
  *   kind         4-1 の「形式」
  *   required     4-1 の「必須」
  *   pattern      4-1・4-2 の正規表現（3 箇所。無い設問は持たない）
  *   errorMessage 4-3 のエラーメッセージ（記録にあるのは希望時間 4 設問だけである）
- *   businessHours 4-2 の「説明文に書かれた営業時間」◎（前回の値。既定ではない）
  *   entrantItem  入る側から数えたときの項目名（→ 5 の #3。希望時間の 4 設問は 1 項目である）
  */
 const formItems = [
@@ -96,45 +108,43 @@ const formItems = [
     pattern: '^(?:[A-Za-z0-9]{10})(?:,[A-Za-z0-9]{10})*$',
     entrantItem: '友達欄',
   },
+  // ここから 4 つが希望時間である。題（日付）も説明文の営業時間も、この表は持たない
+  // — 今年の入力から組む（→ formItemsFor）。持つのはラベル ◎ のほうである。
   {
     number: 6,
-    title: '11月1日(準備日)',
+    label: wishTimeLabels[0],
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
     errorMessage: '無効な書式です',
-    businessHours: '8:00-21:00',
     entrantItem: '希望時間',
   },
   {
     number: 7,
-    title: '11月2日(学祭1日目)',
+    label: wishTimeLabels[1],
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
     errorMessage: '無効な書式です',
-    businessHours: '8:00-20:00',
     entrantItem: '希望時間',
   },
   {
     number: 8,
-    title: '11月3日(学祭2日目)',
+    label: wishTimeLabels[2],
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
     // 句点が付いているのはこの 1 設問だけである ◎（→ 4-3）。揃えない。
     errorMessage: '無効な書式です。',
-    businessHours: '8:00-20:00',
     entrantItem: '希望時間',
   },
   {
     number: 9,
-    title: '11月4日(片付け)',
+    label: wishTimeLabels[3],
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
     errorMessage: '無効な書式です',
-    businessHours: '8:00-15:00',
     entrantItem: '希望時間',
   },
 ]
@@ -153,6 +163,76 @@ function wishTimeDescription(item) {
   ].join('\n')
 }
 
+/**
+ * 定義に今年の日付と営業時刻を入れて、フォームに置ける形にする（→ 4-1・4-2）。
+ *
+ * days は型 #1（枠）である（→ input-types.js の toDays）。時刻が HH:MM であることも、
+ * 5 つが早い順であることも、そちらが見てから来る — ここは並べ直さない。
+ * 希望時間 4 設問だけが変わり、残り 5 設問と画像アイテムは表のまま通る。
+ *
+ * 4 行でなければ、どのラベルがどの日に当たるかが決まらないので、ここで名指しして止まる
+ * （→ 2 の止まる箇所 9）。止まるのはフォームを 1 つも作る前である（→ build-form.js）。
+ */
+function formItemsFor(days) {
+  checkDaysForForm(days)
+
+  let at = 0
+  return formItems.map((item) => {
+    if (!item.label) return item
+    const day = days[at++]
+    // 表の行はそのまま持ち上げて、題と営業時間だけを足す。表の側を書き換えない。
+    return Object.assign({}, item, {
+      title: wishTimeTitle(day.date, item.label),
+      businessHours: businessHoursOf(day),
+    })
+  })
+}
+
+/**
+ * 条件入力の「日ごとの営業時刻」が、ラベル 4 つと 1 対 1 で当たる形かを見る。
+ * 空のまま押されたときと、行数が違うときで言うことが違う — 担当者がやることが違うからである。
+ */
+function checkDaysForForm(days) {
+  const rows = (days || []).length
+  if (rows === 0) {
+    throw new Error(
+      '条件入力の「日ごとの営業時刻」が空である。'
+        + '設問の題の日付も、説明文の営業時間も、ここから出る（→ 4-1・4-2）ので、'
+        + `先に ${wishTimeLabels.length} 日ぶん入れてから、もう一度「フォームを作る」を押す（→ 2 の一覧 5）`,
+    )
+  }
+  if (rows !== wishTimeLabels.length) {
+    throw new Error(
+      `条件入力の「日ごとの営業時刻」が ${rows} 行である。`
+        + `ラベル ${wishTimeLabels.length} つ（${wishTimeLabels.join(' / ')}）と上から順に当てる（→ 4-1）ので、`
+        + `${wishTimeLabels.length} 行でなければ、どのラベルがどの日かが決まらない。フォームを 1 つも作らずに止まる`,
+    )
+  }
+}
+
+/**
+ * 設問の題 — `<月>月<日>日(<ラベル>)`（→ 4-1）。
+ * 日付は条件入力の「日ごとの営業時刻」の `日付` 列（YYYY-MM-DD）から来る。
+ * 前回の日付（2025-11-01）を入れれば `11月1日(準備日)` が出る（→ 仕様 #2 の判定）。
+ */
+function wishTimeTitle(date, label) {
+  return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日(${label})`
+}
+
+/**
+ * 説明文に出す営業時間 — その日の `準備開始`〜`片付け終了` である（→ 4-2）。
+ * 1 日の端から端までであって、調理の帯ではない。
+ * 時の先頭の 0 を落とすのは、記録の書き方が `8:00-21:00` だからである ◎（→ 4-2 の表）。
+ */
+function businessHoursOf(day) {
+  return `${withoutLeadingZero(day.prepStart)}-${withoutLeadingZero(day.cleanupEnd)}`
+}
+
+/** `08:00` を `8:00` にする。分のほうは落とさない（`8:05` は `8:05` である）。 */
+function withoutLeadingZero(time) {
+  return time.charAt(0) === '0' ? time.slice(1) : time
+}
+
 /** 入る側から数えた項目名（→ 5 の #3）。設問は 9 つに割れているが、答える中身は 6 項目である。 */
 function entrantItemNames() {
   return formItems
@@ -163,6 +243,7 @@ function entrantItemNames() {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    formItemKind, wishTimePattern, wishTimeExamples, formItems, wishTimeDescription, entrantItemNames,
+    formItemKind, wishTimePattern, wishTimeLabels, wishTimeExamples, formItems,
+    formItemsFor, checkDaysForForm, wishTimeTitle, businessHoursOf, wishTimeDescription, entrantItemNames,
   }
 }

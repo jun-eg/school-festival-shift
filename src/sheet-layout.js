@@ -67,6 +67,7 @@ const sheetLayout = [
         heading: null,
         startColumn: 1,
         note: 'フォームの回答が入る。列は 4-1 の設問 9 つ ＋ タイムスタンプの転記である。'
+          + '後ろ 4 列の列名は毎年変わる（設問の題そのものだからである → 4-1）。'
           + '回答先をこのシートに向けるのは issue #144',
         columns: [
           'タイムスタンプ',
@@ -75,11 +76,13 @@ const sheetLayout = [
           '学年',
           '調理担当ですか？',
           '一緒に組みたいお友達',
-          '11月1日(準備日)',
-          '11月2日(学祭1日目)',
-          '11月3日(学祭2日目)',
-          '11月4日(片付け)',
         ],
+        // 後ろ 4 列は希望時間 4 設問である。列名は設問の題そのもので、題の日付は今年の入力から出る
+        // （→ 4-1）ので、毎年変わる。だから構成は名前を持たない。
+        // 持つのは「タイムスタンプ ＋ 設問 9 つ」という並びだけで、突き合わせも取り込みも位置で当てる
+        // （→ verify-structure.js の checkSections ／ input-types.js の dayAnswerColumns ／
+        //   build-form.js の linkAnswerSheet）。
+        yearlyColumns: 4,
       },
     ],
   },
@@ -133,7 +136,22 @@ const sheetLayout = [
 /** 検証結果シートの「種別」に入る 2 つ（→ 5-4）。値がそのままシートに書かれる。 */
 const checkKind = { violation: '違反', unmet: '未充足' }
 
+/**
+ * 区画の幅 — 名前のある列 ＋ 毎年名前が変わる列である（後者を持つのは「回答」だけである）。
+ * 読む幅も、突き合わせる幅も、列数を見る所も、列名の数ではなくこれを使う
+ * （→ shell.js の readSection ／ verify-structure.js の sectionRightEdge ／ input-types.js の checkRowWidth）。
+ */
+function sectionWidth(section) {
+  return section.columns.length + (section.yearlyColumns || 0)
+}
+
+/** 列数が構成と違うことを名指しする文。名前のある列は名前で、そうでない列は数で出す。 */
+function sectionColumnsText(section) {
+  return section.columns.join(' / ')
+    + (section.yearlyColumns ? ` ＋ 毎年名前が変わる ${section.yearlyColumns} 列` : '')
+}
+
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
-  module.exports = { sheetLayout, checkKind, protectionNote }
+  module.exports = { sheetLayout, checkKind, protectionNote, sectionWidth, sectionColumnsText }
 }
