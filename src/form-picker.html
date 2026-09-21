@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <!--
+      「フォームを作る」で出る画面（docs/tech-requirements.md 2 の一覧 3 ／ issue #144）。
+      担当者に要求するのは、委員会から来た名簿の画像を選ぶことだけである。
+      外から読み込むファイルは 0 個である（→ 6 の #5 と同じ扱い）。
+    -->
+    <style>
+      body {
+        font-family: sans-serif;
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 16px;
+        color: #202124;
+      }
+      p { margin: 0 0 12px; }
+      .note { color: #5f6368; }
+      button { font-size: 13px; padding: 6px 16px; }
+      #state { white-space: pre-wrap; word-break: break-all; }
+      .stopped { color: #b3261e; }
+    </style>
+  </head>
+  <body>
+    <p>委員会から来た<strong>調理名簿の画像</strong>を選ぶ。フォームの中にそのまま貼られる。</p>
+    <p><input type="file" id="picked" accept="image/*" /></p>
+    <p><button id="run">フォームを作る</button></p>
+    <p id="state" class="note"></p>
+
+    <script>
+      var button = document.getElementById('run')
+      var state = document.getElementById('state')
+
+      function say(text, stopped) {
+        state.textContent = text
+        state.className = stopped ? 'stopped' : 'note'
+      }
+
+      button.addEventListener('click', function () {
+        var file = document.getElementById('picked').files[0]
+        if (!file) {
+          say('画像が選ばれていない。', true)
+          return
+        }
+
+        button.disabled = true
+        say('読んでいる…')
+
+        var reader = new FileReader()
+        reader.onerror = function () {
+          button.disabled = false
+          say('画像が読めなかった。', true)
+        }
+        reader.onload = function () {
+          // data:image/png;base64,xxxx の後ろだけを渡す。
+          var base64 = String(reader.result).split(',')[1]
+          say('フォームを作っている…（1 分ほどかかることがある）')
+          google.script.run
+            .withSuccessHandler(done)
+            .withFailureHandler(function (error) {
+              button.disabled = false
+              say('止まった: ' + error.message, true)
+            })
+            .createFormFromPicker({
+              base64: base64,
+              mimeType: file.type,
+              fileName: file.name,
+            })
+        }
+        reader.readAsDataURL(file)
+      })
+
+      function done(built) {
+        button.disabled = false
+        say(
+          built.log.join('\n')
+            + '\n\n配る URL（LINE ノートに貼る）:\n'
+            + built.url
+            + '\n\nフォームを開く:\n'
+            + built.editUrl,
+        )
+      }
+    </script>
+  </body>
+</html>

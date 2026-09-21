@@ -14,11 +14,14 @@
 | [`core.js`](core.js) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`coreSteps`）と、段をつなぐ 1 本（`build`）と、中身が入っている段（`builtInSteps`） | **コア** |
 | [`count-violations.js`](count-violations.js) | **置いた人が条件を破っている所を行にする**（→ 5-4。`違反を数える` の段の中身）。**数える 5 つと、数えない ⑥ を名前で持つ** | **コア** |
 | [`name-unmet.js`](name-unmet.js) | **人数が足りない枠を行にする**（→ 5-4。`未充足を名指しする` の段の中身）。**数えるもと 2 つ（必要人数・委員会の指定枠）を名前で持つ** | **コア** |
+| [`form-definition.js`](form-definition.js) | **フォームの定義一式だけ**（→ 4-1〜4-3。設問 9 つ ＋ 画像アイテム 1 つ・正規表現 3 箇所・エラーメッセージの句点の揺れ ◎） | **コア** |
 | [`shell.js`](shell.js) | **シートを読んで値の表現を揃え、コアを呼び、返ってきた行を書く** | **殻** |
 | [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
 | [`build-template.js`](build-template.js) | 定義どおりにシートを作り、見出しを置き、生成シートに保護をかける | **殻** |
+| [`build-form.js`](build-form.js) | **定義から本番のフォームを作り、回答先をこのスプレッドシート自身に向ける**（→ 6 の #6・下の「フォームは定義から作る」） | **殻** |
+| [`form-picker.html`](form-picker.html) | **名簿の画像を選ぶダイアログ 1 枚。**外から読み込むファイルは 0 個である | **殻** |
 | [`menu.js`](menu.js) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`） | **殻** |
-| [`appsscript.json`](appsscript.json) | マニフェスト。**要求する権限スコープを手で 1 つだけ書いてある**（→ 下の「要求するのは 1 スコープである」） | — |
+| [`appsscript.json`](appsscript.json) | マニフェスト。**要求する権限スコープを手で 3 つ書いてある**（→ 下の「要求するのは 3 スコープである」） | — |
 | `*.test.mjs` | **手元で回す検査。**Apps Script には上げない（`.claspignore` で外してある） | — |
 | [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、**下の「確かめ方」の表との対応**も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
 
@@ -71,7 +74,7 @@
 **コアは配列を受けて配列を返す純粋な関数で、`SpreadsheetApp` に触るのは読み書きの殻だけである**（→ 6 の #8）。
 **値の表現を揃えるのも殻の仕事である。**
 
-| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`sheet-layout.js`](sheet-layout.js)） | 殻（[`shell.js`](shell.js)） |
+| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`sheet-layout.js`](sheet-layout.js)・[`form-definition.js`](form-definition.js)） | 殻（[`shell.js`](shell.js)） |
 | --- | --- | --- |
 | **受け取るもの** | **文字列と数値だけでできた行の配列** | スプレッドシート |
 | **返すもの** | 生成シート 3 枚ぶんの**行の配列** | — |
@@ -79,6 +82,8 @@
 | **持つもの** | 入力の型と、割り当ての規則と、段のつなぎ方 | 読む範囲・書く範囲・値の表現 |
 
 **構造の検証（[`verify-structure.js`](verify-structure.js)）も殻の側である** — スプレッドシートを読むからである。
+**フォームを作る側（[`build-form.js`](build-form.js)）も殻である** — `FormApp` と `SpreadsheetApp` を掴む。
+**写した定義（[`form-definition.js`](form-definition.js)）はコアで、どちらも掴まない。**
 **ただし `SpreadsheetApp` を名指しはしない**（スプレッドシートを引数で受ける）ので、
 **手元では偽のスプレッドシートを渡して回せる**（→ 下の「確かめ方」）。
 
@@ -272,20 +277,59 @@
 **構成に無いシートが 1 枚増えていても止めない** — 生成が書く先は 3 枚に決まっていて、崩れないからである
 （**組み立てのほうは、構成に無いシートに中身があれば残して名指しする** → [`build-template.js`](build-template.js)）。
 
+## フォームは定義から作る
+
+**担当者は、メニューを押して名簿の画像を選ぶだけである**（→ 2 の一覧 3）。
+**フォームを作る作業（作る側 ACTION 4「時間がかかる ◎」）も、回答先スプレッドシートの紐付けも要求しない**
+（→ 6 の #6 ／ [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。
+
+| どこが持つか | 何を |
+| --- | --- |
+| [`form-definition.js`](form-definition.js) | **4-1〜4-3 を写した定義だけ。**設問 9 つ ＋ 画像アイテム 1 つ・正規表現 3 箇所・エラーメッセージ。**作り方を持たない** |
+| [`build-form.js`](build-form.js) | **作り方だけ。**フォームに置き、回答先を向け、フォームが作ったシートを構成の「回答」に繋ぐ。**設問も文言も足さない・揃えない** |
+| [`form-picker.html`](form-picker.html) | **担当者が画像を選ぶ 1 枚。**選んだ画像はそのまま画像アイテムに入る。**外から読み込むファイルは 0 個である** |
+
+**写す。揃えない・直さない。** **エラーメッセージの句点の揺れ ◎**（`11月3日(学祭2日目)` だけ「無効な書式です**。**」）
+**も、揃えずに渡している**（→ 4-3）。**揃えたいなら [`docs/design-doc.md`](../docs/design-doc.md) に戻して判断を起こす。**
+
+### 回答シートは、フォームが作ったシートに置き換わる
+
+**`setDestination` で回答先を向けると、Google が回答シートを 1 枚作る**（名前は Google が決める「フォームの回答 1」）。
+**構成は 5 枚である**（→ 8 の 1）ので、**テンプレートの空の「回答」を消して、フォームが作ったシートを同じ名前・同じ位置に置き直す。**
+**名前を替えても紐付きは切れない** — 回答はそのシートに積まれ続ける。
+**保護（警告のみ）と固定行は、置き直したシートにかけ直す。**
+
+**見出しは照らしてから繋ぐ。** フォームが作った 1 行目が**構成の 10 列**（→ [`sheet-layout.js`](sheet-layout.js)）と
+1 つでも違えば、**繋がずに名指しして止まる。** **黙って直さない。**
+
+**2 回目は作らない。** **「回答」にすでにフォームが紐付いていれば、名指しして止まる** —
+**フォームは 1 シーズンに 1 回作るもので、希望が増えても作り直さない**（→ 5 の #11）。
+**回答シートに行があるときも止まる**（**回答を消してから作り直す、をしない**）。
+
+### 実機でしか分からないもの
+
+**ここで確かめられるのは手順だけである**（→ 下の「確かめ方」の 2 本）。
+**本物の Google フォームで正規表現とエラーメッセージ（句点の揺れ ◎）が設定できるか**は
+**6-1 の #1 の前提そのもの**で、[#145](https://github.com/jun-eg/school-festival-shift/issues/145) が判定する。
+**外れたらフォームを「完成品の複製」に切り替える**（→ 6 の #6 の却下側）。
+**`setDestination` が下のスコープで通るか**も実機で分かる（→ [`real-device-log.md`](real-device-log.md)）。
+
 ## メニューは 1 つである
 
 **担当者が開くと「シフト」メニューが出る。** 項目は
 **2「担当者がやることの全部」の操作 3・7・9 と同じ名前**である（フォームを作る／生成／画像を書き出す）。
-**担当者に新しい操作を増やしていないし、画面も 1 枚も作っていない**（→ 6 の #2）。
+**担当者に新しい操作を増やしていない。****手直しの画面も作っていない**（→ 6 の #2）—
+**開くのは、名簿の画像を選ぶダイアログ 1 枚だけである**（→ 上の「フォームは定義から作る」・2 の一覧 3）。
 
-**中身はまだ入っていない。** 押すと「**まだ作っていない（issue #…）**」と名指しで言う
-（[#144](https://github.com/jun-eg/school-festival-shift/issues/144)／[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#157](https://github.com/jun-eg/school-festival-shift/issues/157) が入れる）。
+**「フォームを作る」の中身は入っている**（→ 上の「フォームは定義から作る」）。**押すと画像を選ぶダイアログが開く。**
+**残り 2 つはまだである。** 押すと「**まだ作っていない（issue #…）**」と名指しで言う
+（[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#157](https://github.com/jun-eg/school-festival-shift/issues/157) が入れる）。
 **黙って走らせない。**
 
 **`buildTemplate` はメニューに出していない。**
 **走らせるのはテンプレートを用意する側で、担当者ではない**（2 の一覧に無い操作を増やさないため）。
 
-## 要求するのは 1 スコープである
+## 要求するのは 3 スコープである
 
 **[`appsscript.json`](appsscript.json) の `oauthScopes` に手で書いてある**
 （→ [#139](https://github.com/jun-eg/school-festival-shift/issues/139)／6-1 の #4）。
@@ -293,7 +337,9 @@
 
 | 要求するスコープ | 何を許すか | 何がこれを要求しているか |
 | --- | --- | --- |
-| `https://www.googleapis.com/auth/spreadsheets.currentonly` | **このスクリプトが入っているスプレッドシート 1 つだけ**の参照・編集 | **`SpreadsheetApp.getActive()`**（[`shell.js`](shell.js) の 1 行 ／ [`build-template.js`](build-template.js) ／ [`menu.js`](menu.js) の `toast`）と、**その先で触るシート・範囲・保護の全部**（`Protection` の全メソッドもこの対で足りる） |
+| `https://www.googleapis.com/auth/spreadsheets.currentonly` | **このスクリプトが入っているスプレッドシート 1 つだけ**の参照・編集 | **`SpreadsheetApp.getActive()`**（[`shell.js`](shell.js) の 1 行 ／ [`build-template.js`](build-template.js) ／ [`build-form.js`](build-form.js) ／ [`menu.js`](menu.js) の `toast`）と、**その先で触るシート・範囲・保護の全部**（`Protection` の全メソッドもこの対で足りる） |
+| `https://www.googleapis.com/auth/forms` | **フォームの作成と編集** | **`FormApp.create`** と、そこに置く設問・正規表現・画像アイテム、**`setDestination`**（→ [`build-form.js`](build-form.js)・[#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。**`forms.currentonly` では足りない** — あちらは**フォームにバインドしたスクリプト用**で、**こちらはスプレッドシート側からフォームを新しく作る** |
+| `https://www.googleapis.com/auth/script.container.ui` | **このファイルの上にダイアログを出すこと** | **`showModalDialog`**（名簿の画像を選ぶ 1 枚 → [`build-form.js`](build-form.js)）。**メニューを出すだけなら要らなかった** — **`getUi` ／ `createMenu` ／ `addToUi` ／ `toast` は 1 スコープのときに実機を通っている**（→ [`real-device-log.md`](real-device-log.md) の「`oauthScopes` を書いた後に出た画面」）。**画像の書き出し（[#157](https://github.com/jun-eg/school-festival-shift/issues/157)）もこのスコープで足りる** |
 
 **`.currentonly` の付かない `https://www.googleapis.com/auth/spreadsheets` を要求しない。**
 **付かない側は「すべてのスプレッドシート」で、担当者のドライブにある全部のファイルが対象になる。**
@@ -315,9 +361,8 @@
 | 要求していないもの | なぜ要らないか |
 | --- | --- |
 | `.../auth/spreadsheets`（すべてのスプレッドシート） | **上のとおり。**掴むのは `getActive()` だけである |
-| `.../auth/drive` ／ `.../auth/drive.file` | **ファイルを作らない・探さない・消さない。****テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1） |
-| `.../auth/script.container.ui` | **メニューを 1 つ出すだけなら要らない** — **`getUi` ／ `createMenu` ／ `addToUi` ／ `toast` が、上の 1 スコープだけで実機を通っている**（→ [`real-device-log.md`](real-device-log.md) の「`oauthScopes` を書いた後に出た画面」）。**ダイアログを開く側（`showModalDialog`）には要る** → [#157](https://github.com/jun-eg/school-festival-shift/issues/157) が足す |
-| `.../auth/forms` | **フォームをまだ作らない。**`FormApp` を掴むのは [#144](https://github.com/jun-eg/school-festival-shift/issues/144) である |
+| `.../auth/drive` ／ `.../auth/drive.file` | **ドライブを探さない・消さない。****テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1）。**フォームを作るのは `FormApp` の側で足りる**（ドライブから**選ばせない** — 名簿の画像は担当者の端末から直接受け取る → [`form-picker.html`](form-picker.html)） |
+| `.../auth/forms.currentonly` | **フォームにバインドしたスクリプト用である。**こちらはスプレッドシート側から**フォームを新しく作る**ので足りない（→ 上の表） |
 | `.../auth/script.external_request` | **外部に 1 度も出ない**（→ 2「個人情報が通る経路」・[#157](https://github.com/jun-eg/school-festival-shift/issues/157) の「外部から読み込むファイルが 0 個」） |
 | `.../auth/script.scriptapp`（トリガー） | **`onOpen` は単純トリガーで承認が要らない。****インストール型のトリガーを 1 つも作らない** |
 | `.../auth/userinfo.email` ほか本人の情報 | **担当者が誰かを、スクリプトが知る必要が無い** |
@@ -335,21 +380,26 @@
 | 2 | **初回承認の画面。****撮り直して連番を足す**（→ [`real-device-log.md`](real-device-log.md) の「確認に使うファイルの規約」） |
 | 3 | **[#159](https://github.com/jun-eg/school-festival-shift/issues/159) の手順書に貼ってある画像** |
 
-**足すことが分かっているのは 2 つである** —
-[#144](https://github.com/jun-eg/school-festival-shift/issues/144)（`FormApp`）と
-[#157](https://github.com/jun-eg/school-festival-shift/issues/157)（`showModalDialog`）。
+**足すことが分かっていた 2 つ**（`FormApp` と `showModalDialog`）**は、[#144](https://github.com/jun-eg/school-festival-shift/issues/144) で入った。**
+**[#157](https://github.com/jun-eg/school-festival-shift/issues/157)（画像の書き出し）はダイアログ 1 枚なので、足すスコープは無い。**
+**いま足すことが分かっているものは 1 つも無い。**
 **先回りして書かない。** 先に書けば、**まだ 1 行も使っていない権限を担当者の承認画面に出す**ことになる。
 
 ### `@OnlyCurrentDoc` を使わない
 
 **同じ狭め方は、コメントの注釈（`@OnlyCurrentDoc`）でもできる。** それでも**マニフェストに書く。**
-**要求するものが 1 か所にまとまっていないと、「いま何を要求しているか」を読むのに `.gs` 7 つを見て回ることになる。**
+**要求するものが 1 か所にまとまっていないと、「いま何を要求しているか」を読むのに `.gs` 11 個を見て回ることになる。**
 **注釈は「このファイルは現在の文書しか触らない」という宣言で、一覧ではない。**
 
-### 実機で確かめてある
+### 実機で確かめたのは 1 スコープのときである
 
-**この一覧で画面が決まる。実機で 2 枚だった**（→ [`real-device-log.md`](real-device-log.md) の
+**この一覧で画面が決まる。1 スコープのときは実機で 2 枚だった**（→ [`real-device-log.md`](real-device-log.md) の
 「`oauthScopes` を書いた後に出た画面」）。**1 スコープで足りることも、そこで見てある。**
+
+**3 スコープになってからは、まだ見ていない**（→ [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。
+**画面が何枚になるかも、この 3 つで `FormApp.create` と `setDestination` が通るかも、実機で分かる。**
+**足りなければ走らせたときに権限のエラーで落ちる** — **落ちた先を見て足す。広いほうへ戻すのは最後である**
+（→ [`real-device-log.md`](real-device-log.md) の「実機で見る項目」）。
 
 ## テンプレートの作り方 — **手で貼る。これが 1 本である**
 
@@ -358,9 +408,11 @@
 
 1. Google ドライブで**スプレッドシートを 1 つ**作り、**名前を付ける**
 2. **拡張機能 → Apps Script** を開く
-3. `src/` の **`.js` 9 つ**を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
-   `sheet-layout` ／ `input-types` ／ `core` ／ `count-violations` ／ `name-unmet` ／ `shell` ／
-   `verify-structure` ／ `build-template` ／ `menu`。
+3. `src/` の **`.js` 11 つ**を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
+   `sheet-layout` ／ `input-types` ／ `core` ／ `count-violations` ／ `name-unmet` ／ `form-definition` ／
+   `shell` ／ `verify-structure` ／ `build-template` ／ `build-form` ／ `menu`。
+   **[`form-picker.html`](form-picker.html) も 1 枚貼る** — エディタの**「＋」→「HTML」**で
+   `form-picker` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）。
    **1 つ貼り忘れれば、走らせたときに名指しで止まる**（→「コアと殻の境目」の最後）。
    **日本語の名前でも通ることは実機で見たが、英字にそろえてある**
    （→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175)・上の「名前の線」）。
@@ -372,11 +424,16 @@
    [`appsscript.json`](appsscript.json) の中身を写す
 6. エディタで **`buildTemplate` を実行**する。**初回の権限承認はここで通る** —
    **「承認が必要です」→「権限を確認」→ 別ウィンドウ**の順で出る
-   （**出る画面は上の「要求するのは 1 スコープである」で決まる。**
+   （**出る画面は上の「要求するのは 3 スコープである」で決まる。**
    実際に出た画面は [`real-device-log.md`](real-device-log.md) の「初回承認で出た画面」）
 7. **実行ログで「5 枚のうち保護したのは 3 枚である」を見る**
 8. スプレッドシートを開き直し、**メニュー「シフト」が出ること**と、**5 枚が並んでいること**を見る
-9. そのファイルを**コピーして配る形**にする。**渡す相手には閲覧者で共有する** —
+9. **メニュー「シフト」→「フォームを作る」で、名簿の画像を選んで 1 回作ってみる**
+   （**作られたフォームを 4-1〜4-3 の表と突き合わせる** ／ **エラーメッセージの文言が設定できたかを見る**
+   → [#145](https://github.com/jun-eg/school-festival-shift/issues/145) ／ 6-1 の #1）。
+   **確かめたら、そのフォームと回答シートは配る形に残さない** — **テンプレートは空である**
+   （→ 6 の #1 の却下側「前年の値を既定にしない ◎」）。**もう 1 回コピーし直すところからやる**
+10. そのファイルを**コピーして配る形**にする。**渡す相手には閲覧者で共有する** —
    **担当者はそれをコピーして使う。****コピーでスクリプトが渡ることは実機で確かめた**
    （2026-09-21 → [`real-device-log.md`](real-device-log.md) の「コピーで何が渡ったか」。
    [#136](https://github.com/jun-eg/school-festival-shift/issues/136) ／ 6-1 の #3）
@@ -393,12 +450,13 @@
 | **ファイル名が 1 対 1 で対応する** | **貼った名前がそのまま付く**ので、リポジトリの `.js` と Apps Script の `.gs` が名前で突き合わせられる（**日本語の名前でもそのまま通った** → [`real-device-log.md`](real-device-log.md)。**いまは英字である** → [#175](https://github.com/jun-eg/school-festival-shift/issues/175)） |
 
 **却下ではない** — clasp を使いたい実装者が使うのは構わない。**手順の原本がどちらかを決めただけである。**
-**`src/` のファイルが増えたら、この判断は見直す。****4 つから 10 になったが、動かしていない**
+**`src/` のファイルが増えたら、この判断は見直す。****4 つから 12 になったが、動かしていない**
 （`core.js` と `shell.js` → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)、
 `verify-structure.js` → [#138](https://github.com/jun-eg/school-festival-shift/issues/138)、
 `input-types.js` → [#140](https://github.com/jun-eg/school-festival-shift/issues/140)、
 `count-violations.js` → [#141](https://github.com/jun-eg/school-festival-shift/issues/141)、
-`name-unmet.js` → [#142](https://github.com/jun-eg/school-festival-shift/issues/142)）
+`name-unmet.js` → [#142](https://github.com/jun-eg/school-festival-shift/issues/142)、
+`form-definition.js` と `build-form.js` ＋ `form-picker.html` → [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）
 — **貼る回数はまだ手で追える**し、**貼るのが 1 回だけであることも、インストールが 0 であることも変わっていない。**
 **clasp の導入を担当者に要求することは、どちらにしても無い。**
 
@@ -410,9 +468,11 @@ node src/input-types.test.mjs
 node src/core.test.mjs
 node src/count-violations.test.mjs
 node src/name-unmet.test.mjs
+node src/form-definition.test.mjs
 node src/shell.test.mjs
 node src/verify-structure.test.mjs
 node src/build-template.test.mjs
+node src/build-form.test.mjs
 ```
 
 **依存はゼロである**（Node の標準だけを使う）。**何も書き換えない。**
@@ -425,11 +485,13 @@ node src/build-template.test.mjs
 | [`core.test.mjs`](core.test.mjs) | **スプレッドシートを 1 つも作らずにコアを走らせる。**`SpreadsheetApp` を掴むファイルの一覧／配列を渡して配列が返るか／入っていない段が名指しで返るか／段を差し替えて先に回せるか／**条件が 5-1 の型で段に渡るか**／**表現の揺れ・列数の違い・決めていない種別で止まるか**／**中身が入っている段が未了に出ないか** | 28 |
 | [`count-violations.test.mjs`](count-violations.test.mjs) | **数えるのは 5 つで ⑥ を数えないこと／違反を 1 件ずつ仕込むとそれぞれが名指しで出ること／未充足を 1 件も混ぜないこと／判定できない行で止まること／コアの段として繋がっていること** | 31 |
 | [`name-unmet.test.mjs`](name-unmet.test.mjs) | **数えるもとは 2 つで、切り方が希望と逆向きであること／必要人数と指定枠の不足がどちらも名指しで出ること／名指しされていない未充足が 0 件であること／数えられない需要で止まること／コアの段として繋がっていること** | 28 |
+| [`form-definition.test.mjs`](form-definition.test.mjs) | **定義を 4-1〜4-3 の表と 1 行ずつ突き合わせて差分が 0 か**（設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢）／**正規表現が 3 箇所で希望時間の 4 設問は同じ 1 本か**／**句点の揺れ ◎ を揃えずに写しているか**／**説明文が例 3 つと営業時間を持つか**／**入る側から数え直すと 6 項目か**。**[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 50 行を通し、正規表現も選択肢も必須も 1 件も弾かないことを見る** | 18 |
 | [`shell.test.mjs`](shell.test.mjs) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか**／**構造が崩れていれば 1 行も読まず 1 枚も書かずに止まるか** | 23 |
 | [`verify-structure.test.mjs`](verify-structure.test.mjs) | **読むだけの偽のスプレッドシートの上で構造を照らす。****シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える／行を 1 つ消す／生成シートを上書きする／行と列をまとめて消す、のそれぞれで名指しの行が出るか**／**セルが 1 つも変わっていないか**／読むのがシートごとに 1 回か | 16 |
 | [`build-template.test.mjs`](build-template.test.mjs) | **偽のスプレッドシートの上で組み立てを走らせる。**5 枚できるか／保護が 3 枚に警告のみでかかるか／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか** | 9 |
+| [`build-form.test.mjs`](build-form.test.mjs) | **偽のフォームと偽のスプレッドシートの上でフォームを作る。**定義の順に置かれるか（必須・選択肢・正規表現・文言ごと）／**選んだ画像が画像アイテムに入るか**／**回答先がこのスプレッドシート自身に向くか**／**フォームが作った回答シートが構成の「回答」になるか**（見出し・位置・保護・5 枚のまま）／**2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まるか** | 24 |
 
-**この 8 つで分かるのは、手元で回る範囲だけである。**
+**この 10 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
 [`real-device-log.md`](real-device-log.md) が持つ。ここに二重に書かない。**
 
@@ -445,5 +507,5 @@ node src/build-template.test.mjs
 | **コアの段の残り 4 つの中身**（数える側 2 つが入っている。→「コアと殻の境目」の段の表） | [#146](https://github.com/jun-eg/school-festival-shift/issues/146)／[#149](https://github.com/jun-eg/school-festival-shift/issues/149)／[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
 | **役割名が規則の名前と違う年に、規則 3・4・5 を当てるかどうか**（いまは当たらない。**弾かないことは 3 に書いた**） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（置く先の役割名を持つのは生成の側である → 5 の #6） |
 | **殻をメニューに繋ぐこと**（`runOnActiveSpreadsheet` を押す口）と、**崩れの名指しが担当者の画面にどう出るか**（いまは走らせたときの例外である） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（→ 5 の #6・上の「走る前に構造を検証する」） |
-| **回答シートに回答先を向けること。**フォームが別のシートを作る形になるなら、繋ぎ方はそこで決まる | [#144](https://github.com/jun-eg/school-festival-shift/issues/144)（→ 6 の #6） |
+| **本物の Google フォームで、正規表現とエラーメッセージの文言（句点の揺れ ◎ を含む）が設定できるか**（**繋ぎ方と作り方は入った** → 上の「フォームは定義から作る」） | [#145](https://github.com/jun-eg/school-festival-shift/issues/145)（→ 6-1 の #1。**外れたら「完成品の複製」に切り替える**） |
 | **割り当てと指標に実際に何行書くか**（**検証結果の中身は入った** — 違反と未充足の両方である） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
