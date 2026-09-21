@@ -15,7 +15,7 @@
 | [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
 | [`build-template.js`](build-template.js) | 定義どおりにシートを作り、見出しを置き、生成シートに保護をかける | **殻** |
 | [`menu.js`](menu.js) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`） | **殻** |
-| [`appsscript.json`](appsscript.json) | マニフェスト。**権限スコープはまだ書いていない**（→ [#139](https://github.com/jun-eg/school-festival-shift/issues/139)） | — |
+| [`appsscript.json`](appsscript.json) | マニフェスト。**要求する権限スコープを手で 1 つだけ書いてある**（→ 下の「要求するのは 1 スコープである」） | — |
 | `*.test.mjs` | **手元で回す検査。**Apps Script には上げない（`.claspignore` で外してある） | — |
 | [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、手元の検査 85 件との対応も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
 
@@ -183,6 +183,72 @@
 **`buildTemplate` はメニューに出していない。**
 **走らせるのはテンプレートを用意する側で、担当者ではない**（2 の一覧に無い操作を増やさないため）。
 
+## 要求するのは 1 スコープである
+
+**[`appsscript.json`](appsscript.json) の `oauthScopes` に手で書いてある**
+（→ [#139](https://github.com/jun-eg/school-festival-shift/issues/139)／6-1 の #4）。
+**初回承認で担当者が見る画面は、この一覧で決まる。**
+
+| 要求するスコープ | 何を許すか | 何がこれを要求しているか |
+| --- | --- | --- |
+| `https://www.googleapis.com/auth/spreadsheets.currentonly` | **このスクリプトが入っているスプレッドシート 1 つだけ**の参照・編集 | **`SpreadsheetApp.getActive()`**（[`shell.js`](shell.js) の 1 行 ／ [`build-template.js`](build-template.js) ／ [`menu.js`](menu.js) の `toast`）と、**その先で触るシート・範囲・保護の全部**（`Protection` の全メソッドもこの対で足りる） |
+
+**`.currentonly` の付かない `https://www.googleapis.com/auth/spreadsheets` を要求しない。**
+**付かない側は「すべてのスプレッドシート」で、担当者のドライブにある全部のファイルが対象になる。**
+**このスクリプトは `openById` も `openByUrl` も呼ばない** — **掴むのは `getActive()` だけで、
+自分が入っているファイルの外へ 1 度も出ない**（→ 2「個人情報が通る経路」）。
+
+**自動判定に任せるとこうならない。** Google 自身が「Apps Script はコードを走査して必要なスコープを自動で決めるが、
+**ときどき必要より広いスコープを割り当てる。そのぶん、必要以上のアクセスをユーザーに求めることになる**」と書いている
+（→ [OAuth スコープ](https://developers.google.com/apps-script/concepts/scopes)）。
+**実際そうなった** — `oauthScopes` を 1 つも書かずに通した初回承認で出たのは、**広いほうの 1 つ**である
+（`Google スプレッドシートのすべてのスプレッドシートの参照、編集、作成、削除`。
+2026-09-20 → [`real-device-log.md`](real-device-log.md) の「初回承認で出た画面」の 0004）。
+**手で書くのは、この差を消すためである。**
+
+### 書かないもの
+
+**「余計なスコープが 1 つも無い」は、書かない側を名指しして初めて数えられる。**
+
+| 要求していないもの | なぜ要らないか |
+| --- | --- |
+| `.../auth/spreadsheets`（すべてのスプレッドシート） | **上のとおり。**掴むのは `getActive()` だけである |
+| `.../auth/drive` ／ `.../auth/drive.file` | **ファイルを作らない・探さない・消さない。****テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1） |
+| `.../auth/script.container.ui` | **メニューを 1 つ出すだけなら要らない** — **`getUi` ／ `createMenu` ／ `addToUi` ／ `toast` が、上の 1 スコープだけで実機を通っている**（→ [`real-device-log.md`](real-device-log.md) の「`oauthScopes` を書いた後に出た画面」）。**ダイアログを開く側（`showModalDialog`）には要る** → [#157](https://github.com/jun-eg/school-festival-shift/issues/157) が足す |
+| `.../auth/forms` | **フォームをまだ作らない。**`FormApp` を掴むのは [#144](https://github.com/jun-eg/school-festival-shift/issues/144) である |
+| `.../auth/script.external_request` | **外部に 1 度も出ない**（→ 2「個人情報が通る経路」・[#157](https://github.com/jun-eg/school-festival-shift/issues/157) の「外部から読み込むファイルが 0 個」） |
+| `.../auth/script.scriptapp`（トリガー） | **`onOpen` は単純トリガーで承認が要らない。****インストール型のトリガーを 1 つも作らない** |
+| `.../auth/userinfo.email` ほか本人の情報 | **担当者が誰かを、スクリプトが知る必要が無い** |
+
+### 手で書いた以上、自動では増えない
+
+**ここが罠である。** **`oauthScopes` を書いた瞬間に自動判定は止まる。**
+**新しいサービスを掴んだのにここへ足さないと、走らせたときに権限のエラーで落ちる。**
+
+**足すときは 3 つが一緒に動く。**
+
+| # | 一緒に動くもの |
+| --- | --- |
+| 1 | [`appsscript.json`](appsscript.json) の `oauthScopes` |
+| 2 | **初回承認の画面。****撮り直して連番を足す**（→ [`real-device-log.md`](real-device-log.md) の「確認に使うファイルの規約」） |
+| 3 | **[#159](https://github.com/jun-eg/school-festival-shift/issues/159) の手順書に貼ってある画像** |
+
+**足すことが分かっているのは 2 つである** —
+[#144](https://github.com/jun-eg/school-festival-shift/issues/144)（`FormApp`）と
+[#157](https://github.com/jun-eg/school-festival-shift/issues/157)（`showModalDialog`）。
+**先回りして書かない。** 先に書けば、**まだ 1 行も使っていない権限を担当者の承認画面に出す**ことになる。
+
+### `@OnlyCurrentDoc` を使わない
+
+**同じ狭め方は、コメントの注釈（`@OnlyCurrentDoc`）でもできる。** それでも**マニフェストに書く。**
+**要求するものが 1 か所にまとまっていないと、「いま何を要求しているか」を読むのに `.gs` 6 つを見て回ることになる。**
+**注釈は「このファイルは現在の文書しか触らない」という宣言で、一覧ではない。**
+
+### 実機で確かめてある
+
+**この一覧で画面が決まる。実機で 2 枚だった**（→ [`real-device-log.md`](real-device-log.md) の
+「`oauthScopes` を書いた後に出た画面」）。**1 スコープで足りることも、そこで見てある。**
+
 ## テンプレートの作り方 — **手で貼る。これが 1 本である**
 
 **担当者に要求する操作ではない。** テンプレートを 1 つ作るときに、用意する側が 1 回だけやる。
@@ -202,7 +268,8 @@
    [`appsscript.json`](appsscript.json) の中身を写す
 6. エディタで **`buildTemplate` を実行**する。**初回の権限承認はここで通る** —
    **「承認が必要です」→「権限を確認」→ 別ウィンドウ**の順で出る
-   （どの画面が出るかを記録するのは [#139](https://github.com/jun-eg/school-festival-shift/issues/139)）
+   （**出る画面は上の「要求するのは 1 スコープである」で決まる。**
+   実際に出た画面は [`real-device-log.md`](real-device-log.md) の「初回承認で出た画面」）
 7. **実行ログで「5 枚のうち保護したのは 3 枚である」を見る**
 8. スプレッドシートを開き直し、**メニュー「シフト」が出ること**と、**5 枚が並んでいること**を見る
 9. そのファイルを**コピーして配る形**にする。**渡す相手には閲覧者で共有する** —
@@ -257,7 +324,7 @@ node src/build-template.test.mjs
 
 | 何 | どこが決めるか |
 | --- | --- |
-| **要求する権限スコープ**（`appsscript.json` の `oauthScopes`）と、初回承認で出る画面 | [#139](https://github.com/jun-eg/school-festival-shift/issues/139)（→ 6-1 の #4） |
+| **担当者が初回承認の画面を自力で越えられるか**（**出る画面は上で決まっている。越えられるかは実地でしか分からない**） | [#160](https://github.com/jun-eg/school-festival-shift/issues/160)（M5 → 6-1 の #4） |
 | **コアの段 6 つの中身**（骨組みだけがある。→「コアと殻の境目」の段の表） | [#146](https://github.com/jun-eg/school-festival-shift/issues/146)／[#149](https://github.com/jun-eg/school-festival-shift/issues/149)／[#151](https://github.com/jun-eg/school-festival-shift/issues/151)／[#141](https://github.com/jun-eg/school-festival-shift/issues/141)／[#142](https://github.com/jun-eg/school-festival-shift/issues/142)／[#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
 | **殻をメニューに繋ぐこと**（`runOnActiveSpreadsheet` を押す口）と、**崩れの名指しが担当者の画面にどう出るか**（いまは走らせたときの例外である） | [#151](https://github.com/jun-eg/school-festival-shift/issues/151)（→ 5 の #6・上の「走る前に構造を検証する」） |
 | **回答シートに回答先を向けること。**フォームが別のシートを作る形になるなら、繋ぎ方はそこで決まる | [#144](https://github.com/jun-eg/school-festival-shift/issues/144)（→ 6 の #6） |
