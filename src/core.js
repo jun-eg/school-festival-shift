@@ -48,13 +48,21 @@ function builtInSteps() {
   if (typeof takeIn !== 'function') {
     throw new Error('take-in.js が貼られていない（「取り込む」の中身がそこにある → issue #146）')
   }
+  if (typeof expand !== 'function') {
+    throw new Error('expand.js が貼られていない（「展開する」の中身がそこにある → issue #149）')
+  }
   if (typeof countViolations !== 'function') {
     throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
   }
   if (typeof nameUnmet !== 'function') {
     throw new Error('name-unmet.js が貼られていない（「未充足を名指しする」の中身がそこにある → issue #142）')
   }
-  return { '取り込む': takeIn, '違反を数える': countViolations, '未充足を名指しする': nameUnmet }
+  return {
+    '取り込む': takeIn,
+    '展開する': expand,
+    '違反を数える': countViolations,
+    '未充足を名指しする': nameUnmet,
+  }
 }
 
 /** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */

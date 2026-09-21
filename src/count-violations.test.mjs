@@ -26,7 +26,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const { countViolations, takeConditions, toWishes, build, sheetColumns } = context

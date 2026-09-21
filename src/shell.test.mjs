@@ -88,7 +88,7 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns, builtInSteps } = context
@@ -133,8 +133,9 @@ function filledBook() {
   const book = emptyTemplate()
   const conditions = book.getSheetByName('条件入力')
 
-  // 日ごとの営業時刻（A〜F）— 2 日ぶん。時刻だけのセルは Date で返ってくる
-  ;[[1, 8, 10, 18, 18, 20], [2, 8, 10, 18, 18, 20]].forEach((row, i) => {
+  // 日ごとの営業時刻（A〜F）— 4 日ぶん。時刻だけのセルは Date で返ってくる
+  // （4 行なのは、回答の日ごとの列 4 つと上から順に 1 対 1 で当たるからである → 4-1・規則 1）
+  ;[[1, 8, 10, 18, 18, 20], [2, 8, 10, 18, 18, 20], [3, 8, 10, 18, 18, 20], [4, 8, 10, 18, 18, 20]].forEach((row, i) => {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
     row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
   })
@@ -209,6 +210,8 @@ check(
   [
     ['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00'],
     ['2025-11-02', '08:00', '10:00', '18:00', '18:00', '20:00'],
+    ['2025-11-03', '08:00', '10:00', '18:00', '18:00', '20:00'],
+    ['2025-11-04', '08:00', '10:00', '18:00', '18:00', '20:00'],
   ],
 )
 
