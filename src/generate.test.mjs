@@ -94,7 +94,7 @@ function conditionsOf(dayRows, needRows, more) {
   return {
     days: toDays(dayRows, '日ごとの営業時刻'),
     roleNeeds: toNeeds(needRows, '役割と必要人数'),
-    cookLeaderGrades: toCookLeaderGrades(one.grades || [['3年生'], ['4年生']], '調理責任者の学年'),
+    cookLeaderGrades: toCookLeaderGrades(one.grades || [[3], [4]], '調理責任者の学年'),
     committeeNeeds: toNeeds(one.committee || [], '委員会の指定枠'),
     prepCleanupRule: toPrepCleanupRule(one.boundary === null ? [] : [['午前と午後の境目', one.boundary || '12:00']], '準備・片付けのルール'),
     // 置き方のルール（型 #7）。空で置くと既定の 1 時間である（→ 5-1 の #7）。
