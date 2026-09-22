@@ -4,16 +4,15 @@
 //   使い方: node src/distribution-image.test.mjs
 //
 // 見るものは 7 つある。
-//   ① 前回の配布物 ◎ と同じ形である — 1 日 1 枚、表題に日、見出しは名前の 1 列、列が 30 分枠、セルが役割名 1 つ
-//   ② 粒度が落ちない — マス目の（人・枠・役割）が、画像の（名前・時刻・役割）と 1 つも違わない（→ 5 の #9 ／ M4）
-//   ③ 学籍番号を描かない（前回の配布物に無い ◎ → 2 の「個人情報が通る経路」）
-//   ④ 1 枠も入っていない行を落とし、背景は役割の色である（→ assignment-grid.js の roleColors）
-//   ⑤ 図形がはみ出さず、同じ入力から同じ図形が出る（→ 6 の #3）
-//   ⑥ 描けないものは黙って捨てず、名指しして止まる
-//   ⑦ 描画のために外から読み込むファイルが 0 個である（→ 5 の #9 ／ 6 の #5）
+//   ① 前回の配布物と同じ形である
+//   ② 粒度が落ちない — マス目の（人・枠・役割）が画像と 1 つも違わない（→ M4）
+//   ③ 学籍番号を描かない
+//   ④ 1 枠も入っていない行を落とし、背景は役割の色である
+//   ⑤ 図形がはみ出さず、同じ入力から同じ図形が出る
+//   ⑥ 描けないものは名指しして止まる
+//   ⑦ 描画のために外から読み込むファイルが 0 個である
 //
-// これは契約であって実装ではない。何も書き換えない。
-// 前回の記録から描いたときに粒度が落ちないかは scripts/前回のシフト表.mjs が見る。
+// 前回の記録から描いたときの粒度は scripts/前回のシフト表.mjs が見る。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -23,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 読み込む ---------------------------------------------------------------
-// SpreadsheetApp を文脈に置いていない。描く中身を組む側はコアなので、掴まなくても通る（→ 6 の #8）。
+// SpreadsheetApp は置かない（コアなので掴まずに通る）。
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js', 'distribution-image.js']) {
@@ -56,8 +55,7 @@ function whyItStopped(work) {
 }
 
 // ---- 材料 -------------------------------------------------------------------
-// 前回の 2025-11-01 と 2025-11-02 の 5 時刻である（→ data/前回の確定シフト.md）。
-// 3 日目と 4 日目は 1 人も入れない — 描かない日が黙って消えないかを見る。
+// 前回の 2025-11-01 と 2025-11-02 の 5 時刻。3・4 日目は空にして、描かない日が消えないかを見る。
 
 const days = toDays([
   ['2025-11-01', '08:00', '10:00', '17:00', '17:00', '21:00'],
@@ -78,16 +76,16 @@ const assignments = [
   assignment('2025-11-02', '10:30', '11:00', '調理責任者', 'EED2386071'),
   assignment('2025-11-02', '10:00', '10:30', 'クリーンパトロール', 'ECK2626643'),
   assignment('2025-11-02', '19:30', '20:00', '片付け', 'LTS2390333'),
-  // 表に色の無い役割名（委員会の指定枠は年で増える → 5-1 の #2）
+  // 表に色の無い役割名（委員会の指定枠は年で増える）
   assignment('2025-11-02', '12:00', '12:30', '委員会の受付', 'LTS2390333'),
 ]
 const names = { LTS2518500: '小林なんえい', EED2386071: '山本きた', ECK2626643: 'たなか風蔵', LTS2390333: '高木琴音' }
 const nameOf = (studentId) => names[studentId] || ''
-// 友達欄はマス目には並ぶが、配る画像には載らない（担当者が手で寄せるための列である → issue #200）。
+// 友達欄はマス目には並ぶが、配る画像には載らない。
 const friends = { EED2386071: '太郎君、同期', LTS2390333: 'ECK2626643' }
 const friendsOf = (studentId) => friends[studentId] || ''
 
-// 殻が読むのと同じ形にする — 見出しは 48 列ぶんで、右の余りは空である（→ shell.js の readGrid）。
+// 殻が読むのと同じ形（見出しは 48 列ぶんで右の余りは空 → shell.js の readGrid）。
 const layouts = gridLayouts(assignmentName)
 const width = 3 + 48
 function asRead(grid) {
@@ -96,7 +94,7 @@ function asRead(grid) {
 }
 const grids = layouts.map((layout, index) => ({
   layout: layout,
-  // 2 日目には、1 枠も入っていない人（「この人をここに置かない」の手直しで残る行 → 5-3）を 1 人混ぜる。
+  // 2 日目には、1 枠も入っていない人（手直しで残る行）を 1 人混ぜる。
   grid: asRead(toAssignmentGrid(assignments, days[index], nameOf, index === 1 ? ['AAA0000001'] : [], friendsOf)),
 }))
 
@@ -204,25 +202,24 @@ check(
   '⑥ 役割が入っているのに氏名が空なら、行と学籍番号を名指しして止まる',
   whyItStopped(() => distributionTable(noName.header, noName.rows, days[1], '学祭1日目')),
   'シート「学祭1日目」の 2 行目（学籍番号「EED2386071」）に役割が入っているが、氏名が空である。'
-    + '配る画像には氏名しか載らないので、誰の行か読めない。回答にその学籍番号があるかを見て、メニューの「生成」を押す'
-    + '（氏名は生成のたびに回答から入る）',
+    + '回答にその学籍番号があるかを見て、メニューの「生成」を押す',
 )
 
 const emptyGrids = layouts.map((layout, index) => ({ layout: layout, grid: asRead(toAssignmentGrid([], days[index], nameOf)) }))
 check(
   '⑥ 4 枚とも役割が 1 つも無ければ、生成を先に押すよう言って止まる',
   whyItStopped(() => distributionImages(emptyGrids, days)),
-  '割り当ての 4 枚に、役割の入ったセルが 1 つも無い。先にメニューの「生成」を押す（→ 2 の一覧 7）',
+  '割り当ての 4 枚に、役割の入ったセルが 1 つも無い。先にメニューの「生成」を押す',
 )
 check(
   '⑥ 日付が YYYY-MM-DD でなければ止まる',
   whyItStopped(() => monthDayOf('11/1')),
-  '日付「11/1」が YYYY-MM-DD でない（→ 条件入力の「日ごとの営業時刻」）',
+  '日付「11/1」が YYYY-MM-DD でない',
 )
 check(
   '⑥ 条件入力にその日の行が無いのに中身があれば止まる',
   whyItStopped(() => distributionImages(grids, days.slice(0, 1))),
-  'シート「学祭1日目」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。表題の日付が決まらない（→ 4-1）',
+  'シート「学祭1日目」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い',
 )
 
 // ---- ⑦ 外から読み込むファイルが 0 個 ----------------------------------------

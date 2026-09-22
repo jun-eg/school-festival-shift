@@ -4,15 +4,14 @@
 //   使い方: node src/verify-structure.test.mjs
 //
 // 見るものは 6 つある。
-//   ① 構成どおりに並んでいれば、崩れは 0 箇所である（走る）
-//   ② シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える、のそれぞれで名指しの行が出る
-//   ③ 行を消しても、生成シートを上書きしても、列をまとめて消しても名指しする（→ #8 の 3 つの壊し方）
-//   ④ 黙って直した箇所が 0 である（セルが 1 つも変わっていない）
-//   ⑤ 読むのはシートごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
+//   ① 構成どおりなら崩れは 0 箇所
+//   ② シートを消す／列を挿す／見出しを書き換える、のそれぞれで名指しの行が出る
+//   ③ 行の削除・生成シートの上書き・列をまとめて消す、でも名指しする
+//   ④ セルが 1 つも変わっていない（黙って直さない）
+//   ⑤ 読むのはシートごとに 1 回
 //   ⑥ 崩れていれば checkStructure が止まり、崩れている箇所を全部文にして持っている
 //
-// これは契約であって実装ではない。何も書き換えない。
-// 崩れた状態で生成が走らないことは src/shell.test.mjs が見る（run が最初に呼ぶ）。
+// 崩れた状態で生成が走らないことは src/shell.test.mjs が見る。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -22,8 +21,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 読むだけの偽のスプレッドシート -----------------------------------------
-// 構造の検証は読むだけである。だから、この偽のシートには setValues が無い。
-// 書こうとしたら、そこで落ちる（「黙って直さない」を、道具の側で確かめている）。
+// setValues を持たないので、書こうとしたらそこで落ちる（「黙って直さない」を道具の側で確かめる）。
 
 const roundTrips = { reads: 0 }
 
@@ -50,7 +48,7 @@ class FakeSheet {
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) {
-    // 本物は範囲外を取ると例外を投げる。構造の検証がそこへ行かないことを、ここで確かめている
+    // 本物と同じく範囲外で例外を投げる
     if (column + columnCount - 1 > this.maxColumns) throw new Error(`範囲外（${this.name} の ${column + columnCount - 1} 列目）`)
     if (row + rowCount - 1 > this.maxRows) throw new Error(`範囲外（${this.name} の ${row + rowCount - 1} 行目）`)
     return new FakeRange(this, row, column, rowCount, columnCount)
@@ -112,8 +110,7 @@ class FakeSpreadsheet {
 }
 
 // ---- 読み込む ---------------------------------------------------------------
-// 構造の検証が使う headerRowCount と normalizeValue は shell.js にあるので、一緒に読む。
-// SpreadsheetApp は文脈に置いていない — 掴むのは shell.js の 1 行だけで、そこは通らない。
+// headerRowCount と normalizeValue は shell.js にあるので一緒に読む。SpreadsheetApp は置かない。
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
@@ -139,11 +136,11 @@ function whyItStopped(work) {
   }
 }
 
-/** sheetLayout どおりに見出しを置いた、空の 8 枚を作る（テンプレートを組んだ直後の形である）。 */
+/** sheetLayout どおりに見出しを置いた空の 8 枚（テンプレートを組んだ直後の形）を作る。 */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
     const sheet = new FakeSheet(layout.name)
-    // マス目の 4 枚は既定の 26 列に収まらない。テンプレートも同じだけ広げる（→ build-template.js の widenTo）
+    // マス目の 4 枚は既定の 26 列に収まらないので広げる（→ build-template.js の widenTo）
     sheet.maxColumns = Math.max(sheet.maxColumns, sectionRightEdge(layout))
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
@@ -194,8 +191,7 @@ check(
   ],
 )
 
-// マス目の 4 枚は、名前のある 3 列だけを名前で照らす。右は時刻の列で、名前を持たない
-// （何時の枠かは毎回の入力で変わる → sheet-layout.js の slotColumns）。
+// マス目の 4 枚は、名前のある 3 列だけを照らす（右の時刻の列は名前を持たない）。
 const gridWithInsertedColumn = emptyTemplate()
 gridWithInsertedColumn.getSheetByName('学祭1日目').put(1, 4, '08:00').put(1, 5, '08:30').insertColumn(2)
 
@@ -263,8 +259,7 @@ check(
   ],
 )
 
-// 列をまとめて消されると、構成の要る列数そのものが無くなる。
-// 読む範囲をシートの外に取れば範囲外の例外になるので、読む前に名指しする
+// 列をまとめて消されたら、範囲外の例外より先に名指しする
 const bookWithCutColumns = emptyTemplate()
 bookWithCutColumns.getSheetByName('指標').cutColumnsTo(3)
 
@@ -279,8 +274,7 @@ check(
   ],
 )
 
-// マス目の 4 枚は 51 列を取る（→ sheet-layout.js の maxSlotsPerDay）。
-// 既定の 26 列のままコピーされたものは、読む前にここで名指しになる
+// マス目の 4 枚は 51 列を取る（→ sheet-layout.js の maxSlotsPerDay）。26 列のままなら名指しする
 const gridNotWidened = emptyTemplate()
 gridNotWidened.getSheetByName('片付け').cutColumnsTo(26)
 
@@ -290,7 +284,7 @@ check(
   ['シート「片付け」の列が 26 列しかない（構成は 51 列である）'],
 )
 
-// 条件入力は 2 行目までが見出しである。行が 1 行しか残っていなければ、列名の行そのものが無い
+// 条件入力は 2 行目までが見出しなので、1 行しか残っていなければ列名の行が無い
 const bookWithCutRows = emptyTemplate()
 bookWithCutRows.getSheetByName('条件入力').cutRowsTo(1)
 
@@ -341,7 +335,7 @@ const stopped = whyItStopped(() => checkStructure(bookWithInsertedColumn))
 check(
   '⑥ 崩れていれば止まり、箇所数と「黙って直さない」と戻し方を名指しする',
   [
-    stopped?.startsWith('シートの構造が 2 箇所崩れているので、生成を走らせない。'),
+    stopped?.startsWith('シートの構造が 2 箇所崩れているので、生成を走らせない（黙って直さない）。'),
     stopped?.includes('黙って直さない'),
     stopped?.includes('テンプレートをもう 1 回コピーして条件を入れ直す'),
   ],

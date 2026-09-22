@@ -4,16 +4,11 @@
 //   使い方: node src/count-violations.test.mjs
 //
 // 見るものは 5 つある。
-//   ① 数えるのは 5 つで、規則 3 の ⑥ は数えない。数えていないことが隠れていない（→ 5-4 の但し書き）
-//   ② 違反を 1 件ずつ仕込んだ入力で、それぞれが名指しで出る（→ issue #141 の受け入れ条件）
-//   ③ 配列を受けて配列を返し、未充足を 1 件も混ぜない（→ 5-4・#142）
+//   ① 数えるのは 5 つで、規則 3 の ⑥ は数えない（数えていないことを隠さない）
+//   ② 違反を 1 件ずつ仕込むと、それぞれが名指しで出る
+//   ③ 配列を受けて配列を返し、未充足を混ぜない
 //   ④ 判定できない行は、黙って通さずに名指しして止まる
-//   ⑤ コアの段として繋がっていて、返った行が検証結果シートの形に合っている（→ core.js の checkOutput）
-//
-// 前回の確定シフト（data/ のモック 4 本）を、ここに食わせていない。
-// 数えるのは生成した案で、前回の記録は M1 ① の入力である（→ 5-4 の但し書き。乗るかは input-types.test.mjs）。
-//
-// これは契約であって実装ではない。何も書き換えない。
+//   ⑤ コアの段として繋がり、返った行が検証結果シートの形に合っている
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -23,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 読み込む ---------------------------------------------------------------
-// SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
+// SpreadsheetApp は置かない（置かなくても通ることを見る）。
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js']) {
@@ -54,7 +49,7 @@ function whyItStopped(work) {
 }
 
 // ---- 入力を組む -------------------------------------------------------------
-// 値は data/ の転記元と同じ表現で置く。2 日あるのは、⑥ を数えていないことを見るためである。
+// 値は data/ と同じ表現。2 日あるのは ⑥ を数えていないことを見るため。
 
 const dates = ['2025-11-02', '2025-11-03']
 
@@ -68,7 +63,7 @@ function conditionRows(overrides) {
       ['', '', '', '準備', 2],
       ['', '', '', '片付け', 2],
     ],
-    '調理責任者の学年': [['3年生'], ['4年生']],
+    '調理責任者の学年': [[3], [4]],
     '委員会の指定枠': [],
     '準備・片付けのルール': [['午前と午後の境目', '12:00']],
     '置き方のルール': [],
@@ -79,7 +74,7 @@ function conditionRows(overrides) {
 
 const conditions = takeConditions(conditionRows())
 
-/** 回答 1 行。列は 4-1 の設問 9 つ ＋ タイムスタンプである（→ sheet-layout.js の回答シート）。 */
+/** 回答 1 行（設問 9 つ ＋ タイムスタンプ）。 */
 function answerRow(studentId, name, grade, cookAnswer) {
   return [
     '2025-10-24 21:15:03', studentId, name, grade, cookAnswer, '',
@@ -102,7 +97,7 @@ const wishes = toWishes([
   answerRow(people.d.id, people.d.name, '3年生', 'はい'),
 ])
 
-/** 候補（展開する段の出力 → #149）。この検査では、回答した 4 人に 2 日ぶんの全枠を渡す。 */
+/** 候補。回答した 4 人に 2 日ぶんの全枠を渡す（skip の 1 枠だけ抜く）。 */
 function candidatesOf(skip) {
   const answered = ['a', 'b', 'c', 'd']
   const candidates = []
@@ -119,7 +114,7 @@ function candidatesOf(skip) {
   return candidates
 }
 
-/** 割り当て 1 行（列は 5-3 の割り当てシート）。開始から 30 分の枠である。 */
+/** 割り当て 1 行。開始から 30 分の枠。 */
 function placed(date, start, role, who) {
   const minutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3)) + 30
   const end = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
@@ -143,7 +138,7 @@ function cleanRows() {
   ]
 }
 
-/** 違反を数える。行を差し替えるだけで、条件も希望も候補も同じものを使う。 */
+/** 違反を数える。条件・希望・候補は、渡さなければ既定のものを使う。 */
 function violationsOf(rows, given) {
   const use = given || {}
   return countViolations(
@@ -157,7 +152,7 @@ function violationsOf(rows, given) {
 const columns = sheetColumns('検証結果')
 const detailColumn = columns.indexOf('内容')
 
-/** 出た行を「内容の頭の名前」だけにする。名指しで出たかどうかは、ここで突き合わせる。 */
+/** 出た行を「内容の頭の名前」だけにする。 */
 function labelsOf(rows) {
   return rows.map((row) => row[detailColumn].split(': ')[0])
 }
@@ -272,8 +267,7 @@ check(
   [['規則 3'], '④', true],
 )
 
-// 店の役割に就いていない日に 準備 だけ置かれているのは、違反ではない。
-// 準備・片付けが需要になったので、置かれたことそのものが仕事である（→ ADR tech-requirements/0009）。
+// 店の役割が無い日に準備だけ置かれるのは違反ではない（→ ADR tech-requirements/0009）
 const prepWithoutShift = violationsOf(cleanRows().concat([placed(dates[0], '08:00', '準備', people.d)]))
 
 check(
@@ -433,7 +427,7 @@ const output = build({
   '取り込む': () => wishes,
   '展開する': () => candidatesOf(),
   '生成する': () => bothSidesRows(),
-  // ここで見るのは違反の側だけである。未充足は別に数える側が持つ（→ 5-4・name-unmet.test.mjs）
+  // 見るのは違反の側だけ（未充足は name-unmet.test.mjs）
   '未充足を名指しする': () => [],
 })
 

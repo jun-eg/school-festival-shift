@@ -1,27 +1,17 @@
 /**
- * 指標を出す側 — docs/tech-requirements.md 8 の 9 ／ 5 の #7（issue #154）。
+ * 指標を出す側（docs/tech-requirements.md 5 の #7 ／ issue #154）。
  *
- * 人ごとに 合計時間・シフト回数・準備回数 ◎ の 3 つを、指標シートの行にする。
- * **並べるだけである。順位付けも閾値も出さない**（→ 5 の #7・上流の △ 5）。
- * 値で並べ替えない ／ 平均や差を出さない ／ 「偏っています」の類を書かない — どれも線を引くことになる。
- * 並びは学籍番号の昇順で、割り当ての 4 枚と同じである（→ assignment-grid.js の toAssignmentGrid）。
+ * 人ごとに 合計時間・シフト回数・準備回数 の 3 つを、指標シートの行にする。
+ * 並べるだけで、順位付けも閾値も平均や差も出さない（どれも線を引くことになる）。
+ * 並びは学籍番号の昇順（割り当ての 4 枚と同じ）。何を 1 と数えるかは metricDefinitions が持つ。
  *
- * 何を 1 と数えるかは 5-6 が持つ（→ metricDefinitions）。ここは写しである。
+ * 置いた行は count-violations.js の readAssignments で読む（同じ行を 2 通りに読まない）。
+ * 氏名はここで埋めない。埋めるのは殻である（→ shell.js の writeOutputs）。
  *
- * 置いた行を読むのは count-violations.js の readAssignments である。
- * 同じ行を 2 通りに読むと、片方が古くなる（→ src/README.md）。
- *
- * 氏名はここで埋めない。型 #6 に氏名は無い（→ 5 の #1）ので、行の氏名は割り当ての行のまま（空）である。
- * 回答から引いて埋めるのは殻である（→ shell.js の writeOutputs・マス目の氏名と同じ手）。
- *
- * 配列を受けて配列を返す。SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
+ * 配列を受けて配列を返す。SpreadsheetApp を掴まない。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
-
-/**
- * 3 つの値と、それぞれ何を 1 と数えるか（→ 5-6）。
- * 列名は指標シートのものである（→ sheet-layout.js）。
- */
+/** 3 つの値と、それぞれ何を 1 と数えるか（→ 5-6）。列名は指標シートのもの。 */
 const metricDefinitions = [
   {
     column: '合計時間',
@@ -39,14 +29,13 @@ const metricDefinitions = [
 ]
 
 /**
- * 人ごとの 3 つの値を、指標シートの行にする（→ 5 の #7）。
+ * 人ごとの 3 つの値を、指標シートの行にする。
  *
- * 受け取るもの
- *   assignments … 割り当ての行（生成する段の出力 → #151。手直しを積んだ後もこの形である → 5-3）
- *   conditions  … 条件入力の型（→ core.js の takeConditions）。枠に乗っているかを readAssignments が見る
- *   wishes      … 希望（型 #6。1 人 1 件）。**1 枠も置かれなかった人も 0 で並べる**ために受け取る
+ *   assignments … 割り当ての行（手直しを積んだ後もこの形）
+ *   conditions  … 条件入力の型。枠に乗っているかを readAssignments が見る
+ *   wishes      … 希望（型 #6）。1 枠も置かれなかった人も 0 で並べるために受け取る
  *
- * 1 枠も置かれない人を落とさない — 落とすと、いちばん偏っている人が指標から消える。
+ * 1 枠も置かれない人を落とさない（落とすと、いちばん偏っている人が消える）。
  * 希望に無い学籍番号が割り当てにあれば（手直しで足された人）、その人も並べる。
  */
 function fairnessMetrics(assignments, conditions, wishes) {
@@ -64,10 +53,7 @@ function fairnessMetrics(assignments, conditions, wishes) {
     .map((studentId) => metricRow(studentId, byPerson[studentId]))
 }
 
-/**
- * 1 人ぶんの行。同じ枠・同じ役割に 2 行あっても 1 枠と数える
- * — 二重は違反の側が数えるもので（→ 5-4）、ここで 2 回数えると指標に二重が混ざる。
- */
+/** 1 人ぶんの行。同じ枠・同じ役割の 2 行は 1 枠と数える（二重は違反の側が数える）。 */
 function metricRow(studentId, rows) {
   const slots = distinctSlots(rows)
   const values = {
@@ -93,7 +79,7 @@ function distinctSlots(rows) {
   return slots
 }
 
-/** 枠の長さの合計を時間で出す。30 分と決め打ちしない — 長さは枠の時刻そのものから出す。 */
+/** 枠の長さの合計を時間で出す。長さは 30 分と決め打ちせず、枠の時刻から出す。 */
 function totalHours(slots) {
   const minutes = slots.reduce((sum, one) => sum + toMinutes(one.end) - toMinutes(one.start), 0)
   return minutes / 60
@@ -101,8 +87,7 @@ function totalHours(slots) {
 
 /**
  * 塊の数（→ 5-5 の「まとまり」）。同じ日・同じ役割の枠を時刻順に並べ、
- * **前の枠の終わりと次の枠の始まりが一致しなければ**、そこで塊が切れる。
- * 枠は帯ごとに刻んであるので、並びで隣でも時刻が飛ぶことがある（→ generate.js の nextRunSlot と同じ見方）。
+ * 前の枠の終わりと次の枠の始まりが一致しなければ塊が切れる（→ generate.js の nextRunSlot と同じ見方）。
  */
 function countRuns(slots) {
   const byDayRole = {}
@@ -122,7 +107,7 @@ function countRuns(slots) {
   return runs
 }
 
-/** 準備か片付けに入った日の数（→ 3 の「規則が名指しする役割名」・count-violations.js の prepCleanupRoles）。 */
+/** 準備か片付けに入った日の数（役割名は count-violations.js の prepCleanupRoles）。 */
 function countPrepCleanupDays(slots) {
   const roles = prepCleanupRoles()
   const days = []

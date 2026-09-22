@@ -1,31 +1,14 @@
 /**
- * 生成する側 — 違反 0 の案を 1 つ組み、満たせない枠は埋めずに残す
- * （docs/tech-requirements.md 5 の #6 ／ 8 の 8。方式は 6 の #3、適用の順序は 5-5。issue #151）。
+ * 生成する側 — 候補・条件・希望から違反 0 の案を 1 つ組み、割り当てシートの行で返す
+ * （docs/tech-requirements.md 5 の #6。適用の順序は 5-5。issue #151）。
  *
- * 受け取るのは候補（展開する段の出力 → #149）と条件入力の型と希望（型 #6）で、
- * 返すのは割り当てシートの行である（→ sheet-layout.js の「割り当て」）。
- *
- * 違反は 1 件も作らない。破るくらいなら置かない（→ 5-4）。
- * 埋まらなかった枠は、埋めずに残す — 名指しするのは未充足の側である（→ 5-4・name-unmet.js ／ #142）。
- * 「解なし」で止まらない（→ 5 の #6）。置けない枠があっても、そこまでの案をそのまま返す。
- *
- * 外部のソルバーを読まない（→ 6 の #3）。読むのは同じスクリプトの中の関数だけである。
- * 同じ入力からは同じ案が出る — 並べ替えの鍵に入力の外のもの（乱数・時刻・オブジェクトの列挙順）を使わない
- * （→ 6 の #3 の理由 ③）。
- *
- * 需要の読み方（どの枠に何人要るか）は未充足の側と同じ口を使う（→ name-unmet.js の allNeeds・requiredAt）。
- * 同じものを 2 通りに読むと、片方が古くなる（→ src/README.md）。
- *
- * 配列を受けて配列を返す。SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
- * ここに判断を新しく書かない — 規則は 3 が、方式は 6 の #3 が、適用の順序は 5-5 が持つ（→ src/README.md）。
- *
+ * 破るくらいなら置かない。埋まらない枠は残し、名指しは未充足の側（name-unmet.js）に任せる。「解なし」で止まらない。
+ * 外部のソルバーを読まず、乱数・時刻・オブジェクトの列挙順を鍵にしない（同じ入力から同じ案 → 6 の #3）。
+ * 需要の読み方は未充足の側と同じ関数（allNeeds・requiredAt）を使う。SpreadsheetApp を掴まない。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
-/**
- * 生成が踏む 5 段（→ 5-5 ／ 6 の #3 ／ 5-3）。踏む順である。
- * 名前で置いてあるのは、どこで何をしているかを隠さないためである。
- */
+/** 生成が踏む 5 段。踏む順である（→ 5-5）。 */
 const generationOrder = [
   {
     key: 'fixed',
@@ -51,11 +34,7 @@ const generationOrder = [
   },
 ]
 
-/**
- * 生成が目的にしないもの・いま見ないもの。
- * ここに名前で置いてあるのは、やっていないことをコードの上で隠さないためである
- * （→ count-violations.js の violationsNotCounted と同じ置き方）。
- */
+/** 生成が目的にしないもの・いま見ないもの（やっていないことを隠さないために名前で置く）。 */
 const generationNotAimed = [
   {
     what: '規則 3 の ⑥（複数日で偏らせない）',
@@ -81,14 +60,8 @@ const generationNotAimed = [
 ]
 
 /**
- * まとまりで置けない端（→ 5-5 の「まとまり」・issue #215）。
- *
- * **「連続して入る最小の長さ」に届かない塊は、必ず出る。**
- * ここに名前で置いてあるのは、どこが例外かをコードの上で隠さないためである
- * （→ violationsNotCounted と同じ置き方）。**規則ではない** — 違反にも未充足にも数えない。
- *
- * 数え直す手（scripts/まとまりと散らし.mjs）は、ここの名前をそのまま読む。
- * 名前を 2 か所に持つと、片方が古くなる（→ src/README.md）。
+ * まとまりで置けない端 — 「連続して入る最小の長さ」に届かない塊が出る理由（→ 5-5 の「まとまり」・issue #215）。
+ * 規則ではないので、違反にも未充足にも数えない。scripts/まとまりと散らし.mjs がこの名前をそのまま読む。
  */
 const runExceptions = [
   {
@@ -122,25 +95,22 @@ const runExceptions = [
 ]
 
 /**
- * 候補・条件・希望から、割り当ての行を組む（→ 5 の #6 ／ 5-5）。
+ * 候補・条件・希望から、割り当ての行を組む（→ 5-5）。
  *
- * 受け取るもの
- *   candidates … その人がその日に入れる候補の枠（展開する段の出力 → #149）
- *   conditions … 条件入力の 6 区画を直した型（→ core.js の takeConditions・input-types.js）
- *   wishes     … 希望（型 #6。取り込む段の出力 → #146）。規則 4 の学年と規則 5 の調理可否がここにある
- *   fixed      … 担当者の手直し（→ 5-3。形は sheet-layout.js の fixedColumns）。先に置き、残りを生成する
+ *   candidates … その人がその日に入れる候補の枠（展開する段の出力）
+ *   conditions … 条件入力の 6 区画を直した型（→ input-types.js）
+ *   wishes     … 希望（型 #6）。規則 4 の学年と規則 5 の調理可否がここにある
+ *   fixed      … 担当者の手直し（形は sheet-layout.js の fixedColumns）。先に置き、残りを生成する
  *
- * 枠が 1 つも無い年と、需要も手直しも 1 行も無い年は、置く先が無いので 0 行である（「解なし」では止まらない）。
- * 置けなかった手直しは、ここでは返さない — 名指しするのは「固定を照らす」の段である（→ nameFixedConflicts）。
- * どちらも generatePlan を通るので、ここで置かなかったものと、そこで名指しされるものは同じである。
+ * 枠も、需要と手直しも無ければ 0 行である。置けなかった手直しは返さず、nameFixedConflicts が名指しする。
  */
 function generate(candidates, conditions, wishes, fixed) {
   return generatePlan(candidates, conditions, wishes, fixed).rows
 }
 
 /**
- * 生成の本体。割り当ての行（rows）と、置けなかった手直し（notPlaced。{ fix, why } の配列）の 2 つを返す。
- * 段の関数が返すのは行の配列だけなので（→ core.js の build）、出口を 2 つに分けてある（→ generate ／ nameFixedConflicts）。
+ * 生成の本体。割り当ての行（rows）と、置けなかった手直し（notPlaced。{ fix, why } の配列）を返す。
+ * 段の関数は行の配列しか返せないので、出口を generate と nameFixedConflicts に分けてある。
  */
 function generatePlan(candidates, conditions, wishes, fixed) {
   const held = conditions || {}
@@ -148,21 +118,20 @@ function generatePlan(candidates, conditions, wishes, fixed) {
   const needs = allNeeds(held) // → name-unmet.js。必要人数と委員会の指定枠を 1 本に並べる
   if (days.length === 0 || (needs.length === 0 && (fixed || []).length === 0)) return { rows: [], notPlaced: [] }
 
-  // 数えられない需要を黙って落とさない（未充足の側と同じ口で止まる → 5-4）。
+  // どの枠にも乗らない需要は、黙って落とさずに止まる（未充足の側と同じ → 5-4）。
   checkEveryNeedLands(needs, days)
 
   const boundary = noonBoundaryToPlaceBy(held)
   const minRun = minRunSlotsToPlaceBy(held)
   const people = peopleToPlace(candidates, wishes)
   const board = { placed: {} }
-  // 需要の単位より先に置く。空のセルの手直しは候補から外すので、置ける人（able）が変わる。
+  // 需要の単位より先に置く。空のセルの手直しが候補を減らし、置ける人（able）を変えるため。
   const notPlaced = placeFixed(board, people, fixed, days, held, wishes, boundary)
   const units = demandUnits(needs, days, people, held)
 
   fillTightestFirst(board, units, boundary, minRun)
   swapWithinSlot(board, units, boundary)
-  // 店の役割が出そろったところで、規則 3 を満たせない日の手直しを外す（→ releaseFixesBreakingRule3）。
-  // 外した枠は空くので、もう 1 度埋める。外していなければ、埋め直さない（手直しが無い年の案は動かない）。
+  // 店の役割が出そろってから、規則 3 を満たせない日の手直しを外し、空いた枠を埋め直す。
   const released = releaseFixesBreakingRule3(board, people, days, boundary)
   if (released.length > 0) {
     fillTightestFirst(board, units, boundary, minRun)
@@ -174,44 +143,29 @@ function generatePlan(candidates, conditions, wishes, fixed) {
   return { rows: assignmentRows(needs, days, people), notPlaced: notPlaced.concat(released) }
 }
 
-/**
- * 規則 3 の境目（→ 5-1 の #5）。入っていなければ、置き方が決まらないので止まる。
- * 黙って置くと、規則 3 の ①〜⑤ を満たしているかを見ないまま違反が作られる
- * （→ count-violations.js の同じ止まり方）。
- */
+/** 規則 3 の境目（→ 5-1 の #5）。無ければ置き方が決まらないので、違反を作らずに止まる。 */
 function noonBoundaryToPlaceBy(conditions) {
   const boundary = (conditions.prepCleanupRule || {}).noonBoundary || ''
   if (boundary !== '') return boundary
-  throw new Error(
-    `条件入力の「準備・片付けのルール」に「${prepCleanupItems.noonBoundary}」が無い。`
-      + '規則 3 を満たす置き方が決まらないので、違反を作らずに止まる（→ 5-1 の #5）',
-  )
+  throw new Error(`条件入力の「準備・片付けのルール」に「${prepCleanupItems.noonBoundary}」が無い`)
 }
 
 /**
- * まとまりの長さを枠の数にする（→ 5-1 の #7・5-5 の「まとまり」）。
- *
- * 入っていなければ既定の 1 時間である（型のほうが既定を持つ → input-types.js の defaultMinRun）ので、
- * ここでは止まらない。枠の刻みに乗らない値で止まるのも型の側である。
- * ここがやるのは、分を枠の数に直すことだけである。
+ * まとまりの長さを分から枠の数にする（→ 5-1 の #7）。
+ * 空なら型が既定（1 時間）を持ち、刻みに乗らない値も型が止めるので、ここに空が来るのは型を通っていないときだけである。
  */
 function minRunSlotsToPlaceBy(conditions) {
   const minutes = ((conditions || {}).placementRule || {}).minRun
   if (minutes) return minutes / slotMinutes
   throw new Error(
-    '条件入力の「置き方のルール」が型に乗っていない（→ 5-1 の #7）。'
-      + `区画が空でも型は既定（${placementItems.minRun}）を持つので、ここが空なのは 6 区画を通っていないということである`,
+    `条件入力の「置き方のルール」が型に乗っていない（空でも既定の ${placementItems.minRun} を持つはずである）`,
   )
 }
 
 /**
  * 候補と希望を突き合わせて、置く相手 1 人 1 件にする。
- *
- * 候補は「その人がその日に入れる枠」しか持っていない（→ #149）ので、
- * 規則 4（学年）と規則 5（調理可否）を見るには希望（型 #6）が要る。
- * 候補にあって希望に無い学籍番号は、入力の食い違いである — 黙って落とさずに名指しして止まる。
- *
- * 並びは候補に出てきた順（＝ 取り込みが返した順）である。並べ直さない（→ 5-5 の同点の順序）。
+ * 規則 4（学年）と規則 5（調理可否）を見るのに希望が要る。候補にあって希望に無い人は、黙って落とさずに止まる。
+ * 並びは候補に出てきた順のまま（→ 5-5 の同点の順序）。
  */
 function peopleToPlace(candidates, wishes) {
   const wishBy = wishesByStudentId(wishes) // → count-violations.js（1 人 1 件であることも見る）
@@ -221,10 +175,7 @@ function peopleToPlace(candidates, wishes) {
   ;(candidates || []).forEach((candidate) => {
     const wish = wishBy[candidate.studentId]
     if (!wish) {
-      throw new Error(
-        `候補に学籍番号「${candidate.studentId}」があるのに、希望にその人が無い。`
-          + '候補は希望から出るもの（→ 規則 1 ／ #149）なので、黙って落とさずに止まる',
-      )
+      throw new Error(`候補に学籍番号「${candidate.studentId}」があるのに、希望にその人が無い`)
     }
     if (!byStudentId[candidate.studentId]) {
       byStudentId[candidate.studentId] = {
@@ -249,14 +200,8 @@ function peopleToPlace(candidates, wishes) {
 
 /**
  * 需要を (日・枠・役割) 1 つずつにほどき、制約のきつい順に並べる（→ 5-5 の「埋める順」）。
- *
- * きつさは「置ける人 − 要る人数」である。少ないほど先に埋める
- * — 後回しにすると、置ける人がほかの枠に取られて埋まらなくなる。
- * 同点は 日 → 枠 → 役割（担当者が需要を書いた順 → name-unmet.js の rolesInOrder）で、
- * 並びは入力だけで決まる（→ 6 の #3 の理由 ③）。
- *
- * 準備・片付けはここに入らない。規則 3 が「その人のその日」から決めるもので、
- * 枠の側から埋めるものではないからである（→ addPrepCleanup）。
+ * きつさは「置ける人 − 要る人数」で、少ないほど先（後回しにすると置ける人をほかに取られる）。
+ * 同点は 日 → 枠 → 役割（需要を書いた順）で、並びは入力だけで決まる。
  */
 function demandUnits(needs, days, people, conditions) {
   const order = rolesInOrder(needs)
@@ -265,9 +210,8 @@ function demandUnits(needs, days, people, conditions) {
   days.forEach((day, dayIndex) => {
     day.slots.forEach((slot, slotIndex) => {
       order.forEach((role, roleIndex) => {
-        // 準備・片付けはここに入らない。規則 3 が「その人のその日」から決めるもので、
-        // 先に埋めると、まだ決まっていない店の役割の側が ②〜④ を動かす（→ addPrepCleanup）。
-        // 需要が残っているぶんは、規則 3 を満たした後に 4 段目が埋める（→ fillPrepCleanupDemand）。
+        // 準備・片付けは入れない。規則 3 が店の役割の後に「その人のその日」から決める（→ addPrepCleanup）。
+        // 残った需要は 4 段目が埋める（→ fillPrepCleanupDemand）。
         if (prepCleanupRoles().indexOf(role) !== -1) return
         const required = requiredAt(needs, day, slot, role).count // → name-unmet.js
         if (required === 0) return
@@ -294,18 +238,18 @@ function demandUnits(needs, days, people, conditions) {
 }
 
 /**
- * その人をその枠のその役割に置けるか — 規則 1・4・5 を 1 か所で見る（→ 3 の規則）。
+ * その人をその枠のその役割に置けるか — 規則 1・4・5 を見る（→ 3 の規則）。
  *
- *   規則 1 … その枠が、その人のその日の候補にある（→ #149）
+ *   規則 1 … その枠が、その人のその日の候補にある
  *   規則 4 … 調理責任者の枠は、条件入力の「調理責任者の学年」にある学年の人だけ
- *   規則 5 … 調理の枠（調理責任者を含む → 3 の役割名の表）は、`調理担当ですか？` が はい の人だけ
+ *   規則 5 … 調理の枠（調理責任者を含む）は、`調理担当ですか？` が はい の人だけ
  *
- * 規則 3 はここで見ない。枠 1 つではなく、その人のその日ぜんぶで決まる（→ prepCleanupStaysPossible）。
- * 役割名は弾かない — 需要に書かれた名前にそのまま置く（→ 規則 6 の ③・5-5）。
+ * 規則 3 はその人のその日ぜんぶで決まるので、ここでは見ない（→ prepCleanupStaysPossible）。
+ * 役割名は弾かない（→ 規則 6 の ③）。
  */
 function canStandAt(person, day, slot, role, conditions) {
   if (!person.slots[whereKey(day.date, slot)]) return false
-  // 準備・片付けは帯の中だけに置く（→ 5-5）。帯の外に書かれた需要は、埋めずに名指しで残す。
+  // 準備・片付けは帯の中だけに置く。帯の外の需要は未充足で残る（→ 5-5）。
   if (prepCleanupRoles().indexOf(role) !== -1 && !isInBand(day, slot, role)) return false
   if (cookRoles.indexOf(role) !== -1 && !person.canCook) return false
   if (role !== ruleRoles.cookLeader) return true
@@ -313,24 +257,16 @@ function canStandAt(person, day, slot, role, conditions) {
   const allowed = (conditions || {}).cookLeaderGrades || []
   if (allowed.length === 0) {
     throw new Error(
-      `条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の必要人数が書いてある。`
-        + '規則 4 を満たす置き方が決まらないので、違反を作らずに止まる（→ 5-1 の #3）',
+      `条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の必要人数が書いてある`,
     )
   }
   return allowed.indexOf(person.grade) !== -1
 }
 
 /**
- * その人をその枠に置いても、規則 3 の ①〜⑤ を満たせるか（→ 3 の規則 3）。
- *
- * 置いた後のその日が午前・午後のどちらに掛かるかを見て、要る帯（準備 ／ 片付け）を決め、
- * その帯に「候補にあって、まだ置いていない」枠が 1 つ以上残るかを見る。
- * 残らないなら置かない — 「破るくらいなら置かない」（→ 5-4）。
- *
- * 置くたびにこれを見ておくと、帯の枠が最後まで 1 つ残る。
- * 後から準備・片付けを置く段（→ addPrepCleanup）が置き場所に困らないのは、このためである。
- *
- * role を渡すと、その役割で置いたものとして見る（→ whyPrepCleanupBreaks）。渡さなければ店の役割である。
+ * その人をその枠に置いても、規則 3 の ①〜⑤ を満たせるか。
+ * 置くたびに要る帯に空き枠が残るかを見るので、後の addPrepCleanup が置き場所に困らない。
+ * role を渡すとその役割で置いたものとして見る。渡さなければ店の役割である。
  */
 function prepCleanupStaysPossible(person, day, slot, boundary, role) {
   return whyPrepCleanupBreaks(person, day, slot, boundary, role) === null
@@ -338,11 +274,8 @@ function prepCleanupStaysPossible(person, day, slot, boundary, role) {
 
 /**
  * 規則 3 を満たせなくなるなら、どう満たせないかの文を返す。満たせるなら null である。
- *
- * 準備・片付けにもう入っているなら、向きはそこで決まっている（→ count-violations.js の prepCleanupDetail）。
- * 入っているのは担当者の手直しだけである — 生成が準備・片付けを置くのは 3 段目からで、店の役割より後だからである。
- * 手直しは後から外さないので、向きが合わない置き方はしない
- * （午前だけの日に片付けが固定されている人を、午前の枠にだけ置く、など）。
+ * この時点で準備・片付けに入っているのは手直しだけで、向きはそれで決まっている（→ prepCleanupDetail）。
+ * 手直しに向きが合わない置き方はしない。
  */
 function whyPrepCleanupBreaks(person, day, slot, boundary, role) {
   const toBand = prepCleanupRoles().indexOf(role) !== -1
@@ -367,10 +300,7 @@ function whyPrepCleanupBreaks(person, day, slot, boundary, role) {
 
 /**
  * その人のその日が、いまどうなっているか（→ 規則 3 の ①）。
- *
- * 午前・午後を見るのに、準備・片付けの行そのものを見ない — 見ると、入れた結果が入れるかどうかの判定を動かす
- * （→ 3 の「規則が名指しする役割名」・count-violations.js の countPrepCleanupBroken と同じ見方）。
- * 境目に半分かかる枠は、午前と午後の両方に数える。
+ * 午前・午後は店の役割からだけ立てる。準備・片付けから立てると、入れた結果が判定を動かす（→ countPrepCleanupBroken）。
  * alsoAt を渡すと、その枠にこれから置いたものとして数える。
  */
 function dayStateOf(person, day, boundary, alsoAt) {
@@ -395,7 +325,6 @@ function markHalfOfDay(state, slot, boundary) {
 }
 
 // 帯の定義（prepCleanupBands ／ prepCleanupRoles ／ isInBand ／ rule3Applies）は count-violations.js が持つ。
-// 数える側（name-unmet.js）も同じものを読むので、規則の側に 1 つだけ置いてある（→ src/README.md）。
 
 /** その人が、その帯でまだ置ける枠（候補にあって、まだ置いていないもの）。並びはその日の枠の順である。 */
 function freeBandSlots(person, day, role) {
@@ -405,11 +334,8 @@ function freeBandSlots(person, day, role) {
 }
 
 /**
- * 制約のきつい枠から順に埋める（→ generationOrder の 1 段目・6 の #3）。
- * 置ける人が尽きたら、その枠はそこまでである。埋めずに次へ行く（→ 5 の #6）。
- *
- * 1 人採ったら、その場で隣の枠へ伸ばす（→ placeRun）。枠ごとに採り直すと、
- * 同じ人が 30 分ごとに持ち場を変える案になる（→ issue #215 の ①）。
+ * 制約のきつい枠から順に埋める。置ける人が尽きたら、その枠は埋めずに次へ行く。
+ * 1 人採ったらその場で隣の枠へ伸ばす（→ placeRun）。枠ごとに採り直すと 30 分ごとに持ち場が変わる（→ issue #215）。
  */
 function fillTightestFirst(board, units, boundary, minRun) {
   const canTake = (person, unit) => isOpenFor(person, unit, boundary)
@@ -423,18 +349,11 @@ function fillTightestFirst(board, units, boundary, minRun) {
 }
 
 /**
- * 1 人を、その枠から「連続して入る最小の長さ」まで伸ばして置く（→ 5-5 の「まとまり」・5-1 の #7）。
+ * 1 人を、その枠から「連続して入る最小の長さ」まで伸ばして置き、置いた枠の数を返す（→ 5-5 の「まとまり」）。
  *
- * **同じ日・同じ役割の、隣り合う枠**にだけ伸ばす。前へ伸ばすのは、後ろで届かなかったぶんだけである
- * （枠は日の頭から順に埋まるので、ふつうは後ろで足りる）。
- *
- * 届かないことは必ずある。**どこで止まったかは名前で持ってある**（→ runExceptions）。
- * 届かないからといって置かない、はしない — **人数が足りない枠を埋めるほうが先である**（→ 5 の #6）。
- * 置いた枠の数を返す。
- *
- * 「隣に置けるか」は段から受け取る。段ごとに見るものが違う（1 段目は規則 3 まで見るが、
- * 4 段目は規則 3 の後なので見ない → fillPrepCleanupDemand）ので、
- * 伸ばす側だけ別の見方をすると、最初の 1 枠と続きの枠で置ける条件が食い違う。
+ * 同じ日・同じ役割の隣り合う枠にだけ伸ばす。前へ伸ばすのは、後ろで届かなかったぶんだけである。
+ * 届かなくても置く — 人数が足りない枠を埋めるほうが先である（止まる所 → runExceptions）。
+ * 「隣に置けるか」（canTake）は段から受け取る。最初の 1 枠と続きの枠で条件を食い違わせないため。
  */
 function placeRun(board, units, person, unit, canTake, minRun) {
   place(board, person, unit.day.date, unit.slot, unit.role)
@@ -446,11 +365,7 @@ function placeRun(board, units, person, unit, canTake, minRun) {
 
 /**
  * まとまりを片側へ伸ばす。step は 1 が後ろ、-1 が前である。置けた枠の数を返す。
- *
- * 止まる先は runExceptions の 5 つである — 隣の枠が無い（帯の切れ目）／候補に無い（希望の切れ目）／
- * その役割の需要が無い（需要の切れ目）／規則 3 を満たせなくなる（規則 3 の端）／
- * すでに要る人数まで置いてある（そこしか置けないとき）。
- * **超過を作らない** — まとまりのために、要る人数より多く置くことはしない（→ 5-4 の突き合わせ）。
+ * 止まるのは runExceptions の 5 つのどれか。まとまりのために要る人数を超えては置かない。
  */
 function extendRun(board, units, person, unit, canTake, howMany, step) {
   let added = 0
@@ -474,10 +389,8 @@ function extendRun(board, units, person, unit, canTake, howMany, step) {
 }
 
 /**
- * 隣り合う枠（→ 5-5 の「まとまり」）。**時刻が続いている枠だけが隣である。**
- *
- * 枠の列は帯ごとに刻んである（→ 5-1 の #1）ので、配列で隣でも時刻が飛んでいることがある
- * （調理終了 と 片付け開始 のあいだ）。飛んでいる所は帯の切れ目で、まとまりはそこで終わる。
+ * 隣り合う枠。時刻が続いている枠だけが隣である。
+ * 枠は帯ごとに刻むので、配列で隣でも時刻が飛ぶ所（帯の切れ目）がある（→ 5-1 の #1）。
  */
 function nextRunSlot(day, index, step) {
   const here = day.slots[index]
@@ -488,9 +401,8 @@ function nextRunSlot(day, index, step) {
 }
 
 /**
- * 準備・片付けの枠に置くとき、その日のもう片方の帯に入っている人は取らない。
- * 規則 3 の ④（両方ある → 片方だけ）と同じ向きである。
- * 規則 3 が当たらない日にも、1 人が同じ日の 準備 と 片付け の両方に入ることはしない。
+ * 準備・片付けの枠に、その日のもう片方の帯に入っている人は取らない（規則 3 の ④ と同じ向き）。
+ * 規則 3 が当たらない日にも同じにする。
  */
 function prepCleanupNotBothBands(person, day, role) {
   if (prepCleanupRoles().indexOf(role) === -1) return true
@@ -499,12 +411,7 @@ function prepCleanupNotBothBands(person, day, role) {
 }
 
 /**
- * その枠に次に置く 1 人（→ 5-5 の「枠の中で誰を採るか」）。
- *
- * 置ける人（規則 1・4・5）のうち、その枠がまだ空いていて、規則 3 を満たせなくならない人から、
- * その日にまだ置いた枠が少ない順・同数なら通しで置いた数が少ない順・同数なら候補に出てきた順で
- * 1 人取る（→ sortToTake）。
- * 均した量は測らない。⑥ の線はここで引いていない（→ generationNotAimed・5-4 の但し書き）。
+ * その枠に次に置く 1 人。置ける人のうち、いま空いていて規則 3 を満たせる人から、sortToTake の順で取る。
  */
 function nextToPlace(unit, boundary) {
   const ready = unit.able.filter((person) => isOpenFor(person, unit, boundary))
@@ -513,9 +420,8 @@ function nextToPlace(unit, boundary) {
 }
 
 /**
- * その人が、その単位の枠でいま空いていて、置いても規則 3 を満たせるか。
- * 置ける人（規則 1・4・5）かどうかは単位の able が持つ（→ demandUnits）ので、ここでは見ない。
- * 採る側（nextToPlace ／ takerFor）と、まとまりを伸ばす側（extendRun）が同じここを読む。
+ * その人が、その単位の枠でいま空いていて、置いても規則 3 を満たせるか（規則 1・4・5 は unit.able が持つ）。
+ * 採る側と、まとまりを伸ばす側（extendRun）が同じここを読む。
  */
 function isOpenFor(person, unit, boundary) {
   return isFreeAt(person, unit.day.date, unit.slot)
@@ -524,10 +430,8 @@ function isOpenFor(person, unit, boundary) {
 }
 
 /**
- * 埋まらなかった枠を、同じ枠の中の役割の入れ替えで詰める（→ generationOrder の 2 段目・6 の #3）。
- *
- * 見るのは 1 手だけである。深く探さない — 決定的であること（6 の #3 の理由 ③）と、
- * 実行時間の上限に当たらないこと（6-1 の #2）のほうを取る。
+ * 埋まらなかった枠を、同じ枠の中の役割の入れ替えで詰める（→ 6 の #3）。
+ * 見るのは 1 手だけで、深く探さない（決定的であることと、実行時間の上限を取る）。
  */
 function swapWithinSlot(board, units, boundary) {
   units.forEach((unit) => {
@@ -540,13 +444,9 @@ function swapWithinSlot(board, units, boundary) {
 /**
  * 入れ替えを 1 手だけ試す。できたら true を返す。
  *
- * 埋まらない枠に置ける人が、同じ枠の別の役割に入っていて、
- * その役割を代わりに引き受けられる人がその枠で空いているときに、2 人を入れ替える。
- * 枠も日も動かさないので、午前・午後（規則 3 の ①）は動かない。
- * 新しく置く側だけ、帯が残るかを見る（→ prepCleanupStaysPossible）。
- *
- * 準備・片付けに入っている人は動かさない。動かすと、その人のその日の規則 3 が崩れる。
- * 手直しで置いた人も動かさない。担当者が意図して置いた 1 手である（→ 5-3）。
+ * 埋まらない枠に置ける人が同じ枠の別の役割に入っていて、その役割を引き受けられる人が空いていれば、2 人を入れ替える。
+ * 枠も日も動かさないので、午前・午後は動かない。
+ * 準備・片付けに入っている人（動かすと規則 3 が崩れる）と、手直しで置いた人は動かさない。
  */
 function swapOnce(board, unit, units, boundary) {
   const movable = unit.able.filter((person) => {
@@ -586,27 +486,26 @@ function unitAt(units, date, slot, role) {
 }
 
 /**
- * 規則 3 の ①〜⑤ を満たす 準備・片付け を置く（→ generationOrder の 3 段目・3 の規則 3）。
+ * 規則 3 の ①〜⑤ を満たす 準備・片付け を、その日の帯の中に置く（→ 3 の規則 3・5-5）。
  *
  *   ② 午前だけ → 準備に入れる ／ ③ 午後だけ → 片付けに入れる
  *   ④ 両方ある → 片方だけに入れる ／ ⑤ どちらも無い → どちらにも入れない
  *
- * 置く先はその日の帯の中である（→ 5-5）。需要の残っている枠を先に取り、
- * 残っていなければ 1 枠だけ置く — 規則 3 が要るのは「入っていること」であって、帯を全部埋めることではない。
+ * 需要の残っている枠を先に取り、無ければ 1 枠だけ置く（規則 3 が要るのは「入っていること」である）。
  */
 function addPrepCleanup(board, needs, days, people, boundary) {
   days.forEach((day) => {
     people.forEach((person) => {
       const state = dayStateOf(person, day, boundary)
-      if (!state.morning && !state.afternoon) return // ⑤ どちらも無い日は、どちらにも入れない
-      // 手直しで準備・片付けに入っていて、もう満たしている日は足さない（→ placeFixed・whyPrepCleanupBreaks）。
+      if (!state.morning && !state.afternoon) return // ⑤
+      // 手直しで、もう満たしている日は足さない。
       if (prepCleanupDetail(state, boundary) === null) return
 
       const role = prepOrCleanupFor(board, needs, person, day, state)
       if (!role) {
+        // prepCleanupStaysPossible が防いでいるはずの食い違いである。
         throw new Error(
-          `「${person.studentId}」の ${day.date} に、${ruleRoles.prep} にも ${ruleRoles.cleanup} にも置ける枠が無い。`
-            + '置く前の見張りと食い違っている（→ prepCleanupStaysPossible）',
+          `「${person.studentId}」の ${day.date} に、${ruleRoles.prep} にも ${ruleRoles.cleanup} にも置ける枠が無い`,
         )
       }
       placeInBand(board, needs, person, day, role)
@@ -616,8 +515,7 @@ function addPrepCleanup(board, needs, days, people, boundary) {
 
 /**
  * 準備・片付けの需要を (日・枠・役割) 1 つずつにほどく（→ 5-5 の 4 段目）。
- * 並びは 日 → 枠 → 役割（担当者が需要を書いた順）で、入力だけで決まる（→ 6 の #3 の理由 ③）。
- * きつさで並べ替えない — 走るのは規則 3 の後で、置ける人はもう動かないからである。
+ * 並びは 日 → 枠 → 役割（需要を書いた順）。規則 3 の後に走るので、きつさでは並べ替えない。
  */
 function prepCleanupUnits(needs, days, people, conditions) {
   const order = rolesInOrder(needs).filter((role) => prepCleanupRoles().indexOf(role) !== -1)
@@ -631,7 +529,6 @@ function prepCleanupUnits(needs, days, people, conditions) {
         units.push({
           day: day,
           slot: slot,
-          // まとまりを伸ばすのに、枠が日の何番目かが要る（→ extendRun）。1 段目の単位と同じ形にしてある。
           slotIndex: slotIndex,
           role: role,
           required: required,
@@ -644,21 +541,13 @@ function prepCleanupUnits(needs, days, people, conditions) {
 }
 
 /**
- * 規則 3 を満たしたうえで、まだ足りていない 準備・片付け の枠を埋める（→ generationOrder の 4 段目・5-5）。
+ * 規則 3 を満たした後で、まだ足りていない 準備・片付け の枠を埋める（→ 5-5 の 4 段目）。
  *
- * 走るのは addPrepCleanup の後である。**規則 3 が要る人には、そこで先に 1 枠置いてある。**
- * だからここで置くのは、次の 2 つのどちらかだけになる。
- *   ・すでにその帯に入っている人に、同じ帯の枠をもう 1 つ足す
- *   ・**その日に店の役割へ就いていない人**を帯に置く（準備日・片付け日がこれである）
- *
- * 規則 3 の ②〜④ は崩れない — 店の役割に就いた人はもう片方の帯に入っているので、
- * prepCleanupNotBothBands がその人をここで取らない。
- * 午前・午後は店の役割の行からしか立たない（→ dayStateOf）ので、ここで置いても ①〜④ の判定は動かない。
- *
- * 置ける人が尽きたら、その枠はそこまでである。埋めずに次へ行き、未充足として名指しで残る（→ 5 の #6）。
+ * ここで置くのは、同じ帯に入っている人への追加か、その日に店の役割が無い人（準備日・片付け日）だけである。
+ * もう片方の帯の人は prepCleanupNotBothBands が取らず、午前・午後も動かないので、規則 3 はここで見ない。
+ * 置ける人が尽きた枠は、未充足で残る。
  */
 function fillPrepCleanupDemand(board, units, minRun) {
-  // 規則 3 はここで見ない。走るのは 3 段目の後で、①〜④ はもう満たしてある（→ 5-5 の 4 段目）。
   const canTake = (person, unit) => (
     isFreeAt(person, unit.day.date, unit.slot) && prepCleanupNotBothBands(person, unit.day, unit.role)
   )
@@ -667,8 +556,7 @@ function fillPrepCleanupDemand(board, units, minRun) {
       const ready = unit.able.filter((person) => canTake(person, unit))
       sortToTake(ready, unit.day.date)
       if (ready.length === 0) return
-      // ここでもまとまりで置く（→ placeRun）。準備日・片付け日は役割が 1 つしか無いので交代は起きないが、
-      // 学祭 2 日の準備帯・片付け帯は店の役割と同じ日にある（→ issue #215 の「対象外」）。
+      // ここでもまとまりで置く。店の役割と同じ日にある帯のため（→ issue #215）。
       placeRun(board, units, ready[0], unit, canTake, minRun)
     }
   })
@@ -676,8 +564,7 @@ function fillPrepCleanupDemand(board, units, minRun) {
 
 /**
  * その人のその日を、準備と片付けのどちらに入れるか（規則 3 の ②〜④）。
- * 両方ある日（④）は片方だけである。需要が残っているほうを先に取り、
- * どちらも残っていなければ準備を取る（並びは prepCleanupBands の順である）。
+ * ④ の日は需要が残っているほうを取り、どちらも残っていなければ準備を取る。
  */
 function prepOrCleanupFor(board, needs, person, day, state) {
   const wanted = []
@@ -691,7 +578,7 @@ function prepOrCleanupFor(board, needs, person, day, state) {
   return (stillWanted.length > 0 ? stillWanted : canDo)[0]
 }
 
-/** その帯のうち、まだ人数が足りていない枠（→ name-unmet.js と同じ数え方である）。 */
+/** その帯のうち、まだ人数が足りていない枠（数え方は name-unmet.js と同じ）。 */
 function wantedBandSlots(board, needs, person, day, role) {
   return freeBandSlots(person, day, role).filter((slot) => (
     requiredAt(needs, day, slot, role).count > placedCount(board, day.date, slot, role)
@@ -706,28 +593,15 @@ function placeInBand(board, needs, person, day, role) {
 }
 
 /**
- * 担当者の手直し（固定）を先に置く（→ generationOrder の 1 段目・5-3 ／ issue #156）。
- * 返すのは、置けなかった手直しと、その理由である（{ fix, why } の配列）。
+ * 担当者の手直し（固定）を先に置き、置けなかったものを { fix, why } の配列で返す（→ 5-3 ／ issue #156）。
  *
- * **5-3 の 3 つの決めのとおりである。**
- *   ・固定を優先して条件を破ることはしない — 規則 1・4・5 と同じ枠に二重はここで、規則 3 は店の割り当てが出そろってから
- *     （→ releaseFixesBreakingRule3）、生成と同じ見方で見て、破るなら置かない
- *   ・固定を黙って外すこともしない — 置かなかったものは理由と一緒に返り、「固定を照らす」の段が名指しする
- *   ・食い違った固定は、名指しで返す
+ * 条件を破る固定は置かず、黙って外さず、理由と一緒に返す（名指しは「固定を照らす」の段）。
+ * ここで見るのは規則 1・4・5 と二重まで。規則 3 は店の割り当てが出そろうまで決まらない
+ * （午前だけの手直しでも、生成が午後を足せば ④ で満たす）ので、releaseFixesBreakingRule3 が後で見る。
+ * 人数の超過と帯の外の準備・片付けは違反ではないので見ない（→ 5-4）。
  *
- * 置く順は 外す印 → 店の役割 → 準備・片付け で、同じ中は 日 → 枠 → 入力の順である（並びは入力だけで決まる → 6 の #3）。
- * 外す印が先なのは、候補から外してから置くためである。準備・片付けが後なのは、同じ日に両方の手直しがあるとき、
- * 名指しされるのが日の後ろのほうに決まるようにするためである（→ whyFixedCannotStay の ④）。
- *
- * **規則 3 は、ここでは見ない。** 規則 3 はその人のその日ぜんぶで決まり、店の割り当てが出そろうまで決まらない
- * — 午前だけの店の手直しでも、生成が午後の枠を足せば ④ で満たす（準備の帯が 0 枠の日でも、片付けで満たせる）。
- * ここで外すと、満たせたはずの 1 手を外すことになる。置いておけば、生成は満たせる向きにしか店の枠を足さない
- * （→ whyPrepCleanupBreaks）。出そろっても満たせない日の手直しは、3 段目の前に外して名指しする
- * （→ releaseFixesBreakingRule3）。
- *
- * 見ないものが 2 つある。**人数の超過**と**帯の外の準備・片付け**である。どちらも違反ではない（→ 5-4）
- * — 超過も帯も生成の置き方であって規則ではなく、担当者の 1 手のほうが先である。
- * 超過になった枠には、生成は人を足さない（要る人数に届いているので → fillTightestFirst）。
+ * 置く順は 外す印 → 店の役割 → 準備・片付け、同じ中は 日 → 枠 → 入力の順。
+ * 外す印は候補から外してから置くために先、準備・片付けは両方の手直しで日の後ろ側を名指しするために後に置く。
  */
 function placeFixed(board, people, fixed, days, conditions, wishes, boundary) {
   const byStudentId = {}
@@ -740,7 +614,7 @@ function placeFixed(board, people, fixed, days, conditions, wishes, boundary) {
     const person = byStudentId[one.studentId]
     const claimKey = `${one.studentId} ${one.date} ${one.start}`
 
-    // 空のセルの手直し — その人をその枠の候補から外す。外す先が無ければ（いまの枠に無い・回答に無い）何もしない。
+    // 空のセルの手直し — その人をその枠の候補から外す（外す先が無ければ何もしない）。
     if (one.role === '') {
       claimed[claimKey] = true
       if (person && one.slot) delete person.slots[whereKey(one.date, one.slot)]
@@ -794,9 +668,8 @@ function fixedToPlace(fixed, days) {
 
 /**
  * 手直し 1 つを置けない理由を返す。置けるなら null である。
- * 見る順は 枠 → 二重 → 規則 1 → 規則 5 → 規則 4 → 規則 3 の ④（準備と片付けの両方）で、最初に当たった 1 つだけを返す。
- * 規則 3 の残り（向きと帯の空き）はここで見ない（→ placeFixed の注意）。
- * 文の頭の名前は、違反を数える側と同じである（→ count-violations.js の violationRules）。
+ * 見る順は 枠 → 二重 → 規則 1 → 5 → 4 → 規則 3 の ④ で、最初に当たった 1 つだけを返す。
+ * 文の頭の名前は、違反を数える側と同じである（→ violationRules）。
  */
 function whyFixedCannotStay(one, person, wish, conditions, boundary, alreadyClaimed) {
   if (!one.slot) {
@@ -812,10 +685,7 @@ function whyFixedCannotStay(one, person, wish, conditions, boundary, alreadyClai
   if (one.role === ruleRoles.cookLeader) {
     const allowed = (conditions || {}).cookLeaderGrades || []
     if (allowed.length === 0) {
-      throw new Error(
-        `条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の手直しがある。`
-          + '規則 4 を満たすかが決まらないので、違反を作らずに止まる（→ 5-1 の #3）',
-      )
+      throw new Error(`条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の手直しがある`)
     }
     if (allowed.indexOf(person.grade) === -1) {
       return `${labelOf('rule4')}: ${ruleRoles.cookLeader} の枠だが、学年が ${allowed.join(' / ')} でない（いま: ${person.grade}）`
@@ -825,23 +695,19 @@ function whyFixedCannotStay(one, person, wish, conditions, boundary, alreadyClai
     const other = prepCleanupRoles().filter((role) => role !== one.role)[0]
     return `${labelOf('rule3')}: その日の ${other} にも手直しで入っていて、片方だけにならない`
   }
-  // 規則 3 の残り（向きと帯の空き）は、店の割り当てが出そろってから見る（→ placeFixed の注意・releaseFixesBreakingRule3）。
+  // 規則 3 の残り（向きと帯の空き）は、店の割り当てが出そろってから見る（→ releaseFixesBreakingRule3）。
   return null
 }
 
 /**
- * 店の役割が出そろった後で、規則 3 を満たせない日の手直しを外す（→ 5-3 ／ 3 の規則 3）。
- * 返すのは外した手直しと、その理由である（placeFixed と同じ { fix, why } の形）。
+ * 店の役割が出そろった後で、規則 3 を満たせない日の手直しを外し、{ fix, why } の配列で返す（→ 5-3）。
+ * 生成は満たせない向きに店の枠を足さないので、満たせない日は手直しだけで決まっている。
  *
- * 満たせないのは、手直しだけで決まった日である。生成は、満たせない向きには店の枠を足さない（→ whyPrepCleanupBreaks）
- * — だから満たせない日に入っているのは手直しだけで、外せば元に戻る。
- *
- * 外す順は、外す手直しが少ないほうからである。
- *   ① 向きの合わない準備・片付け（午前だけの日の片付け ／ 午後だけの日の準備 → ②③）
- *   ② 午前にかかる店の役割（残りが午後だけになり、片付けで満たせるなら）
- *   ③ 午後にかかる店の役割（残りが午前だけになり、準備で満たせるなら）
+ * 外す順は、外す手直しが少ないほうから。
+ *   ① 向きの合わない準備・片付け（午前だけの日の片付け ／ 午後だけの日の準備）
+ *   ② 午前にかかる店の役割（残りが午後だけで、片付けで満たせるなら）
+ *   ③ 午後にかかる店の役割（残りが午前だけで、準備で満たせるなら）
  *   ④ その日の店の役割ぜんぶ
- * 外した後は、3 段目がその日の正しい側を置く。
  */
 function releaseFixesBreakingRule3(board, people, days, boundary) {
   const released = []
@@ -883,8 +749,8 @@ function releaseFixesBreakingRule3(board, people, days, boundary) {
 }
 
 /**
- * その人のその日が、規則 3 を満たせないなら、どう満たせないかの文を返す。満たせるなら null である。
- * 「満たせる」は、3 段目が準備・片付けを置けば満たすことを含む（帯に、希望にあって空いている枠がある）。
+ * その人のその日が規則 3 を満たせないなら、どう満たせないかの文を返す。満たせるなら null である。
+ * 3 段目が準備・片付けを置けば満たせる日（帯に空き枠がある）も、満たせるに含む。
  */
 function rule3Gap(person, day, boundary) {
   const state = dayStateOf(person, day, boundary)
@@ -903,14 +769,9 @@ function rule3Gap(person, day, boundary) {
 }
 
 /**
- * 「固定を照らす」の段の中身（→ core.js の coreSteps ／ 5-3「食い違った固定は、名指しで返す」／ issue #156）。
- * いまの入力で置けない手直しを、検証結果の行にする。種別は「食い違った固定」である（→ sheet-layout.js の checkKind）。
- *
- * 置けるかどうかは、生成そのもの（generatePlan）を通して見る — 見方を 2 通りに持たない（→ src/README.md）。
- * 規則 3 は、店の割り当てが出そろうまで置けるかが決まらない（→ releaseFixesBreakingRule3）ので、
- * 途中までを別に写すと食い違う。手直しがあるときだけ、生成をもう 1 回通すことになる（手直しが無ければ通さない）。
- * 生成は置けなかった手直しを返さないので、名指しはここだけが持つ。
- * 違反にも未充足にも数えない — 置いていないので、どの枠の人数にも、どの人の割り当てにも入っていない。
+ * 「固定を照らす」の段の中身（→ 5-3 ／ issue #156）。いまの入力で置けない手直しを、検証結果の行にする。
+ * 置けるかは生成そのもの（generatePlan）を通して見る。規則 3 は出そろうまで決まらないので、別に写すと食い違う。
+ * 手直しがあるときだけ、生成をもう 1 回通す。
  */
 function nameFixedConflicts(fixed, candidates, conditions, wishes) {
   if ((fixed || []).length === 0) return []
@@ -961,13 +822,11 @@ function placedOn(person, date) {
 /**
  * その枠で誰を先に採るかの並び（→ 5-5 の「枠の中で誰を採るか」）。
  *
- *   ① **その日にまだ置いた枠が少ない人**（1 日の中の散らし。→ issue #215）
+ *   ① その日にまだ置いた枠が少ない人（1 日の中の散らし → issue #215）
  *   ② 通しで置いた数が少ない人
- *   ③ 候補に出てきた順（＝ 取り込みが返した順）
+ *   ③ 候補に出てきた順
  *
- * ① を足しただけである。**規則にしていない** — 違反にも未充足にも数えない（→ 5-4・generationNotAimed）。
- * 均した量は測らず、順位も閾値も出さない。**規則 3 の ⑥（日をまたいだ偏り）とは別である** — 見るのはその日だけで、
- * ② が残っているので、日をまたいだ同点の順序は動いていない。
+ * 規則ではなく、均した量も測らない。① はその日だけを見るので、規則 3 の ⑥（日をまたいだ偏り）とは別である。
  */
 function sortToTake(ready, date) {
   ready.sort((a, b) => placedOn(a, date) - placedOn(b, date) || a.count - b.count || a.order - b.order)
@@ -990,9 +849,8 @@ function whereKey(date, slot) {
 }
 
 /**
- * 置いた結果を、割り当てシートの行にする（列は sheet-layout.js の「割り当て」）。
- * 並びは 日 → 枠 → 役割（担当者が需要を書いた順）→ 候補に出てきた順である。
- * 需要に無い役割（規則 3 で置いた準備・片付け）は、その枠の後ろに回る。
+ * 置いた結果を、割り当てシートの行にする。
+ * 並びは 日 → 枠 → 役割（需要を書いた順。需要に無い役割は後ろ）→ 候補に出てきた順である。
  */
 function assignmentRows(needs, days, people) {
   const order = rolesInOrder(needs) // → name-unmet.js
@@ -1019,10 +877,7 @@ function roleRank(order, role) {
   return at === -1 ? order.length : at
 }
 
-/**
- * 割り当て 1 件を行にする。
- * 氏名は空である — 型 #6 に氏名は無く、埋めると 7 種類の外を参照することになる（→ 5 の #1・5-5）。
- */
+/** 割り当て 1 件を行にする。氏名は型 #6 に無いので空である（→ 5-5）。 */
 function assignmentRow(date, slot, role, studentId) {
   const found = {
     '日': date,

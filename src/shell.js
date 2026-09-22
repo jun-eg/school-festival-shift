@@ -1,34 +1,14 @@
 /**
  * 殻 — SpreadsheetApp に触る唯一の場所（docs/tech-requirements.md 6 の #8）。
+ * シートを読んで表現を揃え、コア（core.js の build）を呼び、返った行を書く。
+ * 割り当ては日ごとの 4 枚にマス目で載る。どの列が何時かはコアの側（assignment-grid.js）が決める。
  *
- * やることは 3 つだけである。
- *   ① シートを読んで、値の表現を揃えてコアに渡す
- *   ② コア（core.js の build）を呼ぶ
- *   ③ 返ってきた行を生成シートに書く
- *
- * 割り当てだけは、シート 1 枚と 1 対 1 でない。日ごとの 4 枚にマス目で載る
- * （→ sheet-layout.js の dayLabels ／ issue #213）。敷き方と戻し方は assignment-grid.js が持つ
- * — 殻がやるのは範囲を決めて読み書きすることだけで、どの列が何時かはコアの側が決める。
- *
- * 走る前の構造の検証（シートの有無・見出し・列数）は verify-structure.js が持つ。
- * run が最初に呼ぶ — 崩れていれば、読む前に名指しして止まる。
- *
- * ここに割り当ての規則を書かない。規則はコアが持つ。
- * 逆に、コアに SpreadsheetApp を持ち込まない — 持ち込むと 6-1 の #2 の逃げ道が消える。
- *
- * 読み書きは範囲ごとに 1 回で済ませる。セル単位で往復しない（→ 6 の #2 の実装上の注意）。
- * 時間を食うのは計算ではなく SpreadsheetApp の往復のほうである。
- *
+ * 規則をここに書かない。コアに SpreadsheetApp を持ち込まない（→ 6-1 の #2）。
+ * 読み書きは範囲ごとに 1 回で、セル単位で往復しない（時間を食うのは往復である）。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
-/**
- * 殻がコアに渡す値の表現。コアはこの形の文字列と、数値しか受け取らない
- * （→ core.js の checkRepresentation）。
- *
- * 時刻が HH:MM であることは sheet-layout.js の注記が決めている（条件入力の「日ごとの営業時刻」）。
- * 日付が YYYY-MM-DD であることは data/前回の確定シフト-モック-0N.json の転記元の形である。
- */
+/** 殻がコアに渡す値の表現。コアはこの形の文字列と数値しか受け取らない（→ core.js の checkRepresentation）。 */
 const valueRepresentation = {
   date: 'YYYY-MM-DD',
   time: 'HH:MM',
@@ -47,25 +27,17 @@ function headerRowCount(layout) {
   return layout.hasSectionHeadings ? 2 : 1
 }
 
-/**
- * コアに渡す入力を読む。名前は core.js の inputNames と同じ順で並ぶ。
- * 値はどれも、表現を揃えたあとの行の配列である。
- */
+/** コアに渡す入力を読む。名前は core.js の inputNames と同じ順で、値は表現を揃えた行の配列である。 */
 function readInputs(spreadsheet) {
   return readInputsAndGrids(spreadsheet).inputs
 }
 
 /**
- * 入力と、読んだマス目 4 枚をいっしょに返す。
- * マス目も返すのは、色を塗り直すときに、担当者のシートの何行目が誰かを読み直さずに済ませるためである
- * （→ paintGrids ／ 6 の #2 の実装上の注意）。
+ * 入力と、読んだマス目 4 枚を返す。マス目は色を塗り直すときに読み直さずに使う（→ paintGrids）。
  *
- * forGeneration のときは、マス目から「割り当て」を組まない（空で渡す）。生成が読むのは手直しだけだからである
- * （→ core.js の build ／ 5-3）。組むと、条件入力の営業時刻を動かした後の前の周の列（いまの枠に無い見出し）で、
- * 機械が置いただけのセルのために止まる。手直しの側は止まらずに名指しで返る（→ generate.js の placeFixed）。
- *
- * catchMissed のときは、読んだマス目を前に見た控えと比べ、取りこぼした書き換えに印を付けてから入力に積む
- * （→ markMissedEdits ／ issue #226）。生成と数え直しが渡す。画像の書き出しは渡さない — 1 セルも書き換えない（→ distributionImagesOn）。
+ * forGeneration のときは「割り当て」を組まない。生成が読むのは手直しだけで、組むと営業時刻を動かした後の
+ * 前の周の列で止まる（→ 5-3）。
+ * catchMissed のときは、取りこぼした書き換えに印を付けてから積む（→ markMissedEdits）。画像の書き出しは渡さない。
  */
 function readInputsAndGrids(spreadsheet, forGeneration, catchMissed) {
   const inputs = {}
@@ -93,14 +65,10 @@ function readInputsAndGrids(spreadsheet, forGeneration, catchMissed) {
 }
 
 /**
- * 読んだマス目 4 枚を、入力に積む。積む先は 2 つある（→ core.js の inputNames）。
- *   割り当て … いま書いてあるとおり（手直しの後の数え直しが読む → assignment-grid.js の fromAssignmentGrid）
- *   手直し   … 担当者が書き換えたセルだけ（印はセルのメモ → assignment-grid.js の fixedFromAssignmentGrid ／ 5-3）
- * forGeneration のときは、割り当てを積まない（→ readInputsAndGrids の注意）。
- *
- * どの列が何時かは、条件入力の「日ごとの営業時刻」から刻んだ枠で決まる（→ 規則 1 の ①）。
- * 4 枚とも空なら、枠を刻まずに済ませる — 条件入力がまだ空のテンプレートでも、
- * ここで止まらないようにするためである（型の名指しは、コアの入口が出す → input-types.js）。
+ * 読んだマス目 4 枚を、入力に積む。
+ *   割り当て … いま書いてあるとおり（forGeneration のときは積まない）
+ *   手直し   … 担当者が書き換えたセル（印はセルのメモ → 5-3）
+ * 4 枚とも空なら枠を刻まない。条件入力が空のテンプレートでも止めないためである。
  */
 function putGridsIntoInputs(inputs, grids, forGeneration) {
   if (grids.length === 0) return
@@ -120,14 +88,8 @@ function putGridsIntoInputs(inputs, grids, forGeneration) {
 }
 
 /**
- * マス目のシート 1 枚を、見出しの行とデータの行に分けて読む。
- *
- * 見出しの行も読むのが、区画を読むのと違うところである — 何時の枠かは見出しに書いてある。
- * 読む幅は区画の幅（名前のある 3 列 ＋ 時刻の 48 列 → sheet-layout.js の maxSlotsPerDay）で、
- * 列がそれだけあることは走る前に確かめてある（→ verify-structure.js の checkColumnCount）。
- *
- * セルのメモも同じ範囲で読む。手直しの印はメモである（→ assignment-grid.js の fixedNote ／ 5-3）。
- * notes は rows と同じ行数・同じ幅で並ぶ。
+ * マス目のシート 1 枚を読む。何時の枠かは見出しに書いてあるので、見出しの行も読む。
+ * 手直しの印はメモなので、notes も rows と同じ形で読む（→ 5-3）。
  */
 function readGrid(sheet, layout) {
   const section = layout.sections[0]
@@ -147,15 +109,8 @@ function readGrid(sheet, layout) {
 /**
  * 区画 1 つぶんの行を読む。
  *
- * 読む幅は区画の幅である（→ sheet-layout.js の sectionWidth）。「回答」の後ろ 4 列のように
- * 構成が名前を持たない列も、位置は取ってあるので同じだけ読む（→ 4-1・input-types.js）。
- *
- * 下の空の行を落とすのは、条件入力の 6 区画を横に並べてある（→ src/README.md）からである。
- * 行数の違う区画が同じ最終行まで読まれるので、短いほうの下は空の行で埋まる。
- *
- * 落とすのは下の空の行だけで、区画の途中の空の行は残す。詰めると、その下の行の番号がずれて、
- * 名指しの「N 行目」が担当者のシートの行を指さなくなる（→ input-types.js の whereIs）。
- * 途中の空の行を読み飛ばすのは、型に直す側である。
+ * 区画は横に並ぶので、短い区画の下は空の行で埋まる。落とすのは下の空の行だけで、途中の空の行は残す
+ * — 詰めると名指しの「N 行目」がずれる（→ input-types.js の whereIs）。
  */
 function readSection(sheet, layout, section) {
   const headerRows = headerRowCount(layout)
@@ -172,20 +127,12 @@ function readSection(sheet, layout, section) {
 }
 
 /**
- * 生成シートに書き戻す。
+ * 生成シートに書き戻し、マス目と検証結果の色を塗り直す。
  *
- * 段が 1 つでも入っていなければ、1 枚も書かない。
- * 段はつながっているので、前の段が欠けたまま後ろの段だけ走らせても、出てくるのは空である。
- * 空の配列で上書きすると、担当者が割り当てシートに入れた手直し（→ 5-3）が黙って消える。
- * 何が入っていないかは notBuilt が名指しで持っている（→ core.js の coreSteps）。
+ * 段が 1 つでも欠けていれば 1 枚も書かない。後ろの段の出力は空なので、上書きすると手直しが黙って消える（→ 5-3）。
+ * gridsAsTheyAre を渡したとき（数え直し）は、担当者が書いたセルを上書きしないよう、マス目を書き戻さない。
  *
- * gridsAsTheyAre を渡したときは、マス目を書き戻さない（手直しの後の数え直し → recountSpreadsheet）。
- * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
- * 書き戻すときは、手直しの印（メモ）も付け直す（→ writeGrids）。
- * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
- * 検証結果も、書くたびに行の背景を塗り直す — 違反の行が赤、店の役割の行が黄色である（→ paintCheckResults ／ issue #220）。
- *
- * 返すのは塗ったマス目である（{ layout, grid } の配列。1 枚も書かなかったときは空）。控えを置き直す側が使う（→ keepSeenGrids）。
+ * 返すのは塗ったマス目（{ layout, grid } の配列。書かなかったときは空）で、控えを置き直すのに使う。
  */
 function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   if ((output.notBuilt || []).length > 0) return []
@@ -193,7 +140,7 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   let grids = []
 
   outputNames.forEach((name) => {
-    // 割り当てはシート 1 枚でない。日ごとの 4 枚にマス目で敷く（→ writeGrids ／ issue #213）。
+    // 割り当ては日ごとの 4 枚にマス目で敷く（→ writeGrids）。
     const layouts = gridLayouts(name)
     if (layouts.length > 0) {
       grids = gridsAsTheyAre || writeGrids(spreadsheet, layouts, output[name], toGrid, output['検証結果'])
@@ -210,7 +157,7 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
     }
     if (name === '検証結果') paintCheckResults(sheet, output[name], headerRows, columnCount)
     if (output[name].length === 0) return
-    // ここに来るのは検証結果と指標で、どちらも氏名を空で返す。違反も指標も、人を学籍番号だけで名指しさせない（→ issue #229）
+    // 検証結果と指標は氏名を空で返すので、回答から埋める（→ issue #229）
     const rows = withNamesFromAnswers(output[name], name, (context || {}).nameOf)
     sheet.getRange(headerRows + 1, 1, rows.length, columnCount).setValues(rows)
   })
@@ -219,22 +166,14 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   return grids
 }
 
-/**
- * 違反した所の印（→ 6 の #2「違反した所はセルの色と検証結果シートに出る」／ issue #155）。
- * 文字を赤い太字にする。背景は役割の色に使っている（→ assignment-grid.js の roleColors）ので、
- * 同じ背景に 2 つの意味を重ねない。
- */
+/** 違反した所の印（→ issue #155）。背景は役割の色に使っているので、文字を赤い太字にする。 */
 const violationMark = { fontColor: '#cc0000', fontWeight: 'bold' }
 
 /**
- * マス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である。
- *
- * 1 枚につき 4 回までで済ませる（セル単位で往復しない → 6 の #2 の実装上の注意）。
- *   ① データの行ぜんぶの書式を 1 回で消す（下の端 getMaxRows まで。行が減っても前の色が残らない）
- *   ② 役割の背景色を、データの行の幅で 1 回で置く
- *   ③④ 違反したセルを RangeList でまとめて、文字の色と太さを 1 回ずつ
- * 書式を消すので、担当者が自分で付けた色や太字も消える（→ src/README.md の「違反した所は、セルの色で出る」）。
- * どの色か・どのセルかはコアの側が決める（→ assignment-grid.js の gridBackgrounds ／ violationCells）。
+ * マス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である。1 枚につき 4 回まで。
+ *   ① 書式を下の端（getMaxRows）まで消す（担当者が付けた色も消える）
+ *   ② 役割の背景色を置く
+ *   ③④ 違反したセルに、RangeList で文字の色と太さ
  */
 function paintGrids(spreadsheet, grids, violations, days) {
   grids.forEach((one) => {
@@ -258,11 +197,8 @@ function paintGrids(spreadsheet, grids, violations, days) {
 }
 
 /**
- * 検証結果の行の背景を塗り直す — 違反の行が赤、違反でない店の役割の行が黄色である（→ issue #220）。
- * どの行を塗るかはコアの側が決める（→ assignment-grid.js の checkResultBackgrounds）。
- *
- * 背景だけを置く。clearFormat は使わない — 数値や日付の書式まで消え、値の見え方が変わる（値は 1 セルも変えない → issue #220）。
- * 下の端（getMaxRows）まで 1 回で置き直すので、行が減っても前の周の赤も黄色も残らない。
+ * 検証結果の行の背景を、下の端（getMaxRows）まで 1 回で置き直す — 違反の行が赤、店の役割の行が黄色（→ issue #220）。
+ * clearFormat は使わない。数値や日付の書式まで消え、値の見え方が変わる。
  */
 function paintCheckResults(sheet, rows, headerRows, width) {
   const height = Math.max(sheet.getMaxRows() - headerRows, rows.length)
@@ -285,10 +221,8 @@ function a1Notation(row, column) {
 }
 
 /**
- * 検証結果と指標の氏名を回答から埋める（→ issue #154・#229）。マス目の氏名と同じ手である（→ writeGrids・namesFromAnswers）。
- * コアは氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、違反・食い違った固定・指標の段が返す行の氏名は空である。
- * 学籍番号が空の行（未充足 — 枠の話であって人の話ではない）は空のまま残る。
- * 空でない氏名は上書きしない。返す行は新しい配列で、コアの出力を書き換えない。
+ * 検証結果と指標の空の氏名を回答から埋める（コアは氏名を見ない → 5 の #1 ／ issue #229）。
+ * 学籍番号が空の行（未充足）は空のまま。コアの出力は書き換えず、新しい配列を返す。
  */
 function withNamesFromAnswers(rows, name, nameOf) {
   if (!nameOf) return rows
@@ -306,18 +240,11 @@ function withNamesFromAnswers(rows, name, nameOf) {
 /**
  * 割り当てを、日ごとの 4 枚のマス目に敷く。
  *
- * 見出しの時刻も毎回書き直す — 枠は条件入力から刻むので、営業時刻を動かせば列も変わる。
- * 前の周の列が残ると、次に読むときに「いまの枠に無い見出し」として名指しになる
- * （→ assignment-grid.js の fromAssignmentGrid）。
+ * 見出しの時刻も毎回書き直す。前の周の列が残ると、次に読むとき「いまの枠に無い見出し」になる。
+ * メモも一度ぜんぶ消して付け直す。人が増えると行がずれ、印が別の人のセルに移るためである（→ 5-3）。
+ * 置けなかった手直しには、何が食い違ったかのメモが付く。
  *
- * 条件入力に行が無い日は、名前のある 3 列だけを残して空にする。黙って別の日に寄せない。
- *
- * 手直しの印（メモ）も書き直す（→ assignment-grid.js の gridNotes ／ 5-3）。行の並びは学籍番号の順なので、
- * 人が増えれば行がずれる — メモを残したままにすると、印が別の人のセルに移る。だから一度ぜんぶ消してから付け直す。
- * 置けた手直しには同じ印が、置けなかった手直しには何が食い違ったかのメモが付く（checks の「食い違った固定」）。
- * 担当者が自分で書いたメモも消える（背景色や太字と同じ → paintGrids）。
- *
- * 返すのは敷いたマス目である（{ layout, grid } の配列）。色を塗り直す側が、読み直さずに使う（→ paintGrids）。
+ * 返すのは敷いたマス目（{ layout, grid } の配列）で、色を塗り直すのに使う。
  */
 function writeGrids(spreadsheet, grids, assignments, context, checks) {
   return grids.map((layout) => {
@@ -330,7 +257,7 @@ function writeGrids(spreadsheet, grids, assignments, context, checks) {
     const day = context.days[layout.grid.dayIndex]
     const fixed = context.fixed || []
     const at = (row, name) => row[fixedColumns.indexOf(name)]
-    // 行を残すのは、印か名指しを載せる先がある人だけである。いまの枠に無い見出しの空のセルは、外す相手が無いので載せない。
+    // 印か名指しを載せる先がある人だけ行を残す。いまの枠に無い見出しの空のセルは載せない。
     const fixedToday = day
       ? fixed
         .filter((row) => at(row, '日') === day.date)
@@ -342,18 +269,17 @@ function writeGrids(spreadsheet, grids, assignments, context, checks) {
     if (grid.header.length > width) {
       throw new Error(
         `シート「${layout.name}」に ${grid.header.length - namedCount} 枠を敷こうとしたが、`
-          + `時刻の列は ${width - namedCount} 列しかない（→ sheet-layout.js の maxSlotsPerDay）`,
+          + `時刻の列は ${width - namedCount} 列しかない`,
       )
     }
 
     sheet.getRange(1, namedCount + 1, 1, width - namedCount).clearContent()
     if (lastRow > headerRows) sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).clearContent()
-    // メモは値の無い行にも残るので、下の端（getMaxRows）まで消す（→ paintGrids の書式と同じ）。
+    // メモは値の無い行にも残るので、下の端（getMaxRows）まで消す。
     const maxRows = sheet.getMaxRows()
     if (maxRows > headerRows) sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).clearNote()
 
-    // 時刻の見出しは左に寄せる。時刻のセルは既定で右寄せになるので、
-    // 見出しが自分の列ではなく右隣の列の頭に見えて、どの列が何時か読みにくい。
+    // 時刻の見出しは左に寄せる。既定の右寄せだと右隣の列の頭に見える。
     sheet.getRange(1, namedCount + 1, 1, width - namedCount).setHorizontalAlignment('left')
 
     if (grid.header.length > namedCount) {
@@ -371,27 +297,17 @@ function writeGrids(spreadsheet, grids, assignments, context, checks) {
 }
 
 /**
- * Apps Script から呼ぶ入口。SpreadsheetApp を名指しするのは、このファイルのこの 1 行だけである。
- * メニューの「生成」がここを押す（→ menu.js の runGeneration ／ issue #151）。
- * steps を渡さなければ、中身が入っている段だけが走る（→ core.js の builtInSteps）。
- * 返すのは run と同じ、コアの出力の束である。
+ * メニューの「生成」から呼ぶ入口（→ menu.js の runGeneration）。SpreadsheetApp を名指しするのはこの 1 行だけである。
+ * steps を渡さなければ、中身が入っている段だけが走る。
  */
 function runOnActiveSpreadsheet(steps) {
   return run(SpreadsheetApp.getActive(), steps)
 }
 
 /**
- * 構造を確かめる → 読む → コアを呼ぶ → 書く。殻の側の 1 本である。
- * スプレッドシートは引数で受ける — 手元の検査で偽のスプレッドシートを渡せるようにするためである。
- * steps はコアの段（→ core.js の coreSteps）で、入っている段だけを渡す。
- * 返すのはコアの出力の束（割り当て・検証結果・指標・notBuilt）である
- * — 担当者に何と言うかは、メニューから呼ぶ側が決める（→ menu.js の runGeneration）。
- * 束ごと返すのは、何も書かなかった理由（notBuilt）と、残せなかった手直しの数（検証結果の「食い違った固定」）の
- * 両方を、読み直さずに言えるようにするためである。
- *
- * 構造が崩れていれば、1 行も読まずに名指しして止まる（→ verify-structure.js）。
- * notBuilt と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、
- * 何を直すかはメニューの出方に関わらず同じである。
+ * 構造を確かめる → 読む → コアを呼ぶ → 書く。スプレッドシートは、検査で偽物を渡せるよう引数で受ける。
+ * 返すのはコアの出力の束（割り当て・検証結果・指標・notBuilt）で、担当者に何と言うかは呼ぶ側が決める。
+ * 構造が崩れていれば、1 行も読まずに例外で止まる（→ verify-structure.js）。
  */
 function run(spreadsheet, steps) {
   checkStructure(spreadsheet)
@@ -403,12 +319,8 @@ function run(spreadsheet, steps) {
 }
 
 /**
- * 手直しの後に数え直す。構造を確かめる → 読む → 数え直す → 検証結果と指標を書き、マス目の色を塗り直す
- * （→ 5 の #8 ／ 6 の #2 ／ issue #155）。
- *
- * run と違うのは 2 つだけである。生成を走らせない（→ core.js の recount）ことと、
- * マス目を書き戻さないことである — マス目は担当者がいま書いたセルそのもので、数える側はそれを読むだけである。
- * 構造の検証は run と同じに先に通す。崩れたまま読むと、別の列を別の枠として数える。
+ * 手直しの後に数え直す（→ 5 の #8 ／ issue #155）。run と違い、生成を走らせず、マス目を書き戻さない
+ * — マス目は担当者が書いたセルそのものである。
  */
 function recountSpreadsheet(spreadsheet) {
   checkStructure(spreadsheet)
@@ -420,12 +332,8 @@ function recountSpreadsheet(spreadsheet) {
 }
 
 /**
- * 配る画像の中身を組む（→ 5 の #9 ／ 2 の一覧 9 ／ issue #157）。構造を確かめる → 読む → 組む、で、何も書かない。
- *
- * 読むのはマス目の 4 枚そのものである — 担当者が手直しした後のセルを、そのまま描く（→ 5-3）。
- * 生成も数え直しも走らせない。描くのは、いまシートに見えているとおりである。
- * 読む口は生成・数え直しと同じ 1 本で、同じ名指しで止まる（見出しがいまの枠に無い・学籍番号が空 → assignment-grid.js）。
- * 返すのはダイアログに渡す値だけである（→ export-images.html）。
+ * 配る画像の中身を組む（→ 5 の #9 ／ issue #157）。いまのマス目のとおりに描き、何も書かない。
+ * 返すのはダイアログに渡す値である（→ export-images.html）。
  */
 function distributionImagesOn(spreadsheet) {
   checkStructure(spreadsheet)
@@ -436,18 +344,9 @@ function distributionImagesOn(spreadsheet) {
 /**
  * セルが書き換えられたときに呼ばれる口（→ menu.js の onEdit）。返すのは担当者に見せる一言である。
  *
- * 数え直すのは、マス目の 4 枚のどれかが書き換えられたときだけである（→ 2 の一覧 8）。
- * 条件入力は書きかけの途中で型に乗らないことが普通にあるので、1 文字ごとに数え直して名指しを出さない
- * — 条件を動かした後は、メニューの「生成」を押す（→ 2 の一覧 7）。
- * スクリプトが書いたセル（生成の書き戻し）では呼ばれない — 単純トリガーは人の編集でしか走らない。
- *
- * 止まった理由は捕まえて、文にして返す。単純トリガーの中で投げた例外は、担当者の画面に出ない
- * （実行ログに残るだけである）。メニューの「生成」が例外をそのまま見せる（→ menu.js の runGeneration）のと
- * 同じことを、ここでは一言にして出す — 黙って止まらない。
- * スプレッドシートはイベントから受ける（e.source）。SpreadsheetApp を名指ししない。
- *
- * 数え直す前に、書き換えたセルに手直しの印（メモ）を付ける（→ markFixedCells ／ 5-3）。
- * 印は数え方を 1 つも動かさない — 数え直しは書いてあるとおりを数えるだけである。印が効くのは次の「生成」である。
+ * 数え直すのはマス目の 4 枚のときだけ。条件入力は書きかけで型に乗らないことが普通にあるので数え直さない。
+ * 単純トリガーの例外は担当者の画面に出ないので、止まった理由は捕まえて一言にして返す。
+ * 数え直す前に、書き換えたセルに手直しの印を付ける（効くのは次の「生成」→ markFixedCells）。
  */
 function recountOnEdit(event) {
   if (!event || !event.range || !event.source) return null
@@ -461,28 +360,23 @@ function recountOnEdit(event) {
     const violations = kinds.filter((kind) => kind === checkKind.violation).length
     const unmet = kinds.filter((kind) => kind === checkKind.unmet).length
     return {
-      text: `数え直した — 違反 ${violations} 件 ／ 未充足 ${unmet} 件（検証結果と指標を書き換えた。`
-        + `違反した所は${violations === 0 ? '無い' : 'マス目の色で出ている'}）`,
+      text: `数え直した — 違反 ${violations} 件 ／ 未充足 ${unmet} 件`
+        + `（違反した所は${violations === 0 ? '無い' : 'マス目の色で出ている'}）`,
       seconds: 5,
     }
   } catch (error) {
     return {
-      text: `数え直せなかった。検証結果と指標は前のままである — ${error.message}`,
+      text: `数え直せなかった（検証結果と指標は前のまま）— ${error.message}`,
       seconds: 30,
     }
   }
 }
 
 /**
- * 担当者が書き換えたセルに、手直しの印（メモ）を付ける（→ assignment-grid.js の fixedNote ／ 5-3 ／ issue #156）。
- * 返すのは印を付けたセルの数である。
+ * 担当者が書き換えたセルに、手直しの印（メモ）を付ける（→ 5-3 ／ issue #156）。返すのは付けたセルの数である。
  *
- * 付けるのは時刻の列のデータの行だけである — 見出しの行と、名前のある 3 列（学籍番号・氏名・友達欄）には付けない。
- * 空にしたセルにも付ける。「この人をこの枠に置かない」という手直しである。
- * 貼り付けで何セルもまとめて書き換えたときは、その範囲ぜんぶに付く（書き込みは 1 回で済ませる → 6 の #2）。
- *
- * 学籍番号を書き換えた行は、役割の入っているセルぜんぶに付ける。
- * 行の持ち主を替えたので、その行の割り当ては担当者が別の人に置き直したものである。
+ * 付けるのは時刻の列のデータの行だけ。空にしたセルにも付ける（「この枠に置かない」という手直し）。
+ * 学籍番号を書き換えた行は、行の持ち主を替えたので、役割の入っているセルぜんぶに付ける。
  */
 function markFixedCells(range) {
   const sheet = range.getSheet()
@@ -520,15 +414,11 @@ function markFixedCells(range) {
 }
 
 /**
- * 取りこぼした書き換えに、手直しの印を付ける（→ assignment-grid.js の missedEdits ／ 5-3 ／ issue #226）。
- * 返すのは印を付けたセルの数である。
+ * 取りこぼした書き換えに、手直しの印を付ける（→ issue #226）。返すのは付けたセルの数である。
  *
- * 本物で間を置かずに 2 セル書き換えると、onEdit が 1 回しか走らず、2 手目のセルに印が付かない（→ real-device-log.md）。
- * 落ちたイベントは中から拾えないので、次に読んだとき（数え直しでも生成でも）に、前に見た控えと違うセルへ印を付ける。
- * 読んだ grid.notes も同じに書き換える — 生成は、この後で grid.notes から手直しを組む（→ putGridsIntoInputs）。
- *
- * 書くのは印を付ける行の、付けるセルの左端から右端までだけである。範囲ぜんぶを読んだメモで書き戻すと、
- * 読んでから書くまでのあいだに onEdit が付けた印を消してしまう。
+ * 間を置かずに 2 セル書き換えると onEdit が 1 回しか走らないので、次に読んだとき、前に見た控えと違うセルへ付ける。
+ * 生成はこの後で grid.notes から手直しを組むので、grid.notes も書き換える。
+ * 書くのは行ごとに印の左端から右端までだけ。範囲ぜんぶを書き戻すと、その間に onEdit が付けた印を消す。
  */
 function markMissedEdits(sheet, layout, grid) {
   const missed = missedEdits(readSeenGrid(sheet), grid.header, grid.rows, grid.notes)
@@ -550,17 +440,12 @@ function markMissedEdits(sheet, layout, grid) {
 }
 
 /**
- * 前に見たマス目の控えを置く鍵（→ assignment-grid.js の seenGrid）。置き場はマス目のシートの developer metadata である。
- * 担当者には見えない。**見えなくてよいのは、印そのものではないからである** — 控えが持つのは取りこぼしを見つける手がかりだけで、
- * どのセルが手直しかは今までどおりセルのメモ（印）が持つ（→ 5-3）。
- * スコープは増えない（spreadsheets.currentonly の中である → src/README.md の「要求するのは 3 スコープである」）。
+ * 前に見たマス目の控えを置く鍵。置き場はマス目のシートの developer metadata で、担当者には見えない
+ * （手直しの印はメモのほうである）。スコープは spreadsheets.currentonly の中で増えない。
  */
 const seenGridKey = 'seenGrid'
 
-/**
- * 控えを読む。無い・読めないときは null を返す — 取りこぼしを拾わないだけで、今までどおりに動く。
- * 読めないことで止めない。控えは生成にも数え直しにも入らない、取りこぼしを見つける手がかりだからである。
- */
+/** 控えを読む。無い・読めないときは null を返し、止めない（取りこぼしを拾わないだけである）。 */
 function readSeenGrid(sheet) {
   try {
     const found = sheet.getDeveloperMetadata().filter((one) => one.getKey() === seenGridKey)
@@ -571,8 +456,8 @@ function readSeenGrid(sheet) {
 }
 
 /**
- * 控えを置き直す。置けないとき（文字数の上限など）は、前の控えを外す
- * — 古い控えが残ると、次に読んだとき、機械が置いたセルを取りこぼした書き換えと取り違える。
+ * 控えを置き直す。置けないとき（文字数の上限など）は前の控えを外す
+ * — 古い控えが残ると、機械が置いたセルを取りこぼした書き換えと取り違える。
  */
 function keepSeenGrid(sheet, seen) {
   let found = []
@@ -596,13 +481,8 @@ function keepSeenGrids(spreadsheet, grids) {
 }
 
 /**
- * マス目を敷くのに要る 4 つ — その日の枠と、学籍番号から引く氏名・友達欄と、担当者の手直しである。
- *
- * どちらも入力から出る。build を通った後に組んでいるので、枠の刻み直しはここでは起きない
- * （崩れていればコアの入口がすでに名指しして止まっている → input-types.js）。
- * 氏名は回答から引く。生成は氏名を 1 度も見ない（→ 5 の #1・assignment-grid.js の namesFromAnswers）。
- * 友達欄も回答から引く。担当者が手で寄せるときに読む列で、生成は見ない（→ 5-2・friendsFromAnswers ／ issue #200）。
- * 手直しは、書き戻すときに印を付け直すのに使う（→ writeGrids）。
+ * マス目を敷くのに要る 4 つ — その日の枠、学籍番号から引く氏名・友達欄、担当者の手直しである。
+ * 氏名と友達欄は回答から引く。生成はどちらも見ない（→ 5 の #1 ／ issue #200）。
  */
 function gridContext(inputs) {
   return {
@@ -614,10 +494,8 @@ function gridContext(inputs) {
 }
 
 /**
- * セル 1 つの表現を揃える。ここが、コアに表現の揺れを入れないための関門である。
- *
- * SpreadsheetApp を掴まない純粋な関数にしてあるのは、手元で回して確かめられるようにするためである。
- * 黙って解釈し直さない — 文字列は両端の空白を落とすだけで、中身には手を入れない。
+ * セル 1 つの表現を揃える。コアに表現の揺れを入れないための関門である。
+ * 文字列は両端の空白を落とすだけで、中身には手を入れない。
  */
 function normalizeValue(value) {
   if (value === null || value === undefined) return ''
@@ -630,9 +508,7 @@ function normalizeValue(value) {
 
 /**
  * Date を valueRepresentation の 3 つのどれかにする。
- *
- * 時刻だけのセルは 1899-12-30 を土台にした Date で返ってくるので、年で見分ける。
- * ちょうど 00:00:00 の日時は日付になる — セルの表示と同じで、ここで作り分けられる情報が無い。
+ * 時刻だけのセルは 1899-12-30 を土台にした Date で返るので、年で見分ける。ちょうど 00:00:00 は日付になる。
  */
 function formatDateTime(dateTime) {
   const year = dateTime.getFullYear()
@@ -656,16 +532,12 @@ function findLayout(name) {
   return layout
 }
 
-/**
- * スプレッドシートから 1 枚を引く。無ければ名指しで止まる（黙って作らない）。
- * ここに来る前に checkStructure が通っているので、run 経由なら無いことは起きない。
- * それでも見るのは、readInputs を単体で呼べる形にしてあるからである（→ verify-structure.js）。
- */
+/** スプレッドシートから 1 枚を引く。無ければ名指しで止まる（黙って作らない）。 */
 function findSheet(spreadsheet, name) {
   const sheet = spreadsheet.getSheetByName(name)
   if (!sheet) {
     throw new Error(
-      `シート「${name}」が無い。テンプレートを組み立て直す（→ src/README.md）`,
+      `シート「${name}」が無い。テンプレートを組み立て直す`,
     )
   }
   return sheet

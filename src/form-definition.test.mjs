@@ -1,26 +1,18 @@
 #!/usr/bin/env node
-// フォームの定義の検査 — src/form-definition.js を、docs/tech-requirements.md 4-1〜4-3 の表と突き合わせる。
+// フォームの定義（src/form-definition.js）を、docs/tech-requirements.md 4-1〜4-3 の表と突き合わせる。
 //
 //   使い方: node src/form-definition.test.mjs
 //
-// 見るものは 6 つある。
+// 見るものは 7 つある。①〜④は日付と営業時刻を入れた後の形を見る。
 //   ① 前回の日付と営業時刻を入れたとき、4-1 の表と 1 行ずつ突き合わせて差分が 0
-//      （設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。→ 仕様 #2 の判定）
-//   ② 正規表現が 2 箇所で、希望時間の 4 設問は同じ 1 本である（→ 4-2。友達欄は自由記述 → issue #200）
-//   ③ エラーメッセージの句点の揺れ ◎ を揃えずに写している（→ 4-3）
+//   ② 正規表現が 2 箇所で、希望時間の 4 設問は同じ 1 本である（友達欄は自由記述 → issue #200）
+//   ③ エラーメッセージの句点の揺れを揃えずに写している（→ 4-3）
 //   ④ 説明文が、記録にある例 3 つと営業時間を持っている（→ 4-2）
-//   ⑤ 入る側から数え直すと 6 項目である（→ 5 の #3）。締切は定義に無い（→ 4-1）
-//   ⑦ 今年の日付を入れれば題も営業時間も今年のものになり、4 行でなければ作らずに止まる（→ 4-1・4-2）
+//   ⑤ 入る側から数え直すと 6 項目である（→ 5 の #3）。締切は定義に無い
+//   ⑥ data/前回の希望データ-モック.csv の 50 行が、正規表現と選択肢を通る
+//   ⑦ 今年の日付を入れれば題も営業時間も今年のものになり、4 行でなければ止まる
 //
-// 定義そのものは題も営業時間も持たない（→ 4-1・4-2）。持つのはラベル 4 つと、
-// 日付・帯からそれを組む口である。だから①〜④は「入力を入れた後の形」を見る。
-//
-// 加えて、data/前回の希望データ-モック.csv の 50 行を正規表現と選択肢に通す。
-// 定義が前回の回答を 1 件も弾かないことは、ここでしか数えていない。
-//
-// ここで分かるのは定義だけである。フォームの作り方（並べる順・回答先・画像）は
-// build-form.test.mjs が、本物の Google フォームで正規表現とエラーメッセージが設定できるかは
-// issue #145（6-1 の #1）が持つ。
+// フォームの作り方は build-form.test.mjs が見る。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
 
-// ラベル 4 つの値は sheet-layout.js が持つ（割り当ての 4 枚の名前と同じ 1 か所である → issue #213）
+// ラベル 4 つの値は sheet-layout.js が持つ
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'form-definition.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
@@ -43,11 +35,8 @@ const { formItems, formItemKind, wishTimePattern, wishTimeExamples, dayLabels } 
 
 // ---- 前回の日付と営業時刻（→ 仕様 #2 の判定） -------------------------------
 //
-// 日付は 2025-11-01〜04（→ data/前回の確定シフト.md）。
-// 5 時刻の置き方は 7「前回の 5 時刻の置き方」の M1 ①・フォームの側と同じである — 始まりの 4 つを
-// その日の営業開始に、片付け終了を営業終了に置く。入力の行として残っているのは説明文の営業時間 ◎ の
-// 1 本の帯だけだからである。説明文に出す帯は 準備開始〜片付け終了 なので、内訳を変えても出る帯は同じである。
-// この 4 行を入れて 4-1 の表が出ることが、入力から組む側が壊れていないことの判定である。
+// 日付は 2025-11-01〜04（→ data/前回の確定シフト.md）。記録に残るのは営業時間の帯だけなので、
+// 始まりの 4 つを営業開始に、片付け終了を営業終了に置く（→ 7「前回の 5 時刻の置き方」）。
 
 const lastYear = [
   ['2025-11-01', '08:00', '21:00'],
@@ -90,9 +79,8 @@ function check(title, actual, expected) {
 
 // ---- ① 4-1 の表そのもの（写した相手） ---------------------------------------
 
-// docs/tech-requirements.md 4-1 の表を、上から順にそのまま置いたものである。
-// 定義を書き換えたらここも書き換わる、では突き合わせにならないので、
-// 表の側は文字列で持つ（form-definition.js の値を 1 つも読まない）。
+// docs/tech-requirements.md 4-1 の表を、上から順にそのまま置いたもの。
+// 突き合わせになるよう、form-definition.js の値を 1 つも読まずに文字列で持つ。
 const tableInRequirements = [
   { number: 1, title: '学籍番号', kind: '短文回答', required: true, detail: '^[A-Za-z0-9]{10}$' },
   { number: 2, title: '氏名', kind: '短文回答', required: true, detail: '—' },
