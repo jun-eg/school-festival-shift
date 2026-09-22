@@ -140,14 +140,18 @@ function demandRoles(plan) {
  * その枠のその役割に要る人数。効く行が複数あれば最大である（→ 5-4）。
  * 未充足の側（name-unmet.js）と同じ読み方を、この検査の側でもう一度書いてある
  * — 生成と未充足が同じ関数を読んでいるので、突き合わせる相手を別に持たないと確かめたことにならない。
+ *
+ * 時間帯を空けた行が効くのは、その日の 調理開始〜調理終了 の帯である（→ 5-1 の #2・issue #210）。
+ * 「全枠」ではない — 営業していない帯に店の役割の需要を立てない。
  */
 function requiredFor(plan, day, slot, role) {
   let required = 0
   plan.conditions.roleNeeds.concat(plan.conditions.committeeNeeds).forEach((need) => {
     if (need.role !== role) return
     if (need.date !== '' && need.date !== day.date) return
-    const covers = need.start === '' || (need.start < slot.end && slot.start < need.end)
-    if (covers && need.count > required) required = need.count
+    const from = need.start === '' ? day.cookStart : need.start
+    const to = need.start === '' ? day.cookEnd : need.end
+    if (from < slot.end && slot.start < to && need.count > required) required = need.count
   })
   return required
 }
@@ -203,7 +207,14 @@ for (let i = 0; i < 10; i++) {
   }))
 }
 
-const plainPlan = planOf([plainDay], fiveRoles.concat([['', '', '', '準備', 2], ['', '', '', '片付け', 2]]), wholeDayWishes)
+/**
+ * 準備・片付けの需要は、時間帯を明示して置く（→ 5-1 の #2・issue #210）。
+ * 空欄で書くと、その日の 調理開始〜調理終了 の帯に立つ — この 2 つは調理帯の外にある帯なので、
+ * 意図した所に立たない。plainDay では 準備が 08:00-10:00、片付けが 18:00-20:00 である。
+ */
+const prepCleanupNeeds = [['', '08:00', '10:00', '準備', 2], ['', '18:00', '20:00', '片付け', 2]]
+
+const plainPlan = planOf([plainDay], fiveRoles.concat(prepCleanupNeeds), wholeDayWishes)
 
 check('① 違反が 0 件である（→ 受け入れ条件・5-4 の「1 件も作らない」）', violationsOf(plainPlan).length, 0)
 
@@ -295,9 +306,12 @@ check(
   demandTotal(shortPlan),
 )
 
+// 枠の側から埋める役割は、需要を超えない。準備・片付けはそうではない — 規則 3 が要るのは「入っていること」
+// なので、帯の需要が尽きても帯の頭に 1 枠置く（→ 5-5 の「準備・片付けをどこに置くか」・placeInBand）。
+// その 2 つをここで数えると、規則 3 を満たしたことが超過として出る。
 check(
-  '② 必要人数を超えて置いていない（需要のある枠と役割ごとに見る）',
-  overPlaced(plainPlan),
+  '② 必要人数を超えて置いていない（需要のある枠と役割ごとに見る。準備・片付けは規則 3 が置くので除く → 5-5）',
+  overPlaced(plainPlan).filter((one) => [ruleRoles.prep, ruleRoles.cleanup].indexOf(one.split(' ')[2]) === -1),
   [],
 )
 
@@ -396,7 +410,7 @@ check(
 )
 
 // 帯の中にしか置かない（→ 5-5）。準備は 08:00-10:00、片付けは 18:00-20:00 である。
-const bandPlan = planOf([plainDay], fiveRoles.concat([['', '', '', '準備', 2], ['', '', '', '片付け', 2]]), wholeDayWishes)
+const bandPlan = planOf([plainDay], fiveRoles.concat(prepCleanupNeeds), wholeDayWishes)
 
 check(
   '⑤ 準備・片付けは、その日の帯の中にしか置かない（→ 5-5・5-1 の #1）',
@@ -453,10 +467,10 @@ check(
 )
 
 check(
-  '⑤ 踏む段は 3 つで、目的にしないものは 3 つ名前で置いてある（⑥・固定・氏名 → 5-5）',
+  '⑤ 踏む段は 4 つで、目的にしないものは 3 つ名前で置いてある（⑥・固定・氏名 → 5-5）',
   [generationOrder.map((step) => step.key), generationNotAimed.map((one) => one.what)],
   [
-    ['fill', 'swap', 'prepCleanup'],
+    ['fill', 'swap', 'prepCleanup', 'prepCleanupDemand'],
     ['規則 3 の ⑥（複数日で偏らせない）', '5-3 の固定（担当者が割り当てシートに入れた手直し）', '割り当ての 氏名'],
   ],
 )
@@ -546,6 +560,10 @@ const mockWishes = takeIn(
 // M2 の判定は別の置き方である（確定シフトの行から算出する → scripts/前回の5時刻.mjs）。
 // ここが見るのは記録と同じ大きさ（36 人・88 枠）で違反 0 が出ることだけで、帯の内訳は見ない
 // （規則 3 の ①〜⑤ そのものは、上の plainDay の側が 1 つずつ見ている）。
+//
+// だから需要は時間帯を明示して置く（→ 下の fiveRolesWholeDay・issue #210）。1 本の帯として刻んだ日は
+// 調理帯が 0 枠なので、時間帯を空けた行はどの枠にも立たない（→ 5-1 の #2）。
+// 帯の内訳を見ないこの置き方で、内訳に依る書き方（空欄）を使わない。
 const lastYearDayRows = [
   ['2025-11-01', '08:00', '08:00', '08:00', '08:00', '21:00'],
   ['2025-11-02', '08:00', '08:00', '08:00', '08:00', '20:00'],
@@ -556,7 +574,11 @@ const lastYearDayRows = [
 // 終端 ≤ 始端の区間を書いた 3 人は、展開の側で止まる（→ expand.test.mjs の ③）。残る 36 人で組む。
 const lastYearDays = toDays(lastYearDayRows, '日ごとの営業時刻')
 const expandable = mockWishes.filter((wish) => whyItStopped(() => expand([wish], lastYearDays)) === null)
-const mockPlan = planOf(lastYearDayRows, fiveRoles, expandable)
+
+// 5 役割を、4 日の全枠に効かせる。どの日も 08:00 に始まり、いちばん遅い日でも 21:00 に終わる（→ 上の 4 行）
+// ので、08:00-21:00 の 1 行が全 88 枠に重なる。数えるのは規模（88 枠 × 8 人 ＝ のべ 704）である。
+const fiveRolesWholeDay = fiveRoles.map((need) => ['', '08:00', '21:00', need[3], need[4]])
+const mockPlan = planOf(lastYearDayRows, fiveRolesWholeDay, expandable)
 
 check(
   '① 前回の希望データ（モック）36 人・88 枠で、違反が 0 件である（→ 5-4 の「1 件も作らない」）',
@@ -577,7 +599,7 @@ check('② 前回のモックでも、必要人数を超えて置いていない
 
 check(
   '③ 前回のモックでも、2 回通すと同じ案が返る（→ 6 の #3 の理由 ③）',
-  JSON.stringify(planOf(lastYearDayRows, fiveRoles, expandable).rows),
+  JSON.stringify(planOf(lastYearDayRows, fiveRolesWholeDay, expandable).rows),
   JSON.stringify(mockPlan.rows),
 )
 

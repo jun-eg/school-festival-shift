@@ -271,12 +271,14 @@ check(
   [['規則 3'], '④', true],
 )
 
+// 店の役割に就いていない日に 準備 だけ置かれているのは、違反ではない。
+// 準備・片付けが需要になったので、置かれたことそのものが仕事である（→ ADR tech-requirements/0009）。
 const prepWithoutShift = violationsOf(cleanRows().concat([placed(dates[0], '08:00', '準備', people.d)]))
 
 check(
-  '② 規則 3 の ⑤ — 午前にも午後にも割り当てが無い人を準備に入れていれば、1 行出る',
-  [labelsOf(prepWithoutShift), detailOf(prepWithoutShift).slice(0, 1), prepWithoutShift[0][columns.indexOf('学籍番号')]],
-  [['規則 3'], '⑤', people.d.id],
+  '② 規則 3 の ⑤ — 午前にも午後にも割り当てが無い人が準備に入っていても、違反にしない（準備日がこれである）',
+  prepWithoutShift,
+  [],
 )
 
 const youngCookLeader = violationsOf(cleanRows().map((row) => (

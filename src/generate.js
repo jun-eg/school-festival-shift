@@ -37,7 +37,11 @@ const generationOrder = [
   },
   {
     key: 'prepCleanup',
-    what: '規則 3 の ①〜⑤ を満たす 準備・片付け を置く（→ 3 の規則 3・5-5）',
+    what: '規則 3 の ①〜④ を満たす 準備・片付け を置く（→ 3 の規則 3・5-5）',
+  },
+  {
+    key: 'prepCleanupDemand',
+    what: '準備・片付けの需要が残っていれば、帯の中で埋める（→ 5-5 の 4 段目）',
   },
 ]
 
@@ -90,6 +94,7 @@ function generate(candidates, conditions, wishes, fixed) {
   fillTightestFirst(board, units, boundary)
   swapWithinSlot(board, units, boundary)
   addPrepCleanup(board, needs, days, people, boundary)
+  fillPrepCleanupDemand(board, prepCleanupUnits(needs, days, people, held))
 
   return assignmentRows(needs, days, people)
 }
@@ -167,8 +172,11 @@ function demandUnits(needs, days, people, conditions) {
   days.forEach((day, dayIndex) => {
     day.slots.forEach((slot, slotIndex) => {
       order.forEach((role, roleIndex) => {
+        // 準備・片付けはここに入らない。規則 3 が「その人のその日」から決めるもので、
+        // 先に埋めると、まだ決まっていない店の役割の側が ②〜④ を動かす（→ addPrepCleanup）。
+        // 需要が残っているぶんは、規則 3 を満たした後に 4 段目が埋める（→ fillPrepCleanupDemand）。
         if (prepCleanupRoles().indexOf(role) !== -1) return
-        const required = requiredAt(needs, day.date, slot, role).count // → name-unmet.js
+        const required = requiredAt(needs, day, slot, role).count // → name-unmet.js
         if (required === 0) return
         const able = people.filter((person) => canStandAt(person, day, slot, role, conditions))
         units.push({
@@ -204,6 +212,8 @@ function demandUnits(needs, days, people, conditions) {
  */
 function canStandAt(person, day, slot, role, conditions) {
   if (!person.slots[whereKey(day.date, slot)]) return false
+  // 準備・片付けは帯の中だけに置く（→ 5-5）。帯の外に書かれた需要は、埋めずに名指しで残す。
+  if (prepCleanupRoles().indexOf(role) !== -1 && !isInBand(day, slot, role)) return false
   if (cookRoles.indexOf(role) !== -1 && !person.canCook) return false
   if (role !== ruleRoles.cookLeader) return true
 
@@ -271,29 +281,8 @@ function markHalfOfDay(state, slot, boundary) {
   if (toMinutes(slot.end) > toMinutes(boundary)) state.afternoon = true
 }
 
-/**
- * 準備・片付けの帯（→ 5-5 の「準備・片付けをどこに置くか」）。
- * 準備は `準備開始`〜`調理開始`、片付けは `片付け開始`〜`片付け終了` である。
- * 枠は時刻をまたがない（→ 5-1 の #1）ので、その枠が帯の中かは枠の側で決まる。
- */
-function prepCleanupBands() {
-  return [
-    { role: ruleRoles.prep, from: 'prepStart', to: 'cookStart' },
-    { role: ruleRoles.cleanup, from: 'cleanupStart', to: 'cleanupEnd' },
-  ]
-}
-
-/** 規則 3 が置く 2 つの役割名（→ 3 の役割名の表）。枠の側から埋める役割と混ぜない。 */
-function prepCleanupRoles() {
-  return prepCleanupBands().map((band) => band.role)
-}
-
-/** その枠が、その役割の帯の中にあるか。 */
-function isInBand(day, slot, role) {
-  const band = prepCleanupBands().filter((one) => one.role === role)[0]
-  if (!band) throw new Error(`準備・片付けの帯に「${role}」が無い（prepCleanupBands と食い違っている）`)
-  return toMinutes(slot.start) >= toMinutes(day[band.from]) && toMinutes(slot.end) <= toMinutes(day[band.to])
-}
+// 帯の定義（prepCleanupBands ／ prepCleanupRoles ／ isInBand ／ rule3Applies）は count-violations.js が持つ。
+// 数える側（name-unmet.js）も同じものを読むので、規則の側に 1 つだけ置いてある（→ src/README.md）。
 
 /** その人が、その帯でまだ置ける枠（候補にあって、まだ置いていないもの）。並びはその日の枠の順である。 */
 function freeBandSlots(person, day, role) {
@@ -317,6 +306,17 @@ function fillTightestFirst(board, units, boundary) {
 }
 
 /**
+ * 準備・片付けの枠に置くとき、その日のもう片方の帯に入っている人は取らない。
+ * 規則 3 の ④（両方ある → 片方だけ）と同じ向きである。
+ * 規則 3 が当たらない日にも、1 人が同じ日の 準備 と 片付け の両方に入ることはしない。
+ */
+function prepCleanupNotBothBands(person, day, role) {
+  if (prepCleanupRoles().indexOf(role) === -1) return true
+  const other = prepCleanupRoles().filter((one) => one !== role)[0]
+  return !(day.slots || []).some((slot) => person.at[whereKey(day.date, slot)] === other)
+}
+
+/**
  * その枠に次に置く 1 人（→ 5-5 の「枠の中で誰を採るか」）。
  *
  * 置ける人（規則 1・4・5）のうち、その枠がまだ空いていて、規則 3 を満たせなくならない人から、
@@ -325,7 +325,9 @@ function fillTightestFirst(board, units, boundary) {
  */
 function nextToPlace(unit, boundary) {
   const ready = unit.able.filter((person) => (
-    isFreeAt(person, unit.day.date, unit.slot) && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary)
+    isFreeAt(person, unit.day.date, unit.slot)
+      && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary)
+      && prepCleanupNotBothBands(person, unit.day, unit.role)
   ))
   ready.sort((a, b) => a.count - b.count || a.order - b.order)
   return ready.length === 0 ? null : ready[0]
@@ -383,6 +385,7 @@ function takerFor(giving, mover, boundary) {
     person !== mover
       && isFreeAt(person, giving.day.date, giving.slot)
       && prepCleanupStaysPossible(person, giving.day, giving.slot, boundary)
+      && prepCleanupNotBothBands(person, giving.day, giving.role)
   ))
   ready.sort((a, b) => a.count - b.count || a.order - b.order)
   return ready.length === 0 ? null : ready[0]
@@ -423,6 +426,60 @@ function addPrepCleanup(board, needs, days, people, boundary) {
 }
 
 /**
+ * 準備・片付けの需要を (日・枠・役割) 1 つずつにほどく（→ 5-5 の 4 段目）。
+ * 並びは 日 → 枠 → 役割（担当者が需要を書いた順）で、入力だけで決まる（→ 6 の #3 の理由 ③）。
+ * きつさで並べ替えない — 走るのは規則 3 の後で、置ける人はもう動かないからである。
+ */
+function prepCleanupUnits(needs, days, people, conditions) {
+  const order = rolesInOrder(needs).filter((role) => prepCleanupRoles().indexOf(role) !== -1)
+  const units = []
+
+  days.forEach((day) => {
+    day.slots.forEach((slot) => {
+      order.forEach((role) => {
+        const required = requiredAt(needs, day, slot, role).count // → name-unmet.js
+        if (required === 0) return
+        units.push({
+          day: day,
+          slot: slot,
+          role: role,
+          required: required,
+          able: people.filter((person) => canStandAt(person, day, slot, role, conditions)),
+        })
+      })
+    })
+  })
+  return units
+}
+
+/**
+ * 規則 3 を満たしたうえで、まだ足りていない 準備・片付け の枠を埋める（→ generationOrder の 4 段目・5-5）。
+ *
+ * 走るのは addPrepCleanup の後である。**規則 3 が要る人には、そこで先に 1 枠置いてある。**
+ * だからここで置くのは、次の 2 つのどちらかだけになる。
+ *   ・すでにその帯に入っている人に、同じ帯の枠をもう 1 つ足す
+ *   ・**その日に店の役割へ就いていない人**を帯に置く（準備日・片付け日がこれである）
+ *
+ * 規則 3 の ②〜④ は崩れない — 店の役割に就いた人はもう片方の帯に入っているので、
+ * prepCleanupNotBothBands がその人をここで取らない。
+ * 午前・午後は店の役割の行からしか立たない（→ dayStateOf）ので、ここで置いても ①〜④ の判定は動かない。
+ *
+ * 置ける人が尽きたら、その枠はそこまでである。埋めずに次へ行き、未充足として名指しで残る（→ 5 の #6）。
+ */
+function fillPrepCleanupDemand(board, units) {
+  units.forEach((unit) => {
+    while (placedCount(board, unit.day.date, unit.slot, unit.role) < unit.required) {
+      const ready = unit.able.filter((person) => (
+        isFreeAt(person, unit.day.date, unit.slot) && prepCleanupNotBothBands(person, unit.day, unit.role)
+      ))
+      ready.sort((a, b) => a.count - b.count || a.order - b.order)
+      if (ready.length === 0) return
+      place(board, ready[0], unit.day.date, unit.slot, unit.role)
+    }
+  })
+}
+
+/**
  * その人のその日を、準備と片付けのどちらに入れるか（規則 3 の ②〜④）。
  * 両方ある日（④）は片方だけである。需要が残っているほうを先に取り、
  * どちらも残っていなければ準備を取る（並びは prepCleanupBands の順である）。
@@ -442,7 +499,7 @@ function prepOrCleanupFor(board, needs, person, day, state) {
 /** その帯のうち、まだ人数が足りていない枠（→ name-unmet.js と同じ数え方である）。 */
 function wantedBandSlots(board, needs, person, day, role) {
   return freeBandSlots(person, day, role).filter((slot) => (
-    requiredAt(needs, day.date, slot, role).count > placedCount(board, day.date, slot, role)
+    requiredAt(needs, day, slot, role).count > placedCount(board, day.date, slot, role)
   ))
 }
 
@@ -537,7 +594,8 @@ if (typeof module !== 'undefined') {
   module.exports = {
     generationOrder, generationNotAimed,
     generate, noonBoundaryToPlaceBy, peopleToPlace, demandUnits, canStandAt, prepCleanupStaysPossible,
-    dayStateOf, markHalfOfDay, prepCleanupBands, prepCleanupRoles, isInBand, freeBandSlots,
+    dayStateOf, markHalfOfDay, freeBandSlots, prepCleanupNotBothBands,
+    prepCleanupUnits, fillPrepCleanupDemand,
     fillTightestFirst, nextToPlace, swapWithinSlot, swapOnce, takerFor, unitAt,
     addPrepCleanup, prepOrCleanupFor, wantedBandSlots, placeInBand,
     place, unplace, placedCount, isFreeAt, whereKey, assignmentRows, roleRank, assignmentRow,

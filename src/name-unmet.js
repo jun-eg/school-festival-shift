@@ -35,7 +35,8 @@ const unmetSources = [
   {
     key: 'roleNeeds',
     label: '必要人数',
-    what: '(日・時間帯・役割名・人数) の行。日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）',
+    what: '(日・時間帯・役割名・人数) の行。時間帯を空けた行は、その役割の帯に効く'
+      + '（準備 → 準備帯 ／ 片付け → 片付け帯 ／ それ以外 → 調理帯。→ 5-1 の #2）',
   },
   {
     key: 'committeeNeeds',
@@ -74,7 +75,7 @@ function nameUnmet(assignments, conditions) {
   days.forEach((day) => {
     day.slots.forEach((slot) => {
       roles.forEach((role) => {
-        const required = requiredAt(needs, day.date, slot, role)
+        const required = requiredAt(needs, day, slot, role)
         if (required.count === 0) return
         const have = (placedAt[roleSlotKey(day.date, slot.start, slot.end, role)] || []).length
         if (have >= required.count) return
@@ -100,31 +101,54 @@ function allNeeds(conditions) {
 }
 
 /**
- * 需要 1 行が、その枠に効くか。
+ * 時間帯を空けた行が効く帯（→ 5-1 の #2）。**役割の側で決まる。**
  *
- * 日も時間帯も、空の欄は「絞らない」である（→ 5-1 の #2）。
- * 時間帯があるときは、**重なる枠すべて**に効く（→ 5-4）。端が触れているだけの枠は重なっていない。
+ *   `準備`   … その日の `準備開始`〜`調理開始`
+ *   `片付け` … その日の `片付け開始`〜`片付け終了`
+ *   それ以外 … その日の `調理開始`〜`調理終了`（店を開けている帯）
+ *
+ * 帯の実体は count-violations.js が 1 つだけ持つ（→ prepCleanupBands）。ここで書き直さない。
+ * 「全枠」ではない — 営業していない帯にまで店の役割の需要が立つ（準備日の朝に `呼び込み` が要ることになる）。
+ * 役割ごとに帯が決まるので、**担当者は日も時間帯も書かずに 1 行ずつ書ける**
+ * （日ごとの 5 時刻を 2 か所に書かせない → 5-1 の #1）。
  */
-function needCovers(need, date, slot) {
-  if (need.date !== '' && need.date !== date) return false
-  if (need.start === '') return true
-  return toMinutes(need.start) < toMinutes(slot.end) && toMinutes(slot.start) < toMinutes(need.end)
+function blankBandFor(day, role) {
+  const band = prepCleanupBands().filter((one) => one.role === role)[0]
+  if (band) return { from: day[band.from], to: day[band.to] }
+  return { from: day.cookStart, to: day.cookEnd }
+}
+
+/**
+ * 需要 1 行が、その枠に効くか。日を受けるのであって、日付の文字列ではない（→ 空けた時間帯の読み）。
+ *
+ * 日の欄が空なら、日では絞らない（→ 5-1 の #2）。
+ * 時間帯の欄が空なら、**その役割の帯**である（→ blankBandFor・ADR tech-requirements/0008・0009）。
+ * 帯の側で決まるので、**準備日・片付け日は店の 5 役割の需要が立たず、`準備` の需要は立つ。**
+ *
+ * 時間帯が決まったあとの切り方は 1 つである — **重なる枠すべて**に効く（→ 5-4）。
+ * 端が触れているだけの枠は重なっていない。**空けた行と書いた行で、切り方を変えていない。**
+ */
+function needCovers(need, day, slot) {
+  if (need.date !== '' && need.date !== day.date) return false
+  const span = need.start === '' ? blankBandFor(day, need.role) : { from: need.start, to: need.end }
+  return toMinutes(span.from) < toMinutes(slot.end) && toMinutes(slot.start) < toMinutes(span.to)
 }
 
 /**
  * その枠・その役割に要る人数と、その数を決めたもとの名前を返す。
+ * 受けるのは日そのものである（→ needCovers）。
  *
  * 効く行が複数あれば**最大**を取る。足し合わせない — 規則 6 の ② が「指定人数まで**引き上げる**」であり、
- * 全枠に効く行（5-1 の #2）と時間帯を絞った行が同時に効くのは、広い 1 行を狭い 1 行が上書きする形だからである
- * （→ 5-4）。
+ * その日の調理帯に効く行（5-1 の #2）と時間帯を絞った行が同時に効くのは、
+ * 広い 1 行を狭い 1 行が上書きする形だからである（→ 5-4）。
  */
-function requiredAt(needs, date, slot, role) {
+function requiredAt(needs, day, slot, role) {
   let count = 0
   const sources = []
 
   needs.forEach((held) => {
     if (held.need.role !== role) return
-    if (!needCovers(held.need, date, slot)) return
+    if (!needCovers(held.need, day, slot)) return
     if (held.need.count > count) {
       count = held.need.count
       sources.length = 0
@@ -171,23 +195,28 @@ function rolesInOrder(needs) {
  *
  * 重ならない行は、数えようがないまま消える。黙って落とすと、
  * 「名指しされていない未充足が 0 件」（→ 5-4）が、数え落としのぶんだけ嘘になる。
- * 日が「日ごとの営業時刻」に無い ／ 時間帯が営業時刻の外、のどちらもここで止まる。
+ * 日が「日ごとの営業時刻」に無い ／ 時間帯が営業時刻の外 ／
+ * **時間帯を空けた行なのに、効く日の調理帯が 1 つも立っていない**（→ needCovers）、のどれもここで止まる。
  */
 function checkEveryNeedLands(needs, days) {
   needs.forEach((held) => {
-    const lands = days.some((day) => day.slots.some((slot) => needCovers(held.need, day.date, slot)))
+    const lands = days.some((day) => day.slots.some((slot) => needCovers(held.need, day, slot)))
     if (lands) return
     throw new Error(
       `条件入力の「${sectionOf(held.source)}」の行（${describeNeed(held.need)}）が、30 分枠に 1 つも重ならない。`
         + '数えられない需要を黙って落とさない'
-        + '（日は「日ごとの営業時刻」にあり、時間帯はそこから刻んだ枠に重なっていること）',
+        + '（日は「日ごとの営業時刻」にあり、時間帯はそこから刻んだ枠に重なっていること。'
+        + '時間帯を空けた行が効くのは、その日の 調理開始〜調理終了 の帯である）',
     )
   })
 }
 
-/** 需要 1 行を、担当者が条件入力の上で見つけられる形の文にする。空の欄は「絞らない」と書く。 */
+/**
+ * 需要 1 行を、担当者が条件入力の上で見つけられる形の文にする。
+ * 日の空欄は「絞らない」、時間帯の空欄は「その日の調理帯」と書く（→ needCovers）。
+ */
 function describeNeed(need) {
-  const when = need.start === '' ? '時間帯を空けた行' : `${need.start}-${need.end}`
+  const when = need.start === '' ? '時間帯を空けた行（その日の調理帯）' : `${need.start}-${need.end}`
   return `${need.date === '' ? '日を空けた行' : need.date} ／ ${when} ／ ${need.role} ／ ${need.count} 人`
 }
 
@@ -221,7 +250,7 @@ function unmetRow(date, slot, role, required, have) {
 if (typeof module !== 'undefined') {
   module.exports = {
     unmetSources,
-    nameUnmet, allNeeds, needCovers, requiredAt, placedPeople, roleSlotKey, rolesInOrder,
+    nameUnmet, allNeeds, blankBandFor, needCovers, requiredAt, placedPeople, roleSlotKey, rolesInOrder,
     checkEveryNeedLands, describeNeed, sectionOf, unmetRow,
   }
 }

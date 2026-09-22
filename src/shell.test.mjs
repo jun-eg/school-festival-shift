@@ -139,7 +139,7 @@ function filledBook() {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
     row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
   })
-  // 役割と必要人数（H〜L）— 1 行だけ。日と時間帯を空けた行は全枠に効く（→ 5-1 の #2）
+  // 役割と必要人数（H〜L）— 1 行だけ。時間帯を空けた行はその日の調理帯に効く（→ 5-1 の #2）
   ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 8 + j, value))
   // 調理責任者の学年（N）— 2 行
   conditions.put(3, 14, '3年生').put(4, 14, ' 4年生 ')
