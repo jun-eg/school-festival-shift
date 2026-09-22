@@ -211,6 +211,94 @@ function conflictNote(role, detail) {
 }
 
 /**
+ * 前に見たマス目の控え（→ 5-3 の「取りこぼした書き換え」／ issue #226）。**印ではない。取りこぼしを印に変える道具である。**
+ *
+ * 本物で間を置かずに 2 セル書き換えると、onEdit が 1 回しか走らず、2 手目のセルに印が付かない（→ real-device-log.md）。
+ * 落ちたイベントは中から拾えないので、生成と数え直しのたびにマス目の中身を控えておき、
+ * 次に読んだときに控えと違うセルを「人が書き換えたのに印が付いていないセル」として印を付ける（→ missedEdits）。
+ * スクリプトの書き戻しは控えを置き直すので、機械が置いたセルは差にならない。
+ *
+ * 控えは（学籍番号 × 見出しの時刻 → 役割）である。行の位置でも列の位置でも当てない — 人が増えれば行が、営業時刻を動かせば列がずれる（→ ADR tech-requirements-0010）。
+ * 役割は出てきた順に 1 文字の番号にして詰める。置き場（シートの developer metadata）の文字数に上限があるからである（→ shell.js の keepSeenGrid）。
+ * 番号の文字が足りない（役割が 62 種類を超える）ときは控えを作らない（null）— 控えが無ければ、取りこぼしを拾わないだけで今までどおりに動く。
+ */
+const seenSymbols = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+/** マス目 1 枚の控えを組む。学籍番号が空の行と、同じ学籍番号が 2 行ある行は、誰の行かが決まらないので控えない。 */
+function seenGrid(header, dataRows) {
+  const named = gridNamedColumns()
+  const studentIdColumn = named.indexOf('学籍番号')
+  const times = header.slice(named.length).map((time) => String(time || '').trim())
+  const values = ['']
+  const rows = {}
+  const counts = studentIdCounts(dataRows, studentIdColumn)
+
+  for (const row of dataRows) {
+    const studentId = studentIdOf(row, studentIdColumn)
+    if (studentId === '' || counts[studentId] > 1) continue
+    let symbols = ''
+    for (let column = 0; column < times.length; column++) {
+      const value = String(row[named.length + column] === undefined ? '' : row[named.length + column]).trim()
+      if (values.indexOf(value) === -1) values.push(value)
+      if (values.length > seenSymbols.length) return null
+      symbols += seenSymbols[values.indexOf(value)]
+    }
+    rows[studentId] = symbols
+  }
+  return { times: times, values: values, rows: rows }
+}
+
+/**
+ * 控えと違うのに印の無いセルを返す（{ row, column } — データの行の番号と、マス目の列の番号。どちらも 0 始まり）。
+ * 付け方は shell.js の markFixedCells と同じ決めである（→ 5-3）。
+ *   ・時刻の列で、控えと役割が違うセル（空にしたセルも入る）
+ *   ・控えに無い学籍番号の行（学籍番号を書き換えた・行を足した）は、役割の入っているセルぜんぶ
+ * 見出しの時刻が控えに無い列は見ない（見出しを書き換えたのは手直しではない）。控えが無ければ何も返さない
+ * — 黙って全部を手直しにしない。
+ * 同じ値に書き直した手は、控えと違わないので拾えない。
+ */
+function missedEdits(seen, header, dataRows, notes) {
+  if (!seen) return []
+  const named = gridNamedColumns()
+  const studentIdColumn = named.indexOf('学籍番号')
+  const counts = studentIdCounts(dataRows, studentIdColumn)
+  const missed = []
+
+  dataRows.forEach((row, rowIndex) => {
+    const studentId = studentIdOf(row, studentIdColumn)
+    if (studentId === '' || counts[studentId] > 1) return
+    const before = seen.rows[studentId]
+    const rowNotes = (notes || [])[rowIndex] || []
+
+    for (let column = named.length; column < header.length; column++) {
+      if (isFixedNote(rowNotes[column])) continue
+      const value = String(row[column] === undefined ? '' : row[column]).trim()
+      if (before === undefined) {
+        if (value !== '') missed.push({ row: rowIndex, column: column })
+        continue
+      }
+      const at = seen.times.indexOf(String(header[column] || '').trim())
+      if (String(header[column] || '').trim() === '' || at === -1) continue
+      if (seen.values[seenSymbols.indexOf(before[at])] !== value) missed.push({ row: rowIndex, column: column })
+    }
+  })
+  return missed
+}
+
+function studentIdOf(row, studentIdColumn) {
+  return String(row[studentIdColumn] === undefined ? '' : row[studentIdColumn]).trim().toUpperCase()
+}
+
+function studentIdCounts(dataRows, studentIdColumn) {
+  const counts = {}
+  dataRows.forEach((row) => {
+    const studentId = studentIdOf(row, studentIdColumn)
+    counts[studentId] = (counts[studentId] || 0) + 1
+  })
+  return counts
+}
+
+/**
  * 1 日ぶんのマス目から、手直しの印が付いたセルだけを手直しの行にする（→ fixedColumns ／ 5-3）。
  *
  * 前の周に機械が置いたセルは読まない。**読むと、却下した「前回の案全体を初期解にする」になる**
@@ -443,6 +531,6 @@ function namesFromAnswers(rows) {
 if (typeof module !== 'undefined') {
   module.exports = {
     gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow,
-    fixedNote, isFixedNote, conflictNote, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
+    fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
   }
 }
