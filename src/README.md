@@ -640,9 +640,11 @@
 
 1. Google ドライブで**スプレッドシートを 1 つ**作り、**名前を付ける**
 2. **拡張機能 → Apps Script** を開く
-3. `src/` の **`.js` 13 つ**を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
-   `sheet-layout` ／ `input-types` ／ `core` ／ `take-in` ／ `count-violations` ／ `name-unmet` ／ `assignment-grid` ／
-   `form-definition` ／ `shell` ／ `verify-structure` ／ `build-template` ／ `build-form` ／ `menu` ／ `distribution-image`。
+3. `src/` の **`.js` 17 本**（`*.test.mjs` を除いた全部）を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
+   `sheet-layout` ／ `input-types` ／ `core` ／ `take-in` ／ `expand` ／ `generate` ／ `count-violations` ／ `name-unmet` ／
+   `fairness-metrics` ／ `assignment-grid` ／ `form-definition` ／ `shell` ／ `verify-structure` ／ `build-template` ／
+   `build-form` ／ `menu` ／ `distribution-image`。
+   **この 17 本で実機に貼って走らせてある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」）。
    **[`form-picker.html`](form-picker.html) と [`export-images.html`](export-images.html) の 2 枚も貼る** — エディタの**「＋」→「HTML」**で
    `form-picker` ／ `export-images` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）。
    **1 つ貼り忘れれば、走らせたときに名指しで止まる**（→「コアと殻の境目」の最後）。
