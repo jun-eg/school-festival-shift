@@ -27,7 +27,7 @@ const dataDir = path.join(here, '..', 'data')
 // ---- 読み込む ---------------------------------------------------------------
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
-const coreFiles = ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js']
+const coreFiles = ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js']
 
 function load(files) {
   const context = vm.createContext({})
