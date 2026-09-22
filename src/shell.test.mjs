@@ -48,6 +48,13 @@ class FakeRange {
     table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
     return this
   }
+  /** 書式だけを変える。往復には数えない — 値を持って行き来していないからである。 */
+  setHorizontalAlignment(alignment) {
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.alignments.set(`${r},${c}`, alignment)
+    }
+    return this
+  }
   clearContent() {
     roundTrips.writes += 1
     for (let r = this.row; r < this.row + this.rowCount; r++) {
@@ -59,7 +66,7 @@ class FakeRange {
 
 class FakeSheet {
   constructor(name, minColumns = 26) {
-    Object.assign(this, { name, cells: new Map(), minColumns })
+    Object.assign(this, { name, cells: new Map(), alignments: new Map(), minColumns })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
@@ -350,6 +357,16 @@ check(
     fullBook.getSheetByName(dayLabels[1]).getLastRow(),
   ],
   [['学籍番号', '氏名', '08:00', '08:30'], 1],
+)
+
+check(
+  '④ 時刻の見出しが左に寄っている（時刻のセルは既定で右寄せになる → issue #213）',
+  [
+    fullBook.getSheetByName(dayLabels[0]).alignments.get('1,3'),
+    fullBook.getSheetByName(dayLabels[0]).alignments.get('1,7'),
+    fullBook.getSheetByName(dayLabels[0]).alignments.get('1,2'),
+  ],
+  ['left', 'left', undefined],
 )
 
 check(

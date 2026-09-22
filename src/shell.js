@@ -203,6 +203,10 @@ function writeGrids(spreadsheet, grids, assignments, context) {
     sheet.getRange(1, namedCount + 1, 1, width - namedCount).clearContent()
     if (lastRow > headerRows) sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).clearContent()
 
+    // 時刻の見出しは左に寄せる。時刻のセルは既定で右寄せになるので、
+    // 見出しが自分の列ではなく右隣の列の頭に見えて、どの列が何時か読みにくい。
+    sheet.getRange(1, namedCount + 1, 1, width - namedCount).setHorizontalAlignment('left')
+
     if (grid.header.length > namedCount) {
       sheet
         .getRange(1, namedCount + 1, 1, grid.header.length - namedCount)
