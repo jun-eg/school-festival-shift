@@ -192,18 +192,18 @@ function buildAssignmentRow(date, slot, role, studentId) {
  * 付けるのは onEdit である（→ shell.js の markFixedCells）。スクリプトの書き戻しでは付かない — 単純トリガーは人の編集でしか走らない。
  *
  * 印かどうかは頭の文字で見る（→ isFixedNote）。担当者が自分で書いたメモは印にならない。
+ * 文言は 1 つに揃える（→ issue #230）。メモを見た人に「誰が直したか」が読めればよく、外し方は割り当ての説明が持つ（→ sheet-layout.js）。
  */
-const fixedNoteHead = '手直し'
-const fixedNote = `${fixedNoteHead} — 生成し直しても残る（このメモを消すと、次の生成で組み直す）`
+const fixedNote = 'シフト作成者による修正済み'
 
-/** そのメモが手直しの印か。頭が「手直し」なら印である（後ろに担当者が書き足しても外れない）。 */
+/** そのメモが手直しの印か。頭が印の文言なら印である（後ろに担当者が書き足しても外れない）。 */
 function isFixedNote(note) {
-  return String(note || '').trim().indexOf(fixedNoteHead) === 0
+  return String(note || '').trim().indexOf(fixedNote) === 0
 }
 
 /**
  * 残せなかった手直しのメモ（→ 5-3「食い違った固定は、名指しで返す」）。
- * 頭が「手直し」でないので、次に読むときには印にならない — 同じ食い違いを生成のたびに名指しし直さない。
+ * 頭が印の文言（→ fixedNote）でないので、次に読むときには印にならない — 同じ食い違いを生成のたびに名指しし直さない。
  * 担当者がそのセルをもう一度書き換えれば、印に置き換わる（→ shell.js の markFixedCells）。
  */
 function conflictNote(role, detail) {
