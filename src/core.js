@@ -28,6 +28,7 @@
 const coreSteps = [
   { name: '取り込む', issue: 146, writesTo: null, whatItDoes: '回答の行を 1 人 1 件に畳む（規則 2 ／ 8 の 6）' },
   { name: '展開する', issue: 149, writesTo: null, whatItDoes: '回答文字列をその人の 30 分枠の集合にする（規則 1 ／ 8 の 7）' },
+  { name: '固定を照らす', issue: 156, writesTo: '検証結果', whatItDoes: '手直しのうち、いまの入力で置けないものを行にする（5-3 ／ 8 の 11）' },
   { name: '生成する', issue: 151, writesTo: '割り当て', whatItDoes: '候補・条件・希望から割り当ての行を組む（5 の #6 ／ 8 の 8）' },
   { name: '違反を数える', issue: 141, writesTo: '検証結果', whatItDoes: '置いた人が条件を破っている所を行にする（5-4 ／ 8 の 3）' },
   { name: '未充足を名指しする', issue: 142, writesTo: '検証結果', whatItDoes: '人数が足りない枠を行にする（5-4 ／ 8 の 3）' },
@@ -54,6 +55,9 @@ function builtInSteps() {
   if (typeof generate !== 'function') {
     throw new Error('generate.js が貼られていない（「生成する」の中身がそこにある → issue #151）')
   }
+  if (typeof nameFixedConflicts !== 'function') {
+    throw new Error('generate.js が古い（「固定を照らす」の中身がそこにある → issue #156）。貼り直す')
+  }
   if (typeof countViolations !== 'function') {
     throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
   }
@@ -66,6 +70,7 @@ function builtInSteps() {
   return {
     '取り込む': takeIn,
     '展開する': expand,
+    '固定を照らす': nameFixedConflicts,
     '生成する': generate,
     '違反を数える': countViolations,
     '未充足を名指しする': nameUnmet,
@@ -85,17 +90,18 @@ const sheetsNotRead = ['検証結果', '指標']
 
 /**
  * コアが受け取る入力の名前。値はどれも「行の配列」である。
- * 条件入力は区画ごと（5-1 の #1〜#5）、回答と割り当てはシートごとに 1 つ。
- * 割り当てが入っているのは、前の周の手直しを固定として積み直すためである（→ 5-3）。
+ * 条件入力は区画ごと（5-1 の #1〜#5）、回答はシート 1 枚で 1 つ。
+ * マス目の 4 枚からは 2 つ出る — 割り当て（いま書いてあるとおり。数え直しが読む → recount）と、
+ * 手直し（担当者が書き換えたセルだけ。生成が固定として先に置く → 5-3）である。
  * 名前は sheet-layout.js から引く — 文字列を二重に持つと、片方が古くなる。
  */
 function inputNames() {
   const names = []
   sheetLayout.forEach((layout) => {
     if (sheetsNotRead.indexOf(layout.name) !== -1) return
-    // マス目の 4 枚は、まとまって 1 つの入力になる（→ sheet-layout.js の grid）。
+    // マス目の 4 枚は、まとまって 2 つの入力になる（→ sheet-layout.js の grid）。
     if (layout.grid) {
-      if (names.indexOf(layout.grid.of) === -1) names.push(layout.grid.of)
+      ;[layout.grid.of, layout.grid.fixed].forEach((name) => { if (names.indexOf(name) === -1) names.push(name) })
       return
     }
     layout.sections.forEach((section) => names.push(layout.hasSectionHeadings ? section.heading : layout.name))
@@ -145,9 +151,14 @@ function build(inputs, steps) {
   const wishes = callStep('取り込む', [inputs['回答']])
   const candidates = callStep('展開する', [wishes, conditions.days])
 
+  // 担当者が書き換えたセルだけが固定である（→ 5-3。印はセルのメモ → assignment-grid.js の fixedNote）。
+  // 前の周に機械が置いたセル（入力の「割り当て」）は、生成に渡さない — 渡すと、どこが人の意思かが消える。
+  // 置けない固定は、生成が黙って落とすのではなく、ここで名指しされる（→ generate.js の nameFixedConflicts）。
+  const fixed = inputs[fixedName]
+  const fixConflicts = callStep('固定を照らす', [fixed, candidates, conditions, wishes])
+
   // 生成にも希望が渡る。規則 4 の学年と規則 5 の調理可否は候補に乗っていない（→ #149）ので、
   // 型 #6 を見ないと、違反を作らずに置くかどうかが決まらない（→ generate.js の canStandAt）。
-  const fixed = inputs['割り当て'] // 前の周で担当者が書き換えたところ（→ 5-3）
   const assignments = callStep('生成する', [candidates, conditions, wishes, fixed])
 
   // 違反と未充足は別に数えて、同じ 1 枚に種別で分けて並べる（→ 5-4）。
@@ -157,7 +168,8 @@ function build(inputs, steps) {
   // 指標に希望が渡るのは、1 枠も置かれなかった人も 0 で並べるためである（→ fairness-metrics.js）。
   const metrics = callStep('指標を出す', [assignments, conditions, wishes])
 
-  const output = { '割り当て': assignments, '検証結果': violations.concat(unmet), '指標': metrics }
+  // 食い違った固定を先頭に置く。未充足は何十行も並ぶので、後ろに回すと担当者の目に入らない（→ 5-3「黙って外さない」）。
+  const output = { '割り当て': assignments, '検証結果': fixConflicts.concat(violations, unmet), '指標': metrics }
   checkOutput(output)
   output.notBuilt = notBuilt
   return output
@@ -172,14 +184,26 @@ function build(inputs, steps) {
  *
  * 数える段は build と同じものを通す — 数え方を 2 通りに持たない（→ src/README.md）。
  * 返すものも build と同じ束である。割り当ては読んだマス目そのもので、殻は書き戻さない（→ shell.js の recountSpreadsheet）。
+ *
+ * 固定は照らさない（→ noFixedToCheck）。手直しはマス目にもう書いてあるので、
+ * 条件を破っていれば違反として数えられ、セルに赤い太字で出る（→ 5 の #13 の ①）。
+ * 照らすと、同じ 1 セルが「違反」と「食い違った固定」の 2 行で出る。
  */
 function recount(inputs) {
-  return build(inputs, { '生成する': keepAsPlaced })
+  return build(inputs, { '固定を照らす': noFixedToCheck, '生成する': keepAsPlaced(inputs[assignmentName]) })
 }
 
-/** 「生成する」の段の代わり。前の周の手直し（→ 5-3）をそのまま返し、1 枠も足さない・外さない。 */
-function keepAsPlaced(candidates, conditions, wishes, fixed) {
-  return fixed
+/**
+ * 「生成する」の段の代わりを作る。マス目に書いてあるとおり（placed）をそのまま返し、1 枠も足さない・外さない。
+ * 前の周に機械が置いたセルも、担当者が書き換えたセルも、区別せずにそのまま数える。
+ */
+function keepAsPlaced(placed) {
+  return function () { return placed }
+}
+
+/** 「固定を照らす」の段の代わり。数え直しでは照らさない（→ recount の注意）。 */
+function noFixedToCheck() {
+  return []
 }
 
 /**
@@ -255,7 +279,8 @@ function checkOutput(output) {
     if (allowedKinds.indexOf(row[kindColumn]) !== -1) return
     throw new Error(
       `検証結果の ${rowIndex + 1} 行目の種別が「${row[kindColumn]}」である。`
-        + `違反と未充足は別に数える（→ 5-4）ので、種別は ${allowedKinds.join(' か ')} のどちらかである`,
+        + `違反と未充足は別に数え（→ 5-4）、食い違った固定はそのどちらでもない（→ 5-3）ので、`
+        + `種別は ${allowedKinds.join(' ／ ')} のどれかである`,
     )
   })
 }
@@ -280,6 +305,6 @@ function sheetColumns(name) {
 if (typeof module !== 'undefined') {
   module.exports = {
     coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames, builtInSteps,
-    build, recount, keepAsPlaced, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
+    build, recount, keepAsPlaced, noFixedToCheck, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
   }
 }

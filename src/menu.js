@@ -54,11 +54,22 @@ function createForm() {
  * 書かなかったことを黙って終わらせない — 何が入っていないかをそのまま名指しで出す。
  * 崩れ（シートが無い・見出しが違う・表現が揃っていない）は、ここで捕まえない。
  * 直すのは担当者のシートのほうなので、例外の文をそのまま見せる（→ src/README.md）。
+ *
+ * 残せなかった手直しがあれば、その数も言う（→ 5-3「食い違った固定は、名指しで返す」／ issue #156）。
+ * 中身は検証結果の先頭と、そのセルのメモにある。
  */
 function runGeneration() {
-  const notBuilt = runOnActiveSpreadsheet()
+  const output = runOnActiveSpreadsheet()
+  const notBuilt = output.notBuilt
   if (notBuilt.length === 0) {
-    SpreadsheetApp.getActive().toast('生成した（割り当て・検証結果・指標を書き換えた）', menuName, 5)
+    const kindAt = outputColumns('検証結果').indexOf('種別')
+    const conflicts = output['検証結果'].filter((row) => row[kindAt] === checkKind.fixConflict).length
+    SpreadsheetApp.getActive().toast(
+      '生成した（割り当て・検証結果・指標を書き換えた。手直しの印があるセルは残した）'
+        + (conflicts === 0 ? '' : `。残せなかった手直しが ${conflicts} 件ある — 検証結果の先頭と、そのセルのメモに理由がある`),
+      menuName,
+      conflicts === 0 ? 5 : 15,
+    )
     return
   }
   SpreadsheetApp.getActive().toast(

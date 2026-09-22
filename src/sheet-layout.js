@@ -37,6 +37,19 @@ const assignmentName = '割り当て'
 const assignmentColumns = ['日', '開始', '終了', '役割', '学籍番号', '氏名']
 
 /**
+ * 手直しという名前。割り当てと同じく、シートの名前ではなく、コアが受け渡す束の名前である（→ 5-3 ／ issue #156）。
+ * マス目の 4 枚のうち、担当者が書き換えたセル（印はセルのメモ → assignment-grid.js の fixedNote）だけがここに乗る。
+ */
+const fixedName = '手直し'
+
+/**
+ * 手直し 1 件の形。割り当ての行と違って、終了を持たない — 持つのはマス目の見出しの時刻（＝ 枠の開始）である。
+ * 見出しがいまの枠に無いこともある（条件入力の営業時刻を動かした後）ので、枠に直すのは生成の側である
+ * （→ generate.js の placeFixed）。役割が空の行は「この人をこの枠に置かない」という手直しである。
+ */
+const fixedColumns = ['日', '開始', '役割', '学籍番号']
+
+/**
  * マス目のシートが取る、時刻の列の数。1 日は 30 分枠が最大 48 である（24 時間 ÷ 30 分）。
  * 実際に使うのはその日の枠の数だけで、右の残りは空のまま置く
  * — 枠の数は条件入力の「日ごとの営業時刻」から出る（→ 規則 1 の ①）ので、
@@ -64,13 +77,15 @@ function gridSheet(dayIndex) {
     frozenColumns: 2,
     // この 4 枚がまとまって「割り当て」1 つになる。dayIndex は
     // 条件入力の「日ごとの営業時刻」の何行目と当てるかである（→ dayLabels）。
-    grid: { of: assignmentName, dayIndex: dayIndex },
+    // fixed は、担当者が書き換えたセルだけを集めた入力の名前である（→ fixedName ／ 5-3）。
+    grid: { of: assignmentName, fixed: fixedName, dayIndex: dayIndex },
     sections: [
       {
         heading: null,
         startColumn: 1,
         note: '生成の結果（→ issue #213）。行が人、列がその日の 30 分枠、セルが役割名 1 つである。'
           + '担当者がセルを書き換えるのが仕様である（→ 5-3）ので、保護をかけない。'
+          + '書き換えたセルにはメモ「手直し」が付き、生成し直しても残る（メモを消すと、次の生成で組み直す → issue #156）。'
           + '時刻の見出しは生成のたびに書き直す — 枠は条件入力の「日ごとの営業時刻」から刻む（→ 規則 1 の ①）',
         columns: ['学籍番号', '氏名'],
         // 右は時刻の列である。名前を持たない — 何時の枠かは毎回の入力で変わる。
@@ -179,7 +194,8 @@ const sheetLayout = [
       {
         heading: null,
         startColumn: 1,
-        note: '違反（置いた人が条件を破っている）と未充足（人数が足りない）を、種別で分けて並べる（→ 5-4）',
+        note: '違反（置いた人が条件を破っている）と未充足（人数が足りない）を、種別で分けて並べる（→ 5-4）。'
+          + '生成し直したときに残せなかった手直しは、食い違った固定として先頭に並ぶ（→ 5-3）',
         columns: ['種別', '日', '開始', '終了', '役割', '学籍番号', '氏名', '内容', 'あと何人'],
       },
     ],
@@ -203,8 +219,12 @@ const sheetLayout = [
   },
 ]
 
-/** 検証結果シートの「種別」に入る 2 つ（→ 5-4）。値がそのままシートに書かれる。 */
-const checkKind = { violation: '違反', unmet: '未充足' }
+/**
+ * 検証結果シートの「種別」に入る 3 つ。値がそのままシートに書かれる。
+ * 違反と未充足は 5-4 が分けた 2 つで、食い違った固定は 5-3 が「名指しで返す」とした手直しである（→ issue #156）。
+ * 食い違った固定は置いていないので、違反にも未充足にも数えない — 3 つ目の種別にしてある。
+ */
+const checkKind = { violation: '違反', unmet: '未充足', fixConflict: '食い違った固定' }
 
 /**
  * 区画の幅 — 名前のある列 ＋ 毎年名前が変わる列である（後者を持つのは「回答」だけである）。
@@ -261,6 +281,6 @@ function gridLayouts(of) {
 if (typeof module !== 'undefined') {
   module.exports = {
     sheetLayout, checkKind, protectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
-    dayLabels, assignmentName, assignmentColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
+    dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }

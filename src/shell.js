@@ -59,8 +59,12 @@ function readInputs(spreadsheet) {
  * 入力と、読んだマス目 4 枚をいっしょに返す。
  * マス目も返すのは、色を塗り直すときに、担当者のシートの何行目が誰かを読み直さずに済ませるためである
  * （→ paintGrids ／ 6 の #2 の実装上の注意）。
+ *
+ * forGeneration のときは、マス目から「割り当て」を組まない（空で渡す）。生成が読むのは手直しだけだからである
+ * （→ core.js の build ／ 5-3）。組むと、条件入力の営業時刻を動かした後の前の周の列（いまの枠に無い見出し）で、
+ * 機械が置いただけのセルのために止まる。手直しの側は止まらずに名指しで返る（→ generate.js の placeFixed）。
  */
-function readInputsAndGrids(spreadsheet) {
+function readInputsAndGrids(spreadsheet, forGeneration) {
   const inputs = {}
   const grids = []
 
@@ -71,6 +75,7 @@ function readInputsAndGrids(spreadsheet) {
     if (layout.grid) {
       grids.push({ layout: layout, grid: readGrid(sheet, layout) })
       inputs[layout.grid.of] = inputs[layout.grid.of] || []
+      inputs[layout.grid.fixed] = inputs[layout.grid.fixed] || []
       return
     }
     layout.sections.forEach((section) => {
@@ -78,27 +83,34 @@ function readInputsAndGrids(spreadsheet) {
     })
   })
 
-  putGridsIntoInputs(inputs, grids)
+  putGridsIntoInputs(inputs, grids, forGeneration)
   return { inputs: inputs, grids: grids }
 }
 
 /**
- * 読んだマス目 4 枚を、割り当ての行に戻して入力に積む（前の周の手直し ＝ 5-3 の固定である）。
+ * 読んだマス目 4 枚を、入力に積む。積む先は 2 つある（→ core.js の inputNames）。
+ *   割り当て … いま書いてあるとおり（手直しの後の数え直しが読む → assignment-grid.js の fromAssignmentGrid）
+ *   手直し   … 担当者が書き換えたセルだけ（印はセルのメモ → assignment-grid.js の fixedFromAssignmentGrid ／ 5-3）
+ * forGeneration のときは、割り当てを積まない（→ readInputsAndGrids の注意）。
  *
  * どの列が何時かは、条件入力の「日ごとの営業時刻」から刻んだ枠で決まる（→ 規則 1 の ①）。
  * 4 枚とも空なら、枠を刻まずに済ませる — 条件入力がまだ空のテンプレートでも、
  * ここで止まらないようにするためである（型の名指しは、コアの入口が出す → input-types.js）。
  */
-function putGridsIntoInputs(inputs, grids) {
+function putGridsIntoInputs(inputs, grids, forGeneration) {
   if (grids.length === 0) return
   const hasAnyRow = grids.some((one) => one.grid.rows.length > 0)
   const days = hasAnyRow ? toDays(inputs['日ごとの営業時刻'], '日ごとの営業時刻') : []
 
   grids.forEach((one) => {
-    const name = one.layout.grid.of
-    inputs[name] = inputs[name].concat(
-      fromAssignmentGrid(one.grid.header, one.grid.rows, days[one.layout.grid.dayIndex], one.layout.name),
+    const day = days[one.layout.grid.dayIndex]
+    const fixed = one.layout.grid.fixed
+    inputs[fixed] = inputs[fixed].concat(
+      fixedFromAssignmentGrid(one.grid.header, one.grid.rows, one.grid.notes, day, one.layout.name),
     )
+    if (forGeneration) return
+    const name = one.layout.grid.of
+    inputs[name] = inputs[name].concat(fromAssignmentGrid(one.grid.header, one.grid.rows, day, one.layout.name))
   })
 }
 
@@ -108,6 +120,9 @@ function putGridsIntoInputs(inputs, grids) {
  * 見出しの行も読むのが、区画を読むのと違うところである — 何時の枠かは見出しに書いてある。
  * 読む幅は区画の幅（名前のある 2 列 ＋ 時刻の 48 列 → sheet-layout.js の maxSlotsPerDay）で、
  * 列がそれだけあることは走る前に確かめてある（→ verify-structure.js の checkColumnCount）。
+ *
+ * セルのメモも同じ範囲で読む。手直しの印はメモである（→ assignment-grid.js の fixedNote ／ 5-3）。
+ * notes は rows と同じ行数・同じ幅で並ぶ。
  */
 function readGrid(sheet, layout) {
   const section = layout.sections[0]
@@ -116,12 +131,12 @@ function readGrid(sheet, layout) {
   const lastRow = sheet.getLastRow()
 
   const header = sheet.getRange(1, 1, 1, width).getValues()[0].map(normalizeValue)
-  const rows = lastRow > headerRows
-    ? sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).getValues().map((row) => row.map(normalizeValue))
-    : []
+  const data = lastRow > headerRows ? sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width) : null
+  const rows = data ? data.getValues().map((row) => row.map(normalizeValue)) : []
+  const notes = data ? data.getNotes().map((row) => row.map((note) => String(note || ''))) : []
 
   while (rows.length > 0 && rows[rows.length - 1].every((cell) => cell === '')) rows.pop()
-  return { header: header, rows: rows }
+  return { header: header, rows: rows, notes: notes.slice(0, rows.length) }
 }
 
 /**
@@ -161,6 +176,7 @@ function readSection(sheet, layout, section) {
  *
  * gridsAsTheyAre を渡したときは、マス目を書き戻さない（手直しの後の数え直し → recountSpreadsheet）。
  * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
+ * 書き戻すときは、手直しの印（メモ）も付け直す（→ writeGrids）。
  * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
  */
 function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
@@ -172,7 +188,7 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
     // 割り当てはシート 1 枚でない。日ごとの 4 枚にマス目で敷く（→ writeGrids ／ issue #213）。
     const layouts = gridLayouts(name)
     if (layouts.length > 0) {
-      grids = gridsAsTheyAre || writeGrids(spreadsheet, layouts, output[name], toGrid)
+      grids = gridsAsTheyAre || writeGrids(spreadsheet, layouts, output[name], toGrid, output['検証結果'])
       return
     }
     const layout = findLayout(name)
@@ -269,9 +285,14 @@ function withNamesFromAnswers(rows, name, nameOf) {
  *
  * 条件入力に行が無い日は、名前のある 2 列だけを残して空にする。黙って別の日に寄せない。
  *
+ * 手直しの印（メモ）も書き直す（→ assignment-grid.js の gridNotes ／ 5-3）。行の並びは学籍番号の順なので、
+ * 人が増えれば行がずれる — メモを残したままにすると、印が別の人のセルに移る。だから一度ぜんぶ消してから付け直す。
+ * 置けた手直しには同じ印が、置けなかった手直しには何が食い違ったかのメモが付く（checks の「食い違った固定」）。
+ * 担当者が自分で書いたメモも消える（背景色や太字と同じ → paintGrids）。
+ *
  * 返すのは敷いたマス目である（{ layout, grid } の配列）。色を塗り直す側が、読み直さずに使う（→ paintGrids）。
  */
-function writeGrids(spreadsheet, grids, assignments, context) {
+function writeGrids(spreadsheet, grids, assignments, context, checks) {
   return grids.map((layout) => {
     const sheet = findSheet(spreadsheet, layout.name)
     const section = layout.sections[0]
@@ -279,7 +300,17 @@ function writeGrids(spreadsheet, grids, assignments, context) {
     const width = sectionWidth(section)
     const headerRows = headerRowCount(layout)
     const lastRow = sheet.getLastRow()
-    const grid = toAssignmentGrid(assignments, context.days[layout.grid.dayIndex], context.nameOf)
+    const day = context.days[layout.grid.dayIndex]
+    const fixed = context.fixed || []
+    const at = (row, name) => row[fixedColumns.indexOf(name)]
+    // 行を残すのは、印か名指しを載せる先がある人だけである。いまの枠に無い見出しの空のセルは、外す相手が無いので載せない。
+    const fixedToday = day
+      ? fixed
+        .filter((row) => at(row, '日') === day.date)
+        .filter((row) => at(row, '役割') !== '' || day.slots.some((slot) => slot.start === at(row, '開始')))
+        .map((row) => at(row, '学籍番号'))
+      : []
+    const grid = toAssignmentGrid(assignments, day, context.nameOf, fixedToday)
 
     if (grid.header.length > width) {
       throw new Error(
@@ -290,6 +321,9 @@ function writeGrids(spreadsheet, grids, assignments, context) {
 
     sheet.getRange(1, namedCount + 1, 1, width - namedCount).clearContent()
     if (lastRow > headerRows) sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).clearContent()
+    // メモは値の無い行にも残るので、下の端（getMaxRows）まで消す（→ paintGrids の書式と同じ）。
+    const maxRows = sheet.getMaxRows()
+    if (maxRows > headerRows) sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).clearNote()
 
     // 時刻の見出しは左に寄せる。時刻のセルは既定で右寄せになるので、
     // 見出しが自分の列ではなく右隣の列の頭に見えて、どの列が何時か読みにくい。
@@ -301,7 +335,9 @@ function writeGrids(spreadsheet, grids, assignments, context) {
         .setValues([grid.header.slice(namedCount)])
     }
     if (grid.rows.length > 0) {
-      sheet.getRange(headerRows + 1, 1, grid.rows.length, grid.header.length).setValues(grid.rows)
+      const written = sheet.getRange(headerRows + 1, 1, grid.rows.length, grid.header.length)
+      written.setValues(grid.rows)
+      written.setNotes(gridNotes(grid, day, fixed, checks))
     }
     return { layout: layout, grid: grid }
   })
@@ -311,6 +347,7 @@ function writeGrids(spreadsheet, grids, assignments, context) {
  * Apps Script から呼ぶ入口。SpreadsheetApp を名指しするのは、このファイルのこの 1 行だけである。
  * メニューの「生成」がここを押す（→ menu.js の runGeneration ／ issue #151）。
  * steps を渡さなければ、中身が入っている段だけが走る（→ core.js の builtInSteps）。
+ * 返すのは run と同じ、コアの出力の束である。
  */
 function runOnActiveSpreadsheet(steps) {
   return run(SpreadsheetApp.getActive(), steps)
@@ -320,7 +357,10 @@ function runOnActiveSpreadsheet(steps) {
  * 構造を確かめる → 読む → コアを呼ぶ → 書く。殻の側の 1 本である。
  * スプレッドシートは引数で受ける — 手元の検査で偽のスプレッドシートを渡せるようにするためである。
  * steps はコアの段（→ core.js の coreSteps）で、入っている段だけを渡す。
- * 返すのは notBuilt — 担当者に何と言うかは、メニューから呼ぶ側が決める（→ menu.js の runGeneration）。
+ * 返すのはコアの出力の束（割り当て・検証結果・指標・notBuilt）である
+ * — 担当者に何と言うかは、メニューから呼ぶ側が決める（→ menu.js の runGeneration）。
+ * 束ごと返すのは、何も書かなかった理由（notBuilt）と、残せなかった手直しの数（検証結果の「食い違った固定」）の
+ * 両方を、読み直さずに言えるようにするためである。
  *
  * 構造が崩れていれば、1 行も読まずに名指しして止まる（→ verify-structure.js）。
  * notBuilt と違って返り値で持ち帰らない — 崩れているのは担当者のシートのほうで、
@@ -328,10 +368,10 @@ function runOnActiveSpreadsheet(steps) {
  */
 function run(spreadsheet, steps) {
   checkStructure(spreadsheet)
-  const inputs = readInputs(spreadsheet)
+  const inputs = readInputsAndGrids(spreadsheet, true).inputs
   const output = build(inputs, steps)
   writeOutputs(spreadsheet, output, gridContext(inputs))
-  return output.notBuilt
+  return output
 }
 
 /**
@@ -362,6 +402,9 @@ function recountSpreadsheet(spreadsheet) {
  * （実行ログに残るだけである）。メニューの「生成」が例外をそのまま見せる（→ menu.js の runGeneration）のと
  * 同じことを、ここでは一言にして出す — 黙って止まらない。
  * スプレッドシートはイベントから受ける（e.source）。SpreadsheetApp を名指ししない。
+ *
+ * 数え直す前に、書き換えたセルに手直しの印（メモ）を付ける（→ markFixedCells ／ 5-3）。
+ * 印は数え方を 1 つも動かさない — 数え直しは書いてあるとおりを数えるだけである。印が効くのは次の「生成」である。
  */
 function recountOnEdit(event) {
   if (!event || !event.range || !event.source) return null
@@ -369,6 +412,7 @@ function recountOnEdit(event) {
   if (!gridLayouts(assignmentName).some((layout) => layout.name === edited)) return null
 
   try {
+    markFixedCells(event.range)
     const output = recountSpreadsheet(event.source)
     const kinds = output['検証結果'].map((row) => row[outputColumns('検証結果').indexOf('種別')])
     const violations = kinds.filter((kind) => kind === checkKind.violation).length
@@ -387,16 +431,64 @@ function recountOnEdit(event) {
 }
 
 /**
- * マス目を敷くのに要る 2 つ — その日の枠と、学籍番号から引く氏名である。
+ * 担当者が書き換えたセルに、手直しの印（メモ）を付ける（→ assignment-grid.js の fixedNote ／ 5-3 ／ issue #156）。
+ * 返すのは印を付けたセルの数である。
+ *
+ * 付けるのは時刻の列のデータの行だけである — 見出しの行と、名前のある 2 列（学籍番号・氏名）には付けない。
+ * 空にしたセルにも付ける。「この人をこの枠に置かない」という手直しである。
+ * 貼り付けで何セルもまとめて書き換えたときは、その範囲ぜんぶに付く（書き込みは 1 回で済ませる → 6 の #2）。
+ *
+ * 学籍番号を書き換えた行は、役割の入っているセルぜんぶに付ける。
+ * 行の持ち主を替えたので、その行の割り当ては担当者が別の人に置き直したものである。
+ */
+function markFixedCells(range) {
+  const sheet = range.getSheet()
+  const layout = gridLayouts(assignmentName).filter((one) => one.name === sheet.getName())[0]
+  if (!layout) return 0
+  const section = layout.sections[0]
+  const namedCount = section.columns.length
+  const width = sectionWidth(section)
+  const top = Math.max(range.getRow(), headerRowCount(layout) + 1)
+  const bottom = range.getLastRow()
+  if (bottom < top) return 0
+
+  let marked = 0
+  const left = Math.max(range.getColumn(), namedCount + 1)
+  const right = Math.min(range.getLastColumn(), width)
+  if (right >= left) {
+    const notes = []
+    for (let row = top; row <= bottom; row++) notes.push(new Array(right - left + 1).fill(fixedNote))
+    sheet.getRange(top, left, bottom - top + 1, right - left + 1).setNotes(notes)
+    marked += (bottom - top + 1) * (right - left + 1)
+  }
+
+  const studentIdColumn = section.columns.indexOf('学籍番号') + 1
+  if (range.getColumn() > studentIdColumn || range.getLastColumn() < studentIdColumn) return marked
+  const slots = sheet.getRange(top, namedCount + 1, bottom - top + 1, width - namedCount)
+  const values = slots.getValues()
+  const before = slots.getNotes()
+  const after = values.map((row, rowIndex) => row.map((cell, column) => {
+    if (normalizeValue(cell) === '' || isFixedNote(before[rowIndex][column])) return before[rowIndex][column]
+    marked += 1
+    return fixedNote
+  }))
+  slots.setNotes(after)
+  return marked
+}
+
+/**
+ * マス目を敷くのに要る 3 つ — その日の枠と、学籍番号から引く氏名と、担当者の手直しである。
  *
  * どちらも入力から出る。build を通った後に組んでいるので、枠の刻み直しはここでは起きない
  * （崩れていればコアの入口がすでに名指しして止まっている → input-types.js）。
  * 氏名は回答から引く。生成は氏名を 1 度も見ない（→ 5 の #1・assignment-grid.js の namesFromAnswers）。
+ * 手直しは、書き戻すときに印を付け直すのに使う（→ writeGrids）。
  */
 function gridContext(inputs) {
   return {
     days: toDays(inputs['日ごとの営業時刻'], '日ごとの営業時刻'),
     nameOf: namesFromAnswers(inputs['回答']),
+    fixed: inputs[fixedName] || [],
   }
 }
 
@@ -463,7 +555,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readInputsAndGrids, readSection, readGrid,
     putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids,
-    a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, recountOnEdit, gridContext,
+    a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, recountOnEdit, markFixedCells, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }

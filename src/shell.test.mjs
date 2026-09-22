@@ -11,6 +11,7 @@
 //   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
 //   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
 //   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、背景に役割の色・違反した所に赤い太字が出る（→ 5 の #8・issue #155）
+//   ⑧ 書き換えたセルに手直しの印（メモ）が付き、生成し直しても残る。残せないものは名指しで返る（→ 5-3・issue #156）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -27,8 +28,9 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // ---- 偽のスプレッドシート ---------------------------------------------------
 // 殻 が使うのは getSheetByName / getLastRow / getRange と、範囲の getValues・setValues・clearContent だけである。
 // 走る前の構造の検証（→ verify-structure.js）が、これに getMaxRows / getMaxColumns / getLastColumn を足す。
+// 手直しの印（→ 5-3）が、範囲の getNotes・setNotes・clearNote と、編集された範囲の位置（getRow など）を足す。
 
-const roundTrips = { reads: 0, writes: 0, formats: 0 }
+const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0 }
 
 /** A1 の書き方を 1 始まりの行と列に戻す（RangeList の偽のため）。 */
 function fromA1(a1) {
@@ -83,6 +85,36 @@ class FakeRange {
     return this
   }
   getSheet() { return this.sheet }
+  getRow() { return this.row }
+  getColumn() { return this.column }
+  getLastRow() { return this.row + this.rowCount - 1 }
+  getLastColumn() { return this.column + this.columnCount - 1 }
+  /** メモを読む・置く・消す。値の往復とは別に数える（→ ⑧）。 */
+  getNotes() {
+    roundTrips.notes += 1
+    const table = []
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      const row = []
+      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.notes.get(`${r},${c}`) ?? '')
+      table.push(row)
+    }
+    return table
+  }
+  setNotes(table) {
+    roundTrips.notes += 1
+    table.forEach((row, i) => row.forEach((note, j) => {
+      if (note === '') this.sheet.notes.delete(`${this.row + i},${this.column + j}`)
+      else this.sheet.notes.set(`${this.row + i},${this.column + j}`, note)
+    }))
+    return this
+  }
+  clearNote() {
+    roundTrips.notes += 1
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.notes.delete(`${r},${c}`)
+    }
+    return this
+  }
   clearContent() {
     roundTrips.writes += 1
     for (let r = this.row; r < this.row + this.rowCount; r++) {
@@ -95,7 +127,7 @@ class FakeRange {
 class FakeSheet {
   constructor(name, minColumns = 26) {
     Object.assign(this, {
-      name, cells: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), minColumns,
+      name, cells: new Map(), notes: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), minColumns,
     })
   }
   getName() { return this.name }
@@ -144,10 +176,10 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-viola
 }
 const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
-  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation,
+  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote,
 } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors })',
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote })',
   context,
 )
 
@@ -210,8 +242,9 @@ function filledBook() {
   ]
   answerRow.forEach((value, j) => answers.put(2, 1 + j, value))
 
-  // 前の周の手直し（→ 5-3）。マス目の 1 セルである — 行が人、列が枠、セルが役割名（→ issue #213）。
+  // 前の周の割り当て。マス目の 1 セルである — 行が人、列が枠、セルが役割名（→ issue #213）。
   // 2025-11-01 の枠は 08:00 から 30 分ずつなので、3 列目が 08:00-08:30 である。
+  // メモが無いので、前の周に機械が置いたセルである（手直しではない → ⑧）。
   const prepDay = book.getSheetByName(dayLabels[0])
   prepDay.put(1, 3, '08:00').put(1, 4, '08:30').put(1, 5, '09:00')
   prepDay.put(2, 1, 'EED2349987').put(2, 2, '高木琴音').put(2, 3, '準備')
@@ -301,11 +334,17 @@ check(
 )
 
 check(
-  '③ 読むのは 6 枚（条件入力・回答・マス目の 4 枚）で、入力の名前は 7 つである',
+  '③ メモの無いセルは手直しにならない（前の周に機械が置いたセルである → 5-3）',
+  inputs['手直し'],
+  [],
+)
+
+check(
+  '③ 読むのは 6 枚（条件入力・回答・マス目の 4 枚）で、入力の名前は 条件入力の区画 ＋ 回答・割り当て・手直し である',
   [sheetsToRead(), Object.keys(inputs).length],
   [
     ['条件入力', '回答'].concat(dayLabels),
-    sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 2,
+    sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 3,
   ],
 )
 
@@ -327,7 +366,7 @@ const withoutMetrics = { '指標を出す': null }
 const skeletonBook = filledBook()
 roundTrips.reads = 0
 roundTrips.writes = 0
-const notBuilt = run(skeletonBook, withoutMetrics)
+const notBuilt = run(skeletonBook, withoutMetrics).notBuilt
 
 check(
   '⑤ 骨組みのまま走らせても、マス目の手直しが残っている（→ 5-3）',
@@ -371,7 +410,7 @@ const fullNotBuilt = run(fullBook, {
   '違反を数える': () => [checkResultRow(checkKind.violation, '検便を通っていない')],
   '未充足を名指しする': () => [checkResultRow(checkKind.unmet, 'あと 1 人')],
   '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
-})
+}).notBuilt
 // 下の check が getValues を呼ぶので、数えた往復はここで写し取る
 const fullRoundTrips = { reads: roundTrips.reads, writes: roundTrips.writes }
 
@@ -404,7 +443,7 @@ check(
 const builtInBook = filledBook()
 check(
   '④ 段を差し替えずに回すと、指標が 1 人 1 行で書かれ、氏名は回答から引いてある（→ issue #154）',
-  [run(builtInBook, {}), builtInBook.getSheetByName('指標').getRange(2, 1, 1, 2).getValues()[0]],
+  [run(builtInBook, {}).notBuilt, builtInBook.getSheetByName('指標').getRange(2, 1, 1, 2).getValues()[0]],
   [[], ['EED2349987', '高木琴音']],
 )
 
@@ -613,6 +652,133 @@ check(
   '⑦ RangeList に渡す A1 の書き方（マス目は 50 列目＝AX 列まである）',
   [a1Notation(1, 1), a1Notation(3, 26), a1Notation(2, 27), a1Notation(2, 50)],
   ['A1', 'Z3', 'AA2', 'AX2'],
+)
+
+// ---- ⑧ 手直しの印（→ 5-3 ／ issue #156） -----------------------------------
+// 担当者が書き換えたセルにだけメモが付き、生成はそのセルを固定として先に置く。
+// 前の周に機械が置いたセル（メモが無い）は、生成し直せば組み直される。
+
+/** onEdit と同じ形で、1 セルを書き換える（値を置いてから、その範囲でイベントを起こす）。 */
+function edit(book, label, row, column, value) {
+  const sheet = book.getSheetByName(label)
+  sheet.put(row, column, value)
+  return recountOnEdit({ source: book, range: sheet.getRange(row, column) })
+}
+
+/** そのシートのメモを [キー, メモ] で並べる。 */
+function notesOf(book, label) {
+  return [...book.getSheetByName(label).notes.entries()].sort()
+}
+
+const markBook = filledBook()
+edit(markBook, dayLabels[0], 2, 5, '準備') // 11-01 09:00 に 準備（08:00 の 準備 は前の周の機械のセル）
+
+check(
+  '⑧ 書き換えたセルに手直しの印（メモ）が付く。見出しの行と名前のある 2 列には付かない',
+  [notesOf(markBook, dayLabels[0]), isFixedNote(fixedNote), isFixedNote('担当者が自分で書いたメモ')],
+  [[['2,5', fixedNote]], true, false],
+)
+
+check(
+  '⑧ 印の付いたセルだけが、入力の「手直し」になる（日・見出しの時刻・役割・学籍番号）',
+  readInputs(markBook)['手直し'],
+  [['2025-11-01', '09:00', '準備', 'EED2349987']],
+)
+
+run(markBook, {})
+check(
+  '⑧ 生成し直すと、印の付いたセルは残り、印の無い前の周のセルは組み直される（この人は調理の枠に置けないので消える）',
+  [
+    markBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 5).getValues()[0],
+    notesOf(markBook, dayLabels[0]),
+  ],
+  [['EED2349987', '高木琴音', '', '', '準備'], [['2,5', fixedNote]]],
+)
+
+run(markBook, {})
+check(
+  '⑧ もう一度生成し直しても残る（書き戻すときに印も付け直すので、次の周でも固定である）',
+  [markBook.getSheetByName(dayLabels[0]).getRange(2, 5, 1, 1).getValues()[0][0], notesOf(markBook, dayLabels[0])],
+  ['準備', [['2,5', fixedNote]]],
+)
+
+// 11-02 10:00 に 調理 と書いた。この人は 調理担当ですか？ が いいえ なので、置けば規則 5 の違反である。
+// 11-03 は、営業時刻を動かす前の列（07:00）に 会計 が書いてあり、印も付いている。
+const conflictBook = filledBook()
+edit(conflictBook, dayLabels[1], 1, 3, '10:00')
+edit(conflictBook, dayLabels[1], 2, 1, 'EED2349987')
+edit(conflictBook, dayLabels[1], 2, 3, '調理')
+const staleDay = conflictBook.getSheetByName(dayLabels[2])
+staleDay.put(1, 3, '07:00').put(2, 1, 'EED2349987').put(2, 3, '会計')
+staleDay.notes.set('2,3', fixedNote)
+
+const conflictOutput = run(conflictBook, {})
+const kindAt = checkResultColumns.indexOf('種別')
+
+check(
+  '⑧ 条件を破る手直しは置かれず、食い違った固定として検証結果の先頭に名指しで出る（違反は 0 件のまま）',
+  [
+    conflictBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => [row[0], row[1], row[2], row[4], row[7]]),
+    conflictOutput['検証結果'].filter((row) => row[kindAt] === checkKind.violation).length,
+  ],
+  [
+    [
+      [checkKind.fixConflict, '2025-11-02', '10:00', '調理', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
+      [checkKind.fixConflict, '2025-11-03', '07:00', '会計', 'いまの 2025-11-03 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+    ],
+    0,
+  ],
+)
+
+check(
+  '⑧ 営業時刻を動かした後の前の周の列があっても、生成は止まらない（前の周の列は書き直される）',
+  conflictBook.getSheetByName(dayLabels[2]).getRange(1, 1, 1, 3).getValues()[0],
+  ['学籍番号', '氏名', '08:00'],
+)
+
+check(
+  '⑧ 残せなかった手直しは、そのセルのメモに理由が出る。1 枠も置いていない人にも行が残る。'
+    + 'いまの枠に無いものは学籍番号のセルに出る（見出しは 08:00 から敷き直されるので、10:00 は 7 列目である）',
+  [
+    conflictBook.getSheetByName(dayLabels[1]).getRange(2, 1, 1, 3).getValues()[0],
+    notesOf(conflictBook, dayLabels[1]).map(([key, note]) => [key, note.startsWith('残せなかった手直し「調理」— 規則 5')]),
+    notesOf(conflictBook, dayLabels[2]).map(([key, note]) => [key, note.startsWith('残せなかった手直し「会計」— いまの 2025-11-03 の枠')]),
+  ],
+  [['EED2349987', '高木琴音', ''], [['2,7', true]], [['2,1', true]]],
+)
+
+check(
+  '⑧ 残せなかった手直しのメモは印にならない（次の生成で同じ食い違いを名指しし直さない）',
+  [readInputs(conflictBook)['手直し'], run(conflictBook, {})['検証結果'].filter((row) => row[kindAt] === checkKind.fixConflict)],
+  [[], []],
+)
+
+// 会計 を 11-01 の調理帯に 1 人立てた。この人は 11-01 の 8:00-21:00 を希望しているので、生成は 10:00 から置く。
+// 10:00 のセルを空にした（＝ この人をここに置かない）。空のセルにも印が付き、生成はそこへ置かない。
+const removalBook = filledBook()
+removalBook.getSheetByName('条件入力').put(3, 11, '会計').put(3, 12, 1)
+run(removalBook, {})
+const before10 = removalBook.getSheetByName(dayLabels[0]).getRange(2, 7, 1, 2).getValues()[0]
+edit(removalBook, dayLabels[0], 2, 7, '')
+run(removalBook, {})
+
+check(
+  '⑧ 空にしたセルも手直しである — 生成し直しても、その人はその枠に戻らない（印は空のセルに残る）',
+  [
+    before10,
+    removalBook.getSheetByName(dayLabels[0]).getRange(2, 7, 1, 2).getValues()[0],
+    notesOf(removalBook, dayLabels[0]).filter(([key]) => key === '2,7').map(([, note]) => note),
+  ],
+  [['会計', '会計'], ['', '会計'], [fixedNote]],
+)
+
+// 学籍番号を書き換えた行は、行の持ち主を替えたことになる。役割の入っているセルぜんぶに印が付く。
+const ownerBook = filledBook()
+edit(ownerBook, dayLabels[0], 2, 1, 'EED2349987')
+check(
+  '⑧ 学籍番号を書き換えた行は、役割の入っているセルぜんぶに印が付く（空のセルと名前の列には付かない）',
+  notesOf(ownerBook, dayLabels[0]),
+  [['2,3', fixedNote]],
 )
 
 // ---- シートが無いとき -------------------------------------------------------

@@ -8,8 +8,9 @@
 //   ② 人数が足りない枠が全部名指しで出る（置いた数 ＋ あと何人 ＝ 需要 → 5-4・name-unmet.js）
 //   ③ 同じ入力からは同じ案が出る（決定的である → 6 の #3 の理由 ③）
 //   ④ 外部のソルバーを読んでいない（→ 6 の #3）
-//   ⑤ 5-5 の適用の順序どおりに置く（きつい順 ／ 入れ替え 1 手 ／ 帯の中 ／ 氏名は空 ／ 固定は見ない）
+//   ⑤ 5-5 の適用の順序どおりに置く（きつい順 ／ 入れ替え 1 手 ／ 帯の中 ／ 氏名は空）
 //   ⑥ 決まらない入力で止まり、コアの段として繋がっている
+//   ⑦ 担当者の手直し（固定）を先に置き、再実行で残す。置けない固定は名指しで返し、違反は作らない（→ 5-3・issue #156）
 //
 // 規則を決めたのは上流である（→ docs/tech-requirements.md 3）。方式は 6 の #3、適用の順序は 5-5 が持つ。
 // 扱いが動いたら、ここと src/generate.js の generationOrder ／ generationNotAimed が一緒に動く。
@@ -40,7 +41,7 @@ function load(files) {
 // shell.js を読むのは、モックの CSV を回答シートに貼ったときの表現に揃えるためである（→ ①）。
 const context = load(coreFiles.concat(['shell.js']))
 const {
-  generate, expand, takeIn, countViolations, nameUnmet, builtInSteps, sheetColumns, formatDateTime,
+  generate, expand, takeIn, countViolations, nameUnmet, nameFixedConflicts, builtInSteps, sheetColumns, formatDateTime,
   toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toPlacementRule,
   demandUnits, fillTightestFirst, swapWithinSlot, placedCount, minRunSlotsToPlaceBy,
 } = context
@@ -466,14 +467,6 @@ check(
   [],
 )
 
-check(
-  '⑤ 固定（5-3）は 1 行も見ない — 渡しても案が変わらない（積むのは #156 である）',
-  JSON.stringify(planOf([plainDay], fiveRoles, wholeDayWishes, {
-    fixed: [['2025-11-01', '08:00', '08:30', '会計', 'EED2000009', '']],
-  }).rows),
-  JSON.stringify(planOf([plainDay], fiveRoles, wholeDayWishes).rows),
-)
-
 // 役割名は弾かない（→ 規則 6 の ③）。5 役割に無い名前の指定枠にも置く。
 const patrolPlan = planOf([plainDay], fiveRoles, wholeDayWishes, {
   committee: [['2025-11-01', '12:00', '12:15', 'クリーンパトロール', 1]],
@@ -492,14 +485,14 @@ check(
 )
 
 check(
-  '⑤ 踏む段は 4 つで、目的にしないものは 4 つ名前で置いてある（⑥・1 日の上限・固定・氏名 → 5-5）',
+  '⑤ 踏む段は 5 つで（固定が先頭 → 5-3）、目的にしないものは 4 つ名前で置いてある（⑥・1 日の上限・前の周の機械のセル・氏名 → 5-5）',
   [generationOrder.map((step) => step.key), generationNotAimed.map((one) => one.what)],
   [
-    ['fill', 'swap', 'prepCleanup', 'prepCleanupDemand'],
+    ['fixed', 'fill', 'swap', 'prepCleanup', 'prepCleanupDemand'],
     [
       '規則 3 の ⑥（複数日で偏らせない）',
       '1 日の上限（例: 中央の 1.5 倍まで）',
-      '5-3 の固定（担当者が割り当てシートに入れた手直し）',
+      '前の周に機械が置いたセル',
       '割り当ての 氏名',
     ],
   ],
@@ -510,6 +503,220 @@ check(
   '⑤ まとまりで置けない端が 5 つ名前で置いてある（隠さない → 5-5・count-violations.js の同じ置き方）',
   runExceptions.map((one) => one.what),
   ['希望の切れ目', '帯の切れ目', '需要の切れ目', '規則 3 の端', 'そこしか置けないとき'],
+)
+
+// ---- ⑦ 固定を先に置き、再実行で残す（→ 5-3 ／ issue #156） ------------------
+// 手直しの行は 日 ／ 開始（マス目の見出しの時刻）／ 役割 ／ 学籍番号 である（→ sheet-layout.js の fixedColumns）。
+// 役割が空の行は「この人をこの枠に置かない」である。
+
+/** 手直し 1 件。 */
+function fixOf(start, role, studentId, date) {
+  return [date || '2025-11-01', start, role, studentId]
+}
+
+/** その案に、その人がその枠のその役割で入っているか。 */
+function isAt(plan, start, role, studentId) {
+  return plan.rows.some((row) => (
+    columnOf(row, '開始') === start && columnOf(row, '役割') === role && columnOf(row, '学籍番号') === studentId
+  ))
+}
+
+/** 固定を渡して案を組み、名指しもいっしょに返す。 */
+function fixedPlanOf(needRows, wishes, fixed, more) {
+  const plan = planOf([plainDay], needRows, wishes, Object.assign({}, more || {}, { fixed: fixed }))
+  plan.conflicts = nameFixedConflicts(fixed, plan.candidates, plan.conditions, plan.wishes)
+  return plan
+}
+
+/** 名指しの行から (開始・役割・学籍番号・内容) を引く。 */
+function conflictsOf(plan) {
+  return plan.conflicts.map((row) => ['開始', '役割', '学籍番号', '内容'].map((name) => row[checkResultColumns.indexOf(name)]))
+}
+
+// 担当者が前の周の案に赤を入れた — 店の役割（調理の外）の 3 セルを別の役割に書き換え、1 セルを空にした。
+// そのあと締切後の提出が 1 人来た（→ 5 の #11 の「締切後の提出 ◎」）。再実行しても、書き換えた 4 セルが戻らない。
+const shopRows = plainPlan.rows.filter((row) => ['会計', '呼び込み', '列整理'].indexOf(columnOf(row, '役割')) !== -1)
+const rotated = { '会計': '呼び込み', '呼び込み': '列整理', '列整理': '会計' }
+const handFixes = shopRows.slice(0, 3)
+  .map((row) => fixOf(columnOf(row, '開始'), rotated[columnOf(row, '役割')], columnOf(row, '学籍番号')))
+  .concat([fixOf(columnOf(shopRows[3], '開始'), '', columnOf(shopRows[3], '学籍番号'))])
+const lateWishes = wholeDayWishes.concat([wishOf('EED2000100', ['8:00-20:00'], { grade: '4年生' })])
+const rerun = fixedPlanOf(fiveRoles.concat(prepCleanupNeeds), lateWishes, handFixes)
+
+check(
+  '⑦ 再実行しても、担当者が書き換えたセルが 1 つも戻らない（書き換えた 3 セルは書いた役割のまま → 5 の #11）',
+  handFixes.slice(0, 3).map((fix) => isAt(rerun, fix[1], fix[2], fix[3])),
+  [true, true, true],
+)
+
+check(
+  '⑦ 空にしたセルも戻らない — その人はその枠に置かれない（ほかの人がその役割を埋めるのは構わない）',
+  rerun.rows.filter((row) => columnOf(row, '開始') === handFixes[3][1] && columnOf(row, '学籍番号') === handFixes[3][3]),
+  [],
+)
+
+check(
+  '⑦ 固定を積んで再実行しても、違反は 0 件で、名指しされる固定も 0 件である（どれも条件を満たしている）',
+  [violationsOf(rerun).length, rerun.conflicts.length],
+  [0, 0],
+)
+
+/** 需要のある (日・枠・役割) ごとに、置いた数を要る人数で頭打ちにして足す（手直しの超過は需要を埋めたぶんだけ数える）。 */
+function placedUpToDemand(plan) {
+  let total = 0
+  plan.conditions.days.forEach((day) => {
+    day.slots.forEach((slot) => {
+      demandRoles(plan).forEach((role) => {
+        const here = plan.rows.filter((row) => (
+          columnOf(row, '日') === day.date && columnOf(row, '開始') === slot.start && columnOf(row, '役割') === role
+        )).length
+        total += Math.min(here, requiredFor(plan, day, slot, role))
+      })
+    })
+  })
+  return total
+}
+
+check(
+  '⑦ 未充足の名指しは、固定を積んでも欠けない（要る人数までに置いた数 ＋ あと何人 ＝ 需要）',
+  placedUpToDemand(rerun) + unmetOf(rerun).reduce((sum, row) => sum + row[checkResultColumns.indexOf('あと何人')], 0),
+  demandTotal(rerun),
+)
+
+check(
+  '⑦ 同じ固定からは同じ案が出る（決定的である → 6 の #3 の理由 ③）',
+  JSON.stringify(fixedPlanOf(fiveRoles.concat(prepCleanupNeeds), lateWishes, handFixes).rows),
+  JSON.stringify(rerun.rows),
+)
+
+// 要る人数（会計 1）を超える固定は、違反ではないので置く（→ 5-4）。生成はその枠に人を足さない。
+const overPlan = fixedPlanOf(fiveRoles, wholeDayWishes, [
+  fixOf('14:00', '会計', 'EED2000001'), fixOf('14:00', '会計', 'EED2000003'),
+])
+check(
+  '⑦ 要る人数を超える固定も置く（超過は違反ではない → 5-4）。その枠には生成が人を足さない',
+  [
+    overPlan.rows.filter((row) => columnOf(row, '開始') === '14:00' && columnOf(row, '役割') === '会計').map((row) => columnOf(row, '学籍番号')),
+    violationsOf(overPlan).length,
+  ],
+  [['EED2000001', 'EED2000003'], 0],
+)
+
+// 食い違った固定 — 置けば条件を破るので置かず、理由と一緒に名指しで返す（→ 5-3）。
+//   EED2000001 は 2 年生・調理担当ですか？ が いいえ（i = 1）／ EED2000000 は 1 年生（i = 0）
+//   EED2000200 は 11:00 までしか希望していない
+const narrowWishes = wholeDayWishes.concat([wishOf('EED2000200', ['8:00-11:00'])])
+const conflictPlan = fixedPlanOf(fiveRoles.concat(prepCleanupNeeds), narrowWishes, [
+  fixOf('10:00', '調理', 'EED2000001'),
+  fixOf('10:30', '調理責任者', 'EED2000000'),
+  fixOf('15:00', '会計', 'EED2000200'),
+  fixOf('11:00', '会計', 'EED2009999'),
+  fixOf('07:00', '会計', 'EED2000002'),
+  fixOf('12:00', '会計', 'EED2000004'),
+  fixOf('12:00', '列整理', 'EED2000004'),
+])
+
+check(
+  '⑦ 条件を破る固定は置かず、どの規則で置けないかを名指しで返す（見る順は 枠 → 二重 → 規則 1 → 5 → 4 → 3）',
+  conflictsOf(conflictPlan),
+  [
+    ['10:00', '調理', 'EED2000001', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
+    ['10:30', '調理責任者', 'EED2000000', '規則 4: 調理責任者 の枠だが、学年が 3年生 / 4年生 でない（いま: 1年生）'],
+    ['11:00', '会計', 'EED2009999', '規則 1: この人の回答が無い'],
+    ['12:00', '列整理', 'EED2000004', '同じ枠に二重: 同じ人の同じ 30 分枠に、手直しがもう 1 つある'],
+    ['15:00', '会計', 'EED2000200', '規則 1: 希望の時間の外である'],
+    ['07:00', '会計', 'EED2000002', 'いまの 2025-11-01 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+  ],
+)
+
+check(
+  '⑦ 名指しした固定は案に入っておらず（黙って置かない）、固定のせいで違反は 1 件も作られていない',
+  [
+    [
+      isAt(conflictPlan, '10:00', '調理', 'EED2000001'),
+      isAt(conflictPlan, '10:30', '調理責任者', 'EED2000000'),
+      isAt(conflictPlan, '15:00', '会計', 'EED2000200'),
+      isAt(conflictPlan, '12:00', '列整理', 'EED2000004'),
+    ],
+    isAt(conflictPlan, '12:00', '会計', 'EED2000004'),
+    violationsOf(conflictPlan).length,
+  ],
+  [[false, false, false, false], true, 0],
+)
+
+// 規則 3 と固定 — 準備・片付けの手直しは、店の割り当てが出そろってから向きを見る（→ releaseMisfitBandFixes）。
+//   EED2000300 … 午前の店の時間を希望していない（8:00-9:00 と 14:00-15:00 と 18:00-19:00）。
+//                午後だけの店の固定（14:00 会計）＋ 準備の固定 → 生成が午前を足せないので ③ のまま。準備を外して名指しする
+//   EED2000003 … 1 日じゅう希望している。午後だけの店の固定 ＋ 準備の固定 → 生成が午前に店の枠を足せば ④ で満たす
+//   EED2000005 … 午前の店の固定（10:00 会計）＋ 準備の固定 → ② のとおりなので両方置く。生成は片付けを足さない
+//   EED2000007 … 準備と片付けの両方を固定 → 後から来た片付けは置かない（④ 片方だけ）
+const rule3Wishes = wholeDayWishes.concat([wishOf('EED2000300', ['8:00-9:00,14:00-15:00,18:00-19:00'], { canCook: false })])
+const rule3Plan = fixedPlanOf(fiveRoles.concat(prepCleanupNeeds), rule3Wishes, [
+  fixOf('14:00', '会計', 'EED2000300'), fixOf('08:00', '準備', 'EED2000300'),
+  fixOf('14:00', '呼び込み', 'EED2000003'), fixOf('08:30', '準備', 'EED2000003'),
+  fixOf('10:00', '会計', 'EED2000005'), fixOf('09:00', '準備', 'EED2000005'),
+  fixOf('09:30', '準備', 'EED2000007'), fixOf('18:30', '片付け', 'EED2000007'),
+])
+
+check(
+  '⑦ 規則 3 と向きの合わない準備・片付けの固定は、どう合わないかを名指しで返す（→ 3 の規則 3 の ③④）',
+  conflictsOf(rule3Plan).map((one) => [one[0], one[1], one[2], one[3].slice(0, 7)]),
+  [
+    ['18:30', '片付け', 'EED2000007', '規則 3: そ'],
+    ['08:00', '準備', 'EED2000300', '規則 3: ③'],
+  ],
+)
+
+check(
+  '⑦ 外した後は、その日の正しい側が置かれる（午後だけ → 片付け。違反にしない）',
+  rule3Plan.rows.filter((row) => columnOf(row, '学籍番号') === 'EED2000300').map((row) => [columnOf(row, '開始'), columnOf(row, '役割')]),
+  [['14:00', '会計'], ['18:00', '片付け']],
+)
+
+check(
+  '⑦ 生成が反対側の半日に店の枠を足せるなら、準備の固定は外さない（午前の店の枠が足され、④ で満たす）',
+  [
+    isAt(rule3Plan, '08:30', '準備', 'EED2000003'),
+    rule3Plan.rows.some((row) => columnOf(row, '学籍番号') === 'EED2000003' && columnOf(row, '開始') < '12:00'
+      && ['準備', '片付け'].indexOf(columnOf(row, '役割')) === -1),
+  ],
+  [true, true],
+)
+
+check(
+  '⑦ 向きの合う準備の固定は置き、その日の規則 3 はそれで満たす（生成が片付けを足して ④ を壊さない）',
+  [
+    isAt(rule3Plan, '09:00', '準備', 'EED2000005'),
+    rule3Plan.rows.filter((row) => columnOf(row, '学籍番号') === 'EED2000005' && columnOf(row, '役割') === '片付け').length,
+    isAt(rule3Plan, '09:30', '準備', 'EED2000007'),
+  ],
+  [true, 0, true],
+)
+
+check(
+  '⑦ 準備・片付けを固定した人が居ても、生成が規則 3 を破る置き方をしない（違反 0 件）',
+  violationsOf(rule3Plan).length,
+  0,
+)
+
+// 準備だけを固定した人は、生成が午後だけの店の枠に置かない（置けば ③ で片付けが要り、準備は外せない）。
+const prepOnlyPlan = fixedPlanOf(fiveRoles, wholeDayWishes, [fixOf('08:00', '準備', 'EED2000006')])
+check(
+  '⑦ 準備だけを固定した人を、生成は午後だけの日にしない（違反 0 件・準備の固定は残る）',
+  [violationsOf(prepOnlyPlan).length, isAt(prepOnlyPlan, '08:00', '準備', 'EED2000006')],
+  [0, true],
+)
+
+check(
+  '⑦ 需要が 1 行も無くても、固定は置かれる（黙って消えない）',
+  fixedPlanOf([], wholeDayWishes, [fixOf('08:00', '準備', 'EED2000006')]).rows.map((row) => [columnOf(row, '開始'), columnOf(row, '役割')]),
+  [['08:00', '準備']],
+)
+
+check(
+  '⑦ 段の表は、固定を照らす段を 156 として持ち、検証結果に書く段である（→ 8 の 11）',
+  coreSteps.filter((step) => step.name === '固定を照らす').map((step) => [step.issue, step.writesTo]),
+  [[156, '検証結果']],
 )
 
 // ---- ⑥ 決まらない入力で止まり、段として繋がっている -------------------------
@@ -638,6 +845,45 @@ check(
   '③ 前回のモックでも、2 回通すと同じ案が返る（→ 6 の #3 の理由 ③）',
   JSON.stringify(planOf(lastYearDayRows, fiveRolesWholeDay, expandable).rows),
   JSON.stringify(mockPlan.rows),
+)
+
+// 前回のモックの大きさで、手直しを積んで通し直す（→ 5 の #11「動かしたセルが 1 つも戻っていない」・issue #156）。
+// 案の 7 行に 1 行を手直しにする — 店の役割（調理の外）は別の役割に書き換え、それ以外は書いてあるとおりに固定する。
+// 11 行に 1 行（7 の倍数を除く）は、セルを空にする（その人をその枠に置かない）。
+const mockFixes = []
+mockPlan.rows.forEach((row, index) => {
+  const at = [columnOf(row, '日'), columnOf(row, '開始')]
+  const role = columnOf(row, '役割')
+  if (index % 7 === 0) mockFixes.push(at.concat([rotated[role] || role, columnOf(row, '学籍番号')]))
+  else if (index % 11 === 0) mockFixes.push(at.concat(['', columnOf(row, '学籍番号')]))
+})
+const mockRerun = planOf(lastYearDayRows, fiveRolesWholeDay, expandable, { fixed: mockFixes })
+const mockConflicts = nameFixedConflicts(mockFixes, mockRerun.candidates, mockRerun.conditions, mockRerun.wishes)
+const mockNamed = mockConflicts.map((row) => ['日', '開始', '学籍番号'].map((name) => row[checkResultColumns.indexOf(name)]).join(' '))
+const mockReturned = mockFixes.filter((fix) => {
+  if (mockNamed.indexOf([fix[0], fix[1], fix[3]].join(' ')) !== -1) return false // 名指しで返したものは除く（→ 5 の #11）
+  const here = mockRerun.rows.filter((row) => (
+    columnOf(row, '日') === fix[0] && columnOf(row, '開始') === fix[1] && columnOf(row, '学籍番号') === fix[3]
+  ))
+  return fix[2] === '' ? here.length > 0 : !here.some((row) => columnOf(row, '役割') === fix[2])
+})
+
+check(
+  '⑦ 前回のモックでも、手直しを積んで通し直すと、戻ったセルが 0（名指しで返したものを除く）で、違反も 0 件である',
+  [mockFixes.length > 100, mockReturned.length, violationsOf(mockRerun).length],
+  [true, 0, 0],
+)
+
+// このモックの置き方は準備の帯が 0 枠である（1 日 1 本の帯 → 上の lastYearDayRows）。午前だけの店の手直しは、
+// 生成が同じ人の午後の枠を足せたときだけ満たせる（④ → 片付け）。足せなかった日の手直しだけが名指しで返る
+// （外すのは、残りで規則 3 を満たせる最小の側である → generate.js の releaseFixesBreakingRule3）。
+check(
+  '⑦ 前回のモックで名指しされるのは、規則 3 を満たせない日の手直しだけで、名指しは手直しの 1 割に満たない',
+  [
+    mockConflicts.every((row) => row[checkResultColumns.indexOf('内容')].startsWith('規則 3: ')),
+    mockConflicts.length * 10 < mockFixes.length,
+  ],
+  [true, true],
 )
 
 check(
