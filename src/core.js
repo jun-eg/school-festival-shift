@@ -1,29 +1,17 @@
 /**
  * コア — 配列を受けて配列を返す純粋な関数の置き場（docs/tech-requirements.md 6 の #8）。
  *
- * SpreadsheetApp を 1 度も掴まない。掴んだ瞬間に、6-1 の #2 に書いてある逃げ道
- * （実行時間の上限に当たったら生成をブラウザ側に移す。方式は変えない）が、書き方のせいで消える
- * — ダイアログの中に SpreadsheetApp は無い。
+ * SpreadsheetApp を掴まない。掴むと、生成をブラウザ側に移す逃げ道（→ 6-1 の #2）が消える。
+ * 読み書きと値の表現を揃えるのは shell.js で、ここには文字列と数値だけの行が来る（→ checkRepresentation）。
+ * 行は入口で 5-1 の型に直してから段へ渡す（→ takeConditions）。
+ * 中身の入っていない段は空の配列を返し、「まだ作っていない」を名指しで持ち帰る。
  *
- * 読み書きと、値の表現を揃えるのは shell.js の仕事である。
- * ここに入ってくるのは、文字列と数値だけでできた行の配列である（→ checkRepresentation）。
- * 揺れを殻に閉じ込めないと、決定性がコアの外で崩れる（→ 6 の #8 の理由 ③）。
- *
- * 行のまま段へ渡さない。入口で 5-1 の型に直してから渡す（→ input-types.js ／ takeConditions）。
- * 段が受け取るのは型であって、シートの列の並びではない。
- *
- * 段の中身は、それぞれの issue が入れる（→ coreSteps）。入っている段は builtInSteps が持つ。
- * 入っていない段は空の配列を返し、「まだ作っていない」を名指しで持ち帰る。黙って走らない。
- * ここに判断を新しく書かない（→ src/README.md）。
- *
- * 他のファイルの値をこのファイルの最上位で使わない。Apps Script は .gs を 1 つずつ順に評価するので、
- * 並び順で壊れる。sheet-layout.js を見るのは関数の中だけにしてある。
+ * 他のファイルの値を最上位で使わない。Apps Script は .gs を順に評価するので、並び順で壊れる。
  */
 
 /**
- * コアの段と、それぞれの中身を入れる issue（docs/tech-requirements.md 8「作業の順序」）。
- * 並びは build が呼ぶ順である。writesTo は、その段が行を出す生成シートである（出さない段は null）。
- * name の値は段の名前で、steps のキーと突き合わせる文字列である（→ build）。
+ * コアの段と、中身を入れる issue（→ 8「作業の順序」）。並びは build が呼ぶ順である。
+ * writesTo は段が行を出す生成シート（出さない段は null）。name は steps のキーと突き合わせる。
  */
 const coreSteps = [
   { name: '取り込む', issue: 146, writesTo: null, whatItDoes: '回答の行を 1 人 1 件に畳む（規則 2 ／ 8 の 6）' },
@@ -36,36 +24,31 @@ const coreSteps = [
 ]
 
 /**
- * 中身が入っている段。渡された steps が同じ名前を持っていれば、そちらが勝つ
- * （段を差し替えて先に回せる形は動かさない → build）。
- *
- * ここに名前が無い段は「まだ作っていない」である。入れたら 1 行足す
- * — 入っているのに未了として名指しすると、notBuilt が嘘になる。
- * 関数の中で見ているのは、ファイルを貼る順に依存しないためである（→ 先頭の注意）。
+ * 中身が入っている段。渡された steps が同じ名前を持っていれば、そちらが勝つ（→ build）。
+ * 段を入れたらここに 1 行足す。関数の中で見るのは、ファイルを貼る順に依存しないためである。
  */
 function builtInSteps() {
-  // 手で貼る形なので、1 ファイル貼り忘れることがある（→ src/README.md の「clasp を本筋にしない」）。
-  // 貼られていなければ名指しして止まる。入っている段を「まだ作っていない」に混ぜない。
+  // 手で貼るので貼り忘れがある。入っている段を「まだ作っていない」に混ぜず、名指しして止まる。
   if (typeof takeIn !== 'function') {
-    throw new Error('take-in.js が貼られていない（「取り込む」の中身がそこにある → issue #146）')
+    throw new Error('take-in.js が貼られていない')
   }
   if (typeof expand !== 'function') {
-    throw new Error('expand.js が貼られていない（「展開する」の中身がそこにある → issue #149）')
+    throw new Error('expand.js が貼られていない')
   }
   if (typeof generate !== 'function') {
-    throw new Error('generate.js が貼られていない（「生成する」の中身がそこにある → issue #151）')
+    throw new Error('generate.js が貼られていない')
   }
   if (typeof nameFixedConflicts !== 'function') {
-    throw new Error('generate.js が古い（「固定を照らす」の中身がそこにある → issue #156）。貼り直す')
+    throw new Error('generate.js が古い。貼り直す')
   }
   if (typeof countViolations !== 'function') {
-    throw new Error('count-violations.js が貼られていない（「違反を数える」の中身がそこにある → issue #141）')
+    throw new Error('count-violations.js が貼られていない')
   }
   if (typeof nameUnmet !== 'function') {
-    throw new Error('name-unmet.js が貼られていない（「未充足を名指しする」の中身がそこにある → issue #142）')
+    throw new Error('name-unmet.js が貼られていない')
   }
   if (typeof fairnessMetrics !== 'function') {
-    throw new Error('fairness-metrics.js が貼られていない（「指標を出す」の中身がそこにある → issue #154）')
+    throw new Error('fairness-metrics.js が貼られていない')
   }
   return {
     '取り込む': takeIn,
@@ -79,27 +62,25 @@ function builtInSteps() {
 }
 
 /**
- * コアが返す束。生成が書く 3 つである（→ 5 の #6・#7・5-4）。
- * 「割り当て」だけはシート 1 枚に対応しない — 日ごとの 4 枚にマス目で載る（→ sheet-layout.js の dayLabels）。
- * どのシートのどこに敷くかは殻が決める（→ shell.js の writeOutputs）。
+ * コアが返す束（→ 5-4・5 の #7）。どこに敷くかは殻が決める（→ shell.js の writeOutputs）。
+ * 「割り当て」だけはシート 1 枚でなく、日ごとの 4 枚にマス目で載る。
  */
 const outputNames = ['割り当て', '検証結果', '指標']
 
-/** コアが読まないシート。生成しか書かないので、入力にならない（→ 5-4・5 の #7）。 */
+/** コアが読まないシート。生成しか書かないので入力にならない。 */
 const sheetsNotRead = ['検証結果', '指標']
 
 /**
- * コアが受け取る入力の名前。値はどれも「行の配列」である。
- * 条件入力は区画ごと（5-1 の #1〜#5）、回答はシート 1 枚で 1 つ。
- * マス目の 4 枚からは 2 つ出る — 割り当て（いま書いてあるとおり。数え直しが読む → recount）と、
- * 手直し（担当者が書き換えたセルだけ。生成が固定として先に置く → 5-3）である。
- * 名前は sheet-layout.js から引く — 文字列を二重に持つと、片方が古くなる。
+ * コアが受け取る入力の名前。値はどれも行の配列である。
+ * 条件入力は区画ごと、回答はシート 1 枚で 1 つ。マス目の 4 枚からは
+ * 割り当て（数え直しが読む）と手直し（担当者が書き換えたセル。生成が固定として置く → 5-3）の 2 つが出る。
+ * 名前は sheet-layout.js から引く。
  */
 function inputNames() {
   const names = []
   sheetLayout.forEach((layout) => {
     if (sheetsNotRead.indexOf(layout.name) !== -1) return
-    // マス目の 4 枚は、まとまって 2 つの入力になる（→ sheet-layout.js の grid）。
+    // マス目の 4 枚は、まとまって 2 つの入力になる。
     if (layout.grid) {
       ;[layout.grid.of, layout.grid.fixed].forEach((name) => { if (names.indexOf(name) === -1) names.push(name) })
       return
@@ -109,10 +90,7 @@ function inputNames() {
   return names
 }
 
-/**
- * 条件入力の 6 区画の名前（→ 5-1 の #1〜#5 と #7）。殻が読む単位であり、入力の名前の一部である。
- * 段に渡るのはこの名前ではなく、ここから直した型のほうである（→ takeConditions）。
- */
+/** 条件入力の 6 区画の名前。段に渡るのはここから直した型のほうである（→ takeConditions）。 */
 function conditionNames() {
   return sheetLayout
     .filter((layout) => layout.name === '条件入力')[0]
@@ -122,13 +100,10 @@ function conditionNames() {
 /**
  * 入力の行から、生成シート 3 枚の行を組む。
  *
- * steps は段の名前から関数への対応である（中身が入っていて渡さなかった段は builtInSteps が、
- * どちらにも無い段は「まだ作っていない」になる）。
- * 差し替えで渡せる形にしてあるのは、8 の 3 が 8 の 8 より先にあるからである
- * — 数える側だけを先に入れて、生成が無いまま回せる。
+ * steps は段の名前から関数への対応で、builtInSteps を差し替える。どちらにも無い段は「まだ作っていない」になる。
+ * 差し替えられるのは、数える側を生成より先に回すためである（→ 8 の 3）。
  *
- * 返すもの: { 割り当て, 検証結果, 指標, notBuilt }。シート 3 枚のキーは、シート名そのものである。
- * notBuilt は中身の入っていない段の名指しである。どう見せるか・どこまで書くかは殻が決める。
+ * 返すもの: { 割り当て, 検証結果, 指標, notBuilt }。notBuilt は中身の入っていない段で、見せ方は殻が決める。
  */
 function build(inputs, steps) {
   checkRepresentation(inputs)
@@ -146,29 +121,26 @@ function build(inputs, steps) {
 
   const conditions = takeConditions(inputs)
 
-  // 回答をそのまま先へ流さない。取り込み（規則 2）を通った希望だけが下流へ行く。
-  // 取り込むが返すのは型 #6（1 人 1 件）で、友達欄も氏名もそこに乗っていない（→ 5-2・input-types.js）。
+  // 取り込み（規則 2）を通った型 #6 だけが下流へ行く。友達欄も氏名も乗らない（→ 5-2）。
   const wishes = callStep('取り込む', [inputs['回答']])
   const candidates = callStep('展開する', [wishes, conditions.days])
 
-  // 担当者が書き換えたセルだけが固定である（→ 5-3。印はセルのメモ → assignment-grid.js の fixedNote）。
-  // 前の周に機械が置いたセル（入力の「割り当て」）は、生成に渡さない — 渡すと、どこが人の意思かが消える。
-  // 置けない固定は、生成が黙って落とすのではなく、ここで名指しされる（→ generate.js の nameFixedConflicts）。
+  // 固定は担当者が書き換えたセルだけである（→ 5-3）。前の周に機械が置いた「割り当て」は渡さない。
+  // 置けない固定は、ここで名指しされる（→ generate.js の nameFixedConflicts）。
   const fixed = inputs[fixedName]
   const fixConflicts = callStep('固定を照らす', [fixed, candidates, conditions, wishes])
 
-  // 生成にも希望が渡る。規則 4 の学年と規則 5 の調理可否は候補に乗っていない（→ #149）ので、
-  // 型 #6 を見ないと、違反を作らずに置くかどうかが決まらない（→ generate.js の canStandAt）。
+  // 規則 4 の学年と規則 5 の調理可否は候補に乗っていないので、生成にも希望を渡す。
   const assignments = callStep('生成する', [candidates, conditions, wishes, fixed])
 
-  // 違反と未充足は別に数えて、同じ 1 枚に種別で分けて並べる（→ 5-4）。
-  // 数える側に候補も渡る。規則 1 の違反（希望の時間の外）は、展開した枠と照らさないと見えない。
+  // 違反と未充足は別に数えて、同じ 1 枚に種別で並べる（→ 5-4）。
+  // 規則 1 の違反は展開した枠と照らさないと見えないので、候補も渡す。
   const violations = callStep('違反を数える', [assignments, conditions, wishes, candidates])
   const unmet = callStep('未充足を名指しする', [assignments, conditions])
-  // 指標に希望が渡るのは、1 枠も置かれなかった人も 0 で並べるためである（→ fairness-metrics.js）。
+  // 1 枠も置かれなかった人も 0 で並べるため、指標にも希望を渡す。
   const metrics = callStep('指標を出す', [assignments, conditions, wishes])
 
-  // 食い違った固定を先頭に置く。未充足は何十行も並ぶので、後ろに回すと担当者の目に入らない（→ 5-3「黙って外さない」）。
+  // 食い違った固定を先頭に置く。未充足は何十行も並ぶので、後ろだと目に入らない。
   const output = { '割り当て': assignments, '検証結果': fixConflicts.concat(violations, unmet), '指標': metrics }
   checkOutput(output)
   output.notBuilt = notBuilt
@@ -178,25 +150,15 @@ function build(inputs, steps) {
 /**
  * 手直しの後に、違反と未充足と指標を数え直す（→ 5 の #8 ／ issue #155）。
  *
- * 生成を走らせない。マス目に書いてあるとおりを、そのまま割り当てとして数える（→ keepAsPlaced）。
- * 生成を走らせると、担当者が 1 セル書き換えるたびに残りの枠が組み直され、
- * 「その 1 手で何が変わったか」が見えなくなる。組み直すのはメニューの「生成」を押したときだけである。
- *
- * 数える段は build と同じものを通す — 数え方を 2 通りに持たない（→ src/README.md）。
- * 返すものも build と同じ束である。割り当ては読んだマス目そのもので、殻は書き戻さない（→ shell.js の recountSpreadsheet）。
- *
- * 固定は照らさない（→ noFixedToCheck）。手直しはマス目にもう書いてあるので、
- * 条件を破っていれば違反として数えられ、セルに赤い太字で出る（→ 5 の #13 の ①）。
- * 照らすと、同じ 1 セルが「違反」と「食い違った固定」の 2 行で出る。
+ * 生成を走らせず、マス目に書いてあるとおりを数える（→ keepAsPlaced）。走らせると 1 セル直すたびに
+ * 残りが組み直され、その 1 手で何が変わったかが見えなくなる。数える段は build と同じものを通す。
+ * 固定は照らさない（→ noFixedToCheck）。照らすと、同じ 1 セルが違反と食い違った固定の 2 行で出る。
  */
 function recount(inputs) {
   return build(inputs, { '固定を照らす': noFixedToCheck, '生成する': keepAsPlaced(inputs[assignmentName]) })
 }
 
-/**
- * 「生成する」の段の代わりを作る。マス目に書いてあるとおり（placed）をそのまま返し、1 枠も足さない・外さない。
- * 前の周に機械が置いたセルも、担当者が書き換えたセルも、区別せずにそのまま数える。
- */
+/** 「生成する」の段の代わり。マス目に書いてあるとおり（placed）を、1 枠も足さず外さず返す。 */
 function keepAsPlaced(placed) {
   return function () { return placed }
 }
@@ -206,10 +168,7 @@ function noFixedToCheck() {
   return []
 }
 
-/**
- * 入力から条件入力の 6 区画を取り出し、5-1 の型に直す（→ input-types.js の conditionTypes）。
- * キーは型の側の名前である — 段が掴むのは型であって、区画の見出しではない。
- */
+/** 条件入力の 6 区画を 5-1 の型に直す（→ input-types.js）。キーは型の側の名前である。 */
 function takeConditions(inputs) {
   const conditions = {}
   conditionTypes().forEach((type) => { conditions[type.key] = toType(type, inputs[type.source]) })
@@ -224,11 +183,8 @@ function findStep(name) {
 }
 
 /**
- * 殻が値の表現を揃えたかを、コアの入口で確かめる。
- *
- * 見るのは「文字列か数値か」だけである。日付と時刻の書き方そのものは shell.js が持つ（→ valueRepresentation）。
- * SpreadsheetApp から読んだ値はロケールと書式で表現が揺れる（時刻が Date で来るか文字列で来るか）。
- * 揺れたまま入ってきたら、黙って直さずに名指しで止まる（→ 6 の #8 の理由 ③）。
+ * 殻が値の表現を揃えたかを、コアの入口で確かめる。見るのは「文字列か数値か」だけである。
+ * 揺れたまま入ってきたら、黙って直さずに名指しで止まる（→ 6 の #8）。
  */
 function checkRepresentation(inputs) {
   if (!inputs || typeof inputs !== 'object') throw new Error('入力が、名前と行の配列の対応になっていない')
@@ -249,18 +205,14 @@ function checkRepresentation(inputs) {
         if (type === 'string' || type === 'number') return
         throw new Error(
           `「${name}」の ${rowIndex + 1} 行目 ${columnIndex + 1} 列目の表現が揃っていない。`
-            + `いま: ${type === 'object' ? Object.prototype.toString.call(cell) : type}。`
-            + '文字列か数値に揃えるのは殻の仕事である（→ shell.js の normalizeValue）',
+            + `いま: ${type === 'object' ? Object.prototype.toString.call(cell) : type}（殻で文字列か数値に揃える）`,
         )
       })
     })
   })
 }
 
-/**
- * 段が返した行が、書き込む先のシートの形に合っているかを確かめる。
- * 合わないまま書くと、担当者の画面で列がずれる。黙って詰めない。
- */
+/** 段が返した行が、書き込む先のシートの形に合っているかを確かめる。黙って詰めない。 */
 function checkOutput(output) {
   outputNames.forEach((name) => {
     const columns = sheetColumns(name)
@@ -278,17 +230,12 @@ function checkOutput(output) {
   output['検証結果'].forEach((row, rowIndex) => {
     if (allowedKinds.indexOf(row[kindColumn]) !== -1) return
     throw new Error(
-      `検証結果の ${rowIndex + 1} 行目の種別が「${row[kindColumn]}」である。`
-        + `違反と未充足は別に数え（→ 5-4）、食い違った固定はそのどちらでもない（→ 5-3）ので、`
-        + `種別は ${allowedKinds.join(' ／ ')} のどれかである`,
+      `検証結果の ${rowIndex + 1} 行目の種別「${row[kindColumn]}」が決まった種別でない（${allowedKinds.join(' ／ ')} のどれか）`,
     )
   })
 }
 
-/**
- * 区画を 1 つ引く。検証結果・指標はどれもシート 1 枚に区画を 1 つしか持たない。
- * 「割り当て」はシートに対応しないので、行の形から組む（→ sheet-layout.js の assignmentSection）。
- */
+/** 生成シートの区画を 1 つ引く。「割り当て」はシートに対応しないので、行の形から組む。 */
 function sheetSection(name) {
   if (name === assignmentName) return assignmentSection()
   const layout = sheetLayout.filter((c) => c.name === name)[0]

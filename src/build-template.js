@@ -1,15 +1,10 @@
 /**
  * テンプレートを 1 つ作る（docs/tech-requirements.md 8 の 1）。
  *
- * 走らせるのはテンプレートを用意する側（実装者）である。1 回だけ走らせて、
- * 出来上がったスプレッドシートを担当者にコピーさせる。
- * 担当者のメニュー（menu.js）には出さない — 担当者の操作は
- * 2「担当者がやることの全部」の 10 行だけで、そこにこの操作は無い。
- *
- * 黙って直さない。黙って走らない。
- * すでにあるシートの見出しが構成と違えば、名指しで止まる（上書きしない）。
+ * 実装者が 1 回だけ走らせ、出来上がったスプレッドシートを担当者にコピーさせる。
+ * 担当者のメニュー（menu.js）には出さない。
+ * すでにあるシートの見出しが構成と違えば、上書きせずに名指しで止まる。
  */
-
 /** Apps Script のエディタから手で走らせる入口。 */
 function buildTemplate() {
   const log = buildTemplateInto(SpreadsheetApp.getActive())
@@ -20,8 +15,7 @@ function buildTemplate() {
 /**
  * sheetLayout どおりにシートを作り、見出しを置き、8 枚に保護をかける。
  * 何度走らせても同じ形になる（足りないものだけ足す）。
- * 名前が buildTemplate と別なのは、コアの build と重ならないようにするためである
- * （Apps Script は .gs で 1 つのグローバルを共有する）。
+ * 名前をコアの build と重ねない（Apps Script は .gs で 1 つのグローバルを共有する）。
  */
 function buildTemplateInto(spreadsheet) {
   const log = []
@@ -47,17 +41,14 @@ function buildTemplateInto(spreadsheet) {
   log.push(
     `${sheetLayout.length} 枚のうち保護したのは ${sheetLayout.filter((c) => c.protect).length} 枚である`
     + `（${protectionKind.warningOnly} ${countOf(protectionKind.warningOnly)} 枚 ／ ${protectionKind.ownerOnly} ${countOf(protectionKind.ownerOnly)} 枚。`
-    + `割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚である → issue #213）`,
+    + `割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚）`,
   )
   return log
 }
 
 /**
- * 構成が要る列数まで、シートを広げる。
- *
- * 新しいシートは 26 列しかないが、マス目の 4 枚は 51 列を取る（名前のある 3 列 ＋ 時刻の列 → sheet-layout.js の maxSlotsPerDay）。
- * 足りないまま置くと、走る前の検証が「列が足りない」で止まる（→ verify-structure.js）。
- * 減らさない — 余分な列があること自体は、構造の崩れではない。
+ * 構成が要る列数まで、シートを広げる（新しいシートは 26 列だが、マス目は 51 列を取る）。
+ * 減らさない（余分な列は構造の崩れではない）。
  */
 function widenTo(sheet, layout, log) {
   const rightEdge = sectionRightEdge(layout)
@@ -70,11 +61,7 @@ function widenTo(sheet, layout, log) {
 
 /**
  * 区画ごとに、見出しの行と列名の行を置く。中身が違うときは上書きせずに止まる。
- *
- * 置くのは構成が名前を持っている列だけである。「回答」の後ろ 4 列は空のままになる
- * — 列名は設問の題そのもので、題は今年の入力から出る（→ 4-1）。テンプレートを作る時点では
- * まだ決まっていない。この 4 列が埋まるのは、フォームを作ったときである
- * （テンプレートの「回答」はそこで捨てられ、フォームが作ったシートに置き換わる → build-form.js）。
+ * 「回答」の後ろ 4 列は空のままにする（題は今年の日付から出るので、フォームを作るときに埋まる → build-form.js）。
  */
 function putHeaders(sheet, layout, log) {
   const columnNameRow = layout.hasSectionHeadings ? 2 : 1
@@ -113,11 +100,9 @@ function replaceValues(sheet, row, startColumn, values, sheetName, log) {
 }
 
 /**
- * シートに保護をかける。かけ方は構成が持つ 2 つのどちらかである（→ sheet-layout.js の protectionKind）。
- *
- * 持ち主を締め出せる保護は Google スプレッドシートに無い — コピーしたファイルの持ち主は担当者自身である
- * （→ src/README.md）。だから誰も手で書かないシートは「警告のみ」にして、持ち主にも確認を出す。
- * 「持ち主だけ」は編集者を全部外す。持ち主と、走らせている人は外れない（Protection.removeEditors の決まりである）。
+ * シートに保護をかける。かけ方は構成が持つ 2 つのどちらか（→ sheet-layout.js の protectionKind）。
+ * 持ち主を締め出せる保護は無いので、誰も手で書かないシートは「警告のみ」にする（→ src/README.md）。
+ * 「持ち主だけ」は編集者を全部外す（持ち主と、走らせている人は外れない）。
  */
 function applyProtection(sheet, layout, log) {
   sheet

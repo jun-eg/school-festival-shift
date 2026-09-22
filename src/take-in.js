@@ -1,28 +1,18 @@
 /**
- * 取り込む側 — 回答の行を 1 人 1 件に畳む（docs/tech-requirements.md 3 の規則 2 ／ 8 の 6。issue #146）。
+ * 取り込む側 — 回答の行を 1 人 1 件に畳む（docs/tech-requirements.md 3 の規則 2。issue #146）。
+ * ここを通った希望（型 #6）だけが下流へ行く。行を型に直すのは input-types.js の toWish で、
+ * ここが持つのは「どの 1 行を型にするか」だけである。
  *
- * 回答シートの行は、そのまま先へ流れない。ここを通った希望（型 #6）だけが下流へ行く（→ core.js の build）。
- * 行を型に直すのは input-types.js の toWish である。ここが持つのは「どの 1 行を型にするか」だけである。
+ * 規則 2 の 3 つ。
+ *   ① 学籍番号でまとめる（大文字・小文字の違いは同じ人）
+ *   ② タイムスタンプを見て 1 件に畳む
+ *   ③ 採るのは後から来た行（→ foldDirection）
  *
- * 規則 2 の 3 つ（→ 3 の規則 2）。
- *   ① 学籍番号でまとめる（識別キーは学籍番号である ◎ → 5-1。大文字・小文字の違いは同じ人である ◎）
- *   ② タイムスタンプを見て 1 件に畳む（畳み込みのキーは 学籍番号 ＋ タイムスタンプ ◎）
- *   ③ 採る向きは後から来た行である（→ foldDirection）
- *
- * 担当者の手が 1 度も入らない（→ 7 の M1 ②「人の手が入った箇所 0 箇所」）。
- * 回答スプレッドシートと同じファイルの中に居るので、書き出しも読み込みも挟まらない（→ 6 の #1 の理由 ③）。
- *
- * 配列を受けて配列を返す。SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
- * ここに判断を新しく書かない — 規則は 3 が、採る向きは上流（ADR design-doc-0006）が持つ（→ src/README.md）。
- *
+ * 配列を受けて配列を返す。SpreadsheetApp を掴まない。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
-
 /**
- * 規則 2 の ③ — 同じ人の複数行のうち、どの 1 行を採るか。
- *
- * 決めたのは上流である（→ ADR design-doc-0006。それまでは 9 の △ 3 だった）。
- * 記録の側の裏付けは「出し直しは申し出ではなく希望そのものの修正である ◎」（→ ADR 入る側-0006）。
+ * 規則 2 の ③ — 同じ人の複数行のうち、どの 1 行を採るか（→ ADR design-doc-0006）。
  * 向きが動いたら、ここと 3 の規則 2 の ③ が一緒に動く。
  */
 const foldDirection = {
@@ -31,29 +21,17 @@ const foldDirection = {
   why: '出し直しは希望そのものの修正である ◎（→ ADR 入る側-0006・design-doc-0006）',
 }
 
-/**
- * 畳み込みのキーのうち、型 #6 に乗らないほうの列（→ input-types.js の columnsOutsideWish）。
- * 畳んだ後の 1 件には残らない。ここで見るだけである。
- */
+/** 畳み込みのキーのうち、型 #6 に乗らないほうの列。畳んだ後の 1 件には残らない。 */
 const timestampColumn = 'タイムスタンプ'
 
-/**
- * タイムスタンプの形。殻が揃えたあとの日時である（→ shell.js の valueRepresentation の dateTime）。
- * 揃っていない値は、黙って解釈し直さずに名指しして止まる（→ input-types.js の readTime と同じ扱い）。
- */
+/** タイムスタンプの形（殻が揃えたあとの日時）。揃っていなければ名指しして止まる。 */
 const timestampPattern = /^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/
 
 /**
- * 回答の行を、1 人 1 件の希望（型 #6）にする（→ 5-1 の #6・仕様 #4）。
+ * 回答シートの行の配列を、1 人 1 件の希望（型 #6）の配列にする（→ 仕様 #4）。
  *
- * 受け取るのは回答シートの行の配列、返すのは型 #6 の配列である。
- * 返した配列に、同じ学籍番号は 2 件と無い（→ 仕様 #4・count-violations.js の wishesByStudentId）。
- *
- * 人の並びは、その人が最初に現れた行の順である。採った行の位置で並べ直さない
- * — 出し直した人だけが後ろへ動くと、同じ回答シートから出てくる並びが提出の順でなくなる。
- *
- * 畳んで落ちる行も型に直す。落ちるほうに壊れた値が入っていても、黙って通さない
- * （回答シートは担当者が手で書ける — 保護は「警告のみ」である → src/README.md）。
+ * 人の並びは、その人が最初に現れた行の順である（出し直した人だけが後ろへ動かないように）。
+ * 畳んで落ちる行も型に直す。回答シートは手で書けるので、壊れた値を黙って通さない。
  */
 function takeIn(rows) {
   const source = '回答'
@@ -68,23 +46,22 @@ function takeIn(rows) {
       at: readTimestamp(source, columns, row, rowIndex),
       rowIndex: rowIndex,
     }
-    // 学籍番号は大文字に揃って型に乗っている（→ input-types.js の readStudentId）ので、
-    // 大文字・小文字だけ違う 2 行は、ここまで来る時点で同じキーになっている（→ 3 の規則 2 の ①）
+    // 学籍番号は toWish で大文字に揃っているので、大文字・小文字だけ違う 2 行は同じキーになる
     const studentId = coming.wish.studentId
 
-    // ① 学籍番号でまとめる — 初めて出てきた人は、そのまま置く
+    // ① 初めて出てきた人は、そのまま置く
     if (!kept[studentId]) {
       kept[studentId] = coming
       order.push(studentId)
       return
     }
 
-    // ② タイムスタンプを見て 1 件に畳む ／ ③ 採るのは後から来た行である
+    // ② タイムスタンプで畳む ／ ③ 採るのは後から来た行
     if (coming.at === kept[studentId].at) {
       throw new Error(
         `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が、`
           + `${whereIs(source, kept[studentId].rowIndex)}と同じ${timestampColumn}「${coming.at}」である。`
-          + '畳み込みのキー（学籍番号 ＋ タイムスタンプ ◎）で 1 行に決まらないので、黙って選ばずに止まる（→ 3 の規則 2）',
+          + 'どちらを採るか決まらないので止まる',
       )
     }
     if (takesOver(coming.at, kept[studentId].at)) kept[studentId] = coming
@@ -93,24 +70,18 @@ function takeIn(rows) {
   return order.map((studentId) => kept[studentId].wish)
 }
 
-/**
- * 後から来た行が、いま採ってある行を置き換えるかを見る（→ foldDirection）。
- * 向きを変えるのは、この 1 行と 3 の規則 2 の ③ である。
- */
+/** 後から来た行が、いま採ってある行を置き換えるか（→ foldDirection）。 */
 function takesOver(coming, keeping) {
   return coming > keeping // 日時は YYYY-MM-DD HH:MM:SS なので、文字列のまま比べて時の順になる
 }
 
-/**
- * タイムスタンプのセルを取る。値の表現を揃えるのは殻の仕事で、ここに来るのは揃った行である
- * （→ shell.js の formatDateTime・core.js の checkRepresentation）。
- */
+/** タイムスタンプのセルを取る（表現は殻が揃え済み → shell.js の formatDateTime）。 */
 function readTimestamp(source, columns, row, rowIndex) {
   const cell = cellOf(source, columns, row, rowIndex, timestampColumn)
   if (!timestampPattern.test(cell.value)) {
     throw new Error(
       `${cell.where}が YYYY-MM-DD HH:MM:SS でない。いま: ${showBlankValue(cell.value)}。`
-        + '畳み込みのキーなので、無いまま畳まない（→ 3 の規則 2 の ②）',
+        + '同じ人の行を畳むのに使うので、直してから通す',
     )
   }
   return cell.value

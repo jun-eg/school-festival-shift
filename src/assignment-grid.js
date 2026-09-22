@@ -1,36 +1,26 @@
 /**
- * 割り当てを、従来のシフト表の形に敷く／その形から戻す（issue #213）。
+ * 割り当てを、従来のシフト表の形（行が人・列が 30 分枠・セルが役割名 1 つ、1 日 1 枚）に敷く／戻す（issue #213）。
  *
- * 従来の形は記録が持っている ◎ — 前回の配布物が、行が人・列が 30 分枠・セルが役割名 1 つである。
- * 1 日 1 枚で、4 枚に分かれる（→ sheet-layout.js の dayLabels）。
- *
- * ここが引き受けるのは敷き方だけである。割り当てそのもの（誰をどの枠に置くか）は生成が、
- * 破っている所を数えるのは違反の側が持つ（→ generate.js ／ count-violations.js）。
- * ここに規則を 1 つも書かない（→ src/README.md）。
- *
- * コアの側である。配列を受けて配列を返し、SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
- * 読み書きの範囲を決めるのは殻である（→ shell.js の readGrid ／ writeGrid）。
- *
- * 黙って捨てない。マス目に載らないもの（その日の枠に無い時刻・1 セルに 2 役割・
- * 誰の行か分からない役割）は、その場で名指しして止まる。
- * 「満たせない枠は黙って埋めない」（→ 5 の #6）と同じ扱いである。
+ * 引き受けるのは敷き方だけで、規則は書かない（置くのは generate.js、数えるのは count-violations.js）。
+ * コアの側なので SpreadsheetApp を掴まない（読み書きは shell.js の readGrid ／ writeGrid）。
+ * マス目に載らないもの（枠に無い時刻・1 セルに 2 役割・誰の行か分からない役割）は名指しして止まる。
  *
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
-/** 見出しの左側 — 名前のある 3 列である（→ sheet-layout.js の gridSheet）。 */
+/** 見出しの左側の、名前のある 3 列（→ sheet-layout.js の gridSheet）。 */
 function gridNamedColumns() {
   return gridLayouts(assignmentName)[0].sections[0].columns
 }
 
-/** 割り当ての行から 1 つ取る。列の並びは sheet-layout.js が持つ（→ assignmentColumns）。 */
+/** 割り当ての行から 1 つ取る（列の並びは assignmentColumns）。 */
 function assignmentAt(row, columnName) {
   const index = assignmentColumns.indexOf(columnName)
   if (index === -1) throw new Error(`割り当ての列に「${columnName}」が無い`)
   return row[index]
 }
 
-/** 枠 1 つの鍵。開始だけで当てない — 枠は時刻をまたがないので、終端まで見て 1 つに決まる。 */
+/** 枠 1 つの鍵。終端まで見て 1 つに決める。 */
 function gridSlotKey(start, end) {
   return `${start}-${end}`
 }
@@ -41,19 +31,9 @@ function gridSlotKey(start, end) {
  *   header … 学籍番号 / 氏名 / 一緒に組みたいお友達 / その日の枠の開始時刻（枠の数だけ）
  *   rows   … 1 人 1 行。学籍番号 / 氏名 / 友達欄 / 枠ごとの役割名（入っていない枠は空）
  *
- * 行の並びは学籍番号の昇順である。入力から決まるので、同じ入力からは同じ並びが出る（→ 6 の #3）。
- * 生成の出てきた順に並べない — 順が変わると、担当者が書き換えたセルが別の行へ移ったように見えて、
- * 「動かしたセルが 1 つも戻っていない」（5 の #11）が数えられなくなる。
- *
- * 氏名は回答から引く（nameOf）。生成は氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、
- * ここで足している。見出しに出すためだけの列である（→ input-types.js の columnsOutsideWish）。
- *
- * 友達欄も回答から引く（friendsOf）。担当者が余裕のあるときに手で寄せるための列で、生成は読まない
- * （→ 5-2 ／ issue #200）。氏名と同じく、表示のためだけに足している。
- *
- * alsoStudentIds は、その日に 1 枠も置いていなくても行を残す人である（→ 5-3 ／ issue #156）。
- * 「この人をここに置かない」という手直し（空のセルに付いた印）と、残せなかった手直しの名指しは、
- * 置いた枠が 1 つも無い人にも付く。行が無いと、印を載せるセルが無くなり、手直しが黙って消える。
+ * 行は学籍番号の昇順に並べる。生成の出てきた順だと、担当者が書き換えたセルが別の行へ移ったように見える。
+ * 氏名（nameOf）と友達欄（friendsOf）は回答から引く表示のためだけの列で、生成は読まない。
+ * alsoStudentIds は、1 枠も置いていなくても行を残す人である — 手直しの印を載せるセルを無くさないため（→ issue #156）。
  */
 function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
   const named = gridNamedColumns()
@@ -77,9 +57,7 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
 
     if (index === undefined) {
       throw new Error(
-        `割り当ての ${rowIndex + 1} 行目の ${day.date} ${start}-${end} が、その日の枠に無い。`
-          + '枠は条件入力の「日ごとの営業時刻」から刻む（→ 規則 1 の ①）ので、'
-          + '刻んだ枠の外に置いたものは列に落ちない',
+        `割り当ての ${rowIndex + 1} 行目の ${day.date} ${start}-${end} が、その日の枠に無い`,
       )
     }
     if (!people[studentId]) {
@@ -89,8 +67,7 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
     if (people[studentId][index] !== '') {
       throw new Error(
         `${day.date} ${start}-${end} の「${studentId}」に、`
-          + `「${people[studentId][index]}」と「${role}」の 2 つが入っている。`
-          + '1 セルに入るのは役割 1 つである（同じ人が同じ枠に 2 つ入っているのは違反である → 5-4）',
+          + `「${people[studentId][index]}」と「${role}」の 2 つが入っている（1 セルに入るのは役割 1 つである）`,
       )
     }
     people[studentId][index] = role
@@ -114,14 +91,9 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
 }
 
 /**
- * 1 日ぶんのマス目を、割り当ての行に戻す（手直しの後の数え直しが読む口である → core.js の recount）。
- * 担当者が書き換えたセルだけを読むのは、ここではなく fixedFromAssignmentGrid である（→ 5-3）。
- *
- * 列に当てるのは位置ではなく、見出しに書いてある時刻そのものである。
- * 位置で当てると、条件入力の営業時刻を動かしたときに、前の周の役割が別の枠へ黙って移る。
- *
- * 氏名も友達欄も読まない。表示のための列で、生成が見ると 5 の #1（7 種類の外を参照しない）が破れる。
- * 戻す行の氏名は空である（生成が置くときと同じ → generate.js の generationNotAimed）。
+ * 1 日ぶんのマス目を、割り当ての行に戻す（数え直しが読む → core.js の recount）。
+ * 列は位置ではなく見出しの時刻で当てる — 位置だと、営業時刻を動かしたときに役割が別の枠へ黙って移る。
+ * 氏名も友達欄も読まない（戻す行の氏名は空）。
  */
 function fromAssignmentGrid(header, dataRows, day, label) {
   const named = gridNamedColumns()
@@ -131,7 +103,7 @@ function fromAssignmentGrid(header, dataRows, day, label) {
     if (dataRows.some((row) => row.some((cell) => String(cell) !== ''))) {
       throw new Error(
         `シート「${label}」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。`
-          + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す（→ 4-1）`,
+          + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す`,
       )
     }
     return rows
@@ -151,14 +123,12 @@ function fromAssignmentGrid(header, dataRows, day, label) {
 
     if (studentId === '') {
       throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である。`
-          + '誰の行かが決まらない（行は学籍番号で引く → issue #213）',
+        `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である`,
       )
     }
     if (!studentIdPattern.test(studentId)) {
       throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う。`
-          + '10 桁の英数字である（→ 4-1 の #1）',
+        `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う（10 桁の英数字）`,
       )
     }
 
@@ -169,9 +139,7 @@ function fromAssignmentGrid(header, dataRows, day, label) {
         throw new Error(
           `シート「${label}」の ${rowIndex + 2} 行目 ${cell.column + 1} 列目に「${cell.role}」が入っているが、`
             + `見出しの「${headerTime === '' ? '（空）' : headerTime}」が、いまの ${day.date} の枠に無い。`
-            + '条件入力の「日ごとの営業時刻」を動かしたのなら、メニューの「生成」を押す。'
-            + '手直しの印（メモ）が付いたセルは残し、いまの枠に無くて残せないものは検証結果に名指しで出る'
-            + '（→ 5-3 ／ issue #156）。数え直しは、いま書いてあるとおりしか数えない',
+            + '営業時刻を動かしたのなら、メニューの「生成」を押す（手直しの印の付いたセルは残る）',
         )
       }
       rows.push(buildAssignmentRow(day.date, slot, cell.role, studentId))
@@ -181,56 +149,46 @@ function fromAssignmentGrid(header, dataRows, day, label) {
   return rows
 }
 
-/** 割り当ての 1 行を、列の並びのとおりに組む。氏名は空である（→ fromAssignmentGrid の注意）。 */
+/** 割り当ての 1 行を、列の並びのとおりに組む（氏名は空）。 */
 function buildAssignmentRow(date, slot, role, studentId) {
   const values = { '日': date, '開始': slot.start, '終了': slot.end, '役割': role, '学籍番号': studentId, '氏名': '' }
   return assignmentColumns.map((columnName) => values[columnName])
 }
 
 /**
- * 手直しの印（→ 5-3 ／ issue #156）。**担当者が書き換えたセルに付くメモである。**
- *
- * どのセルが担当者の手で、どのセルが前の周に機械が置いたものかは、値だけでは分からない。
- * 印をセルそのものに付けるのは、次の 3 つのためである。
- *   ・入力の側にある — 割り当ての 4 枚の中にあるので、再実行は「入力が 1 つ増えた状態でもう一度通す」ことになる（→ 5-3）
- *   ・担当者に見える — セルの右上に印が出る。どこを固定したかを、別の画面を開かずに読める（→ 6 の #2）
- *   ・担当者が外せる — メモを消せば、次の生成でそのセルは組み直される
- * 付けるのは onEdit である（→ shell.js の markFixedCells）。スクリプトの書き戻しでは付かない — 単純トリガーは人の編集でしか走らない。
- *
- * 印かどうかは頭の文字で見る（→ isFixedNote）。担当者が自分で書いたメモは印にならない。
- * 文言は 1 つに揃える（→ issue #230）。メモを見た人に「誰が直したか」が読めればよく、外し方は割り当ての説明が持つ（→ sheet-layout.js）。
+ * 手直しの印 — 担当者が書き換えたセルに付くメモ（→ 5-3 ／ issue #156）。
+ * 値だけでは人の手か機械が置いたかが分からないので、セルそのものに付ける。見えて、消せば外れる。
+ * 付けるのは onEdit（→ shell.js の markFixedCells）で、スクリプトの書き戻しでは付かない。
+ * 印かどうかは頭の文字で見る（→ isFixedNote）。文言は 1 つに揃える（→ issue #230）。
  */
 const fixedNote = 'シフト作成者による修正済み'
 
-/** そのメモが手直しの印か。頭が印の文言なら印である（後ろに担当者が書き足しても外れない）。 */
+/** そのメモが手直しの印か（頭が印の文言なら、後ろに書き足してあっても印）。 */
 function isFixedNote(note) {
   return String(note || '').trim().indexOf(fixedNote) === 0
 }
 
 /**
- * 残せなかった手直しのメモ（→ 5-3「食い違った固定は、名指しで返す」）。
- * 頭が印の文言（→ fixedNote）でないので、次に読むときには印にならない — 同じ食い違いを生成のたびに名指しし直さない。
- * 担当者がそのセルをもう一度書き換えれば、印に置き換わる（→ shell.js の markFixedCells）。
+ * 残せなかった手直しのメモ。頭が fixedNote でないので次に読むときには印にならない
+ * （同じ食い違いを生成のたびに名指しし直さない）。書き換えれば印に置き換わる。
  */
 function conflictNote(role, detail) {
   return `残せなかった手直し「${role}」— ${detail}`
 }
 
 /**
- * 前に見たマス目の控え（→ 5-3 の「取りこぼした書き換え」／ issue #226）。**印ではない。取りこぼしを印に変える道具である。**
+ * 前に見たマス目の控え — onEdit の取りこぼしを印に変える道具（→ issue #226）。
  *
- * 本物で間を置かずに 2 セル書き換えると、onEdit が 1 回しか走らず、2 手目のセルに印が付かない（→ real-device-log.md）。
- * 落ちたイベントは中から拾えないので、生成と数え直しのたびにマス目の中身を控えておき、
- * 次に読んだときに控えと違うセルを「人が書き換えたのに印が付いていないセル」として印を付ける（→ missedEdits）。
- * スクリプトの書き戻しは控えを置き直すので、機械が置いたセルは差にならない。
+ * 間を置かずに 2 セル書き換えると onEdit が 1 回しか走らず、2 手目に印が付かない。
+ * そこで生成と数え直しのたびに中身を控え、次に読んだとき控えと違うセルに印を付ける（→ missedEdits）。
  *
- * 控えは（学籍番号 × 見出しの時刻 → 役割）である。行の位置でも列の位置でも当てない — 人が増えれば行が、営業時刻を動かせば列がずれる（→ ADR tech-requirements-0010）。
- * 役割は出てきた順に 1 文字の番号にして詰める。置き場（シートの developer metadata）の文字数に上限があるからである（→ shell.js の keepSeenGrid）。
- * 番号の文字が足りない（役割が 62 種類を超える）ときは控えを作らない（null）— 控えが無ければ、取りこぼしを拾わないだけで今までどおりに動く。
+ * 控えは（学籍番号 × 見出しの時刻 → 役割）で、位置では当てない。
+ * 役割は 1 文字の番号に詰める（置き場の developer metadata に文字数の上限がある → shell.js の keepSeenGrid）。
+ * 役割が 62 種類を超えたら控えを作らない（null）— 取りこぼしを拾わないだけで、ほかは今までどおり動く。
  */
 const seenSymbols = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-/** マス目 1 枚の控えを組む。学籍番号が空の行と、同じ学籍番号が 2 行ある行は、誰の行かが決まらないので控えない。 */
+/** マス目 1 枚の控えを組む。学籍番号が空の行と、同じ学籍番号が 2 行ある行は控えない。 */
 function seenGrid(header, dataRows) {
   const named = gridNamedColumns()
   const studentIdColumn = named.indexOf('学籍番号')
@@ -255,13 +213,10 @@ function seenGrid(header, dataRows) {
 }
 
 /**
- * 控えと違うのに印の無いセルを返す（{ row, column } — データの行の番号と、マス目の列の番号。どちらも 0 始まり）。
- * 付け方は shell.js の markFixedCells と同じ決めである（→ 5-3）。
+ * 控えと違うのに印の無いセルを { row, column }（どちらも 0 始まり）で返す。
  *   ・時刻の列で、控えと役割が違うセル（空にしたセルも入る）
- *   ・控えに無い学籍番号の行（学籍番号を書き換えた・行を足した）は、役割の入っているセルぜんぶ
- * 見出しの時刻が控えに無い列は見ない（見出しを書き換えたのは手直しではない）。控えが無ければ何も返さない
- * — 黙って全部を手直しにしない。
- * 同じ値に書き直した手は、控えと違わないので拾えない。
+ *   ・控えに無い学籍番号の行は、役割の入っているセルぜんぶ
+ * 見出しの時刻が控えに無い列は見ない。控えが無ければ何も返さない（全部を手直しにしない）。
  */
 function missedEdits(seen, header, dataRows, notes) {
   if (!seen) return []
@@ -305,14 +260,12 @@ function studentIdCounts(dataRows, studentIdColumn) {
 }
 
 /**
- * 1 日ぶんのマス目から、手直しの印が付いたセルだけを手直しの行にする（→ fixedColumns ／ 5-3）。
+ * 1 日ぶんのマス目から、手直しの印が付いたセルだけを手直しの行にする（→ 5-3）。
+ * 機械が置いたセルは読まない（読むと、却下した「前回の案全体を初期解にする」になる）。
  *
- * 前の周に機械が置いたセルは読まない。**読むと、却下した「前回の案全体を初期解にする」になる**
- * — どこが人の意思で、どこが機械の都合かが消える（→ 5-3 の却下した形）。
- *
- * 役割が空のセルに付いた印も読む。「この人をこの枠に置かない」という手直しである（役割は空で乗る）。
- * 見出しの時刻がいまの枠に無くても止まらない。そのまま乗せ、生成の側が名指しで返す（→ generate.js の placeFixed）。
- * 誰の行かが決まらない印（学籍番号が空・形式が違う）は、fromAssignmentGrid と同じに止まる。
+ * 役割が空のセルの印も読む（「この人をこの枠に置かない」）。
+ * 見出しの時刻がいまの枠に無くても止まらない（名指しは generate.js の placeFixed）。
+ * 誰の行かが決まらない印は、fromAssignmentGrid と同じに止まる。
  */
 function fixedFromAssignmentGrid(header, dataRows, notes, day, label) {
   const named = gridNamedColumns()
@@ -326,24 +279,22 @@ function fixedFromAssignmentGrid(header, dataRows, notes, day, label) {
     for (let column = named.length; column < row.length; column++) {
       if (!isFixedNote(rowNotes[column])) continue
       const role = String(row[column] || '').trim()
-      // 誰の行でもない空のセルの印は、外す相手がいないので読まない。
+      // 誰の行でもない空のセルの印は読まない
       if (studentId === '' && role === '') continue
       if (!day) {
         throw new Error(
           `シート「${label}」に手直しの印があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。`
-            + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す（→ 4-1）`,
+            + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す`,
         )
       }
       if (studentId === '') {
         throw new Error(
-          `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である。`
-            + '誰の行かが決まらない（行は学籍番号で引く → issue #213）',
+          `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である`,
         )
       }
       if (!studentIdPattern.test(studentId)) {
         throw new Error(
-          `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う。`
-            + '10 桁の英数字である（→ 4-1 の #1）',
+          `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う（10 桁の英数字）`,
         )
       }
       const values = { '日': day.date, '開始': String(header[column] || ''), '役割': role, '学籍番号': studentId }
@@ -355,14 +306,12 @@ function fixedFromAssignmentGrid(header, dataRows, notes, day, label) {
 }
 
 /**
- * 書き戻すマス目のメモを、行と列の並びのまま返す（setNotes にそのまま渡す形 → shell.js の writeGrids）。
+ * 書き戻すマス目のメモを、行と列の並びのまま返す（setNotes にそのまま渡す形）。
  *
- *   残せた手直し … その人の行の、その枠のセルに印（→ fixedNote）。書き戻しても印が残るので、次の周でも固定である
- *   残せなかった手直し … 同じセルに、何が食い違ったかのメモ（→ conflictNote）。
- *     見出しがいまの枠に無いときは列が無いので、その人の学籍番号のセルに付ける
+ *   残せた手直し … そのセルに印（→ fixedNote）。次の周でも固定である
+ *   残せなかった手直し … そのセルに食い違いのメモ（→ conflictNote）。列が無ければ学籍番号のセルに付ける
  *
- * 残せなかったかどうかは、検証結果の「食い違った固定」の行で見る（→ generate.js の nameFixedConflicts）。
- * 同じセルに 2 つ付くときは、改行でつなぐ。それ以外のセルは空（メモなし）である。
+ * 残せなかったかは、検証結果の「食い違った固定」の行で見る。同じセルに 2 つ付くときは改行でつなぐ。
  */
 function gridNotes(grid, day, fixed, checks) {
   const named = gridNamedColumns()
@@ -406,15 +355,9 @@ function gridNotes(grid, day, fixed, checks) {
 }
 
 /**
- * 役割ごとの背景色（→ issue #213 の「色」の行）。
- *
- * 色の名前は記録が持っている ◎ — 前回の配布物は、準備・片付け = グレー ／ 調理 = 黄 ／ 調理責任者 = 橙 ／
- * 会計 = 水 ／ 呼び込み = 桃 ／ 列整理 = 紫 ／ クリーンパトロール = 緑 である。
- * 色の値（color）は記録に無いので、スプレッドシートの標準の色から名前に近いものを当てた。
- * 違反の印（赤い太字 → shell.js の violationMark）が読めるよう、どれも淡い側である。
- *
- * ここに無い役割名は塗らない。役割名は条件入力から来るので、年で増えることがある（→ 5-1 の #2）。
- * 黙って別の色に寄せない。
+ * 役割ごとの背景色（→ issue #213）。色の名前は前回の配布物のもの ◎ で、値は標準の色から近いものを当てた。
+ * 違反の赤い太字（→ shell.js の violationMark）が読めるよう淡い側にしてある。
+ * ここに無い役割名は塗らない（別の色に寄せない）。
  */
 const roleColors = [
   { roles: ['準備', '片付け'], name: 'グレー', color: '#d9d9d9' },
@@ -426,7 +369,7 @@ const roleColors = [
   { roles: ['クリーンパトロール'], name: '緑', color: '#b6d7a8' },
 ]
 
-/** 役割名 1 つの背景色を引く。表に無い役割名と空のセルは null（塗らない）である。 */
+/** 役割名 1 つの背景色を引く。表に無い役割名と空のセルは null（塗らない）。 */
 function roleColorOf(role) {
   const name = String(role || '').trim()
   const found = roleColors.filter((one) => one.roles.indexOf(name) !== -1)[0]
@@ -449,27 +392,20 @@ function gridBackgrounds(dataRows, width) {
 }
 
 /**
- * 検証結果の行の背景色（→ issue #220）。2 色である。
+ * 検証結果の行の背景色（→ issue #220）。
  *
- *   違反の行 … 役割が何であっても、行ぜんぶ赤。置いた人が条件を破っている所で、担当者が直すものである
+ *   違反の行 … 役割が何であっても（空でも）、行ぜんぶ赤
  *   それ以外 … 店の役割（準備・片付け以外）の行だけ、行ぜんぶ黄色（未充足と食い違った固定）
  *
- * 違反を先に見る。準備・片付けの違反も、役割が空の違反（規則 3 → count-violations.js の countPrepCleanupBroken）も赤にする。
- * 違反でない準備・片付けの行は塗らない。未充足のほとんどはこの 2 つで、何十行も並ぶ（→ 5-4）ので、
- * 塗ると店の役割の行が埋もれる。
- * 検証結果はマス目と別のシートなので、調理の黄（roleColors）と同じ色でも意味は重ならない。
- * 黄は標準の黄にしてある — 淡い黄だと白い行と見分けにくい。赤は背景なので、黒い字が読める明るい赤にしてある
- * （マス目の違反の赤い太字 → shell.js の violationMark とは、塗る所が違う）。
+ * 違反でない準備・片付けの行は塗らない — 何十行も並ぶので、塗ると店の役割の行が埋もれる。
+ * 黄は淡いと白い行と見分けにくいので標準の黄、赤は黒い字が読める明るい赤にしてある。
  */
 const checkRowHighlights = {
   violation: { name: '赤', color: '#ea9999' },
   storeRole: { name: '黄', color: '#ffff00' },
 }
 
-/**
- * 検証結果の行ぜんぶの背景色を、行と列の並びのまま返す（setBackgrounds にそのまま渡す形）。
- * 塗らない行は null である。値は見ない側の列にも同じ色を置く — 行ぜんぶを塗る（→ issue #220 のコメント）。
- */
+/** 検証結果の行ぜんぶの背景色を、行と列の並びのまま返す（setBackgrounds の形。塗らない行は null）。 */
 function checkResultBackgrounds(rows, width) {
   const columns = sheetColumns('検証結果')
   const kindColumn = columns.indexOf('種別')
@@ -487,21 +423,14 @@ function checkResultBackgrounds(rows, width) {
 }
 
 /**
- * 違反の行を、1 日ぶんのマス目のセルに当て戻す（→ 6 の #2「違反した所はセルの色に出る」／ issue #155）。
- * 背景は役割の色で使っているので、違反は文字のほうで出す（→ shell.js の violationMark）。
- * 返すのは { row, column } の配列で、どちらもマス目の中の 0 始まりの位置である（row はデータの行）。
+ * 違反の行を、1 日ぶんのマス目のセルに当て戻す（→ issue #155）。印は文字のほうで出す（→ shell.js の violationMark）。
+ * 返すのは { row, column }（どちらも 0 始まり、row はデータの行）の配列である。
  *
  *   枠 1 つが単位の違反（規則 1・4・5・同じ枠に二重）… その人の行の、その枠の列のセル
- *   その人のその日が単位の違反（規則 3）… その人の行の、学籍番号と氏名の 2 列（友達欄には付けない — 誰の違反かを指す列ではない）
- *     — 規則 3 が壊れているのは枠 1 つではない（→ count-violations.js の countPrepCleanupBroken）。
- *       準備にも片付けにも入っていない ④ は、印を付ける枠そのものが無い
+ *   その人のその日が単位の違反（規則 3）… その人の行の、学籍番号と氏名の 2 列
  *
- * 未充足は当てない。枠の話であって人の話ではないので、印を付ける行が無い（→ name-unmet.js）。
- * マス目は名指しを置き換えない — 未充足を名指しするのは検証結果である（→ src/README.md）。
- *
- * 行は学籍番号で引く（→ issue #213）。同じ学籍番号の行が 2 つあれば、どちらにも付ける
- * （どちらに書いた役割も同じ人の割り当てとして数えている → fromAssignmentGrid）。
- * どの行にも列にも当たらない違反には付けない — 検証結果の行が残っているので、黙って消えるのではない。
+ * 未充足は当てない（人の話ではない）。行は学籍番号で引き、同じ学籍番号の行が 2 つあればどちらにも付ける。
+ * どこにも当たらない違反は付けない（検証結果の行は残っている）。
  */
 function violationCells(header, dataRows, day, violations) {
   if (!day) return []
@@ -550,23 +479,16 @@ function violationCells(header, dataRows, day, violations) {
 }
 
 /**
- * 回答の行から (学籍番号 → 氏名) を作る。見出しに出すためだけの対応である。
- *
- * 同じ学籍番号が 2 行あるときは、後から来た行の氏名を採る
- * （→ ADR design-doc-0006・規則 2 の ③。出し直しで名乗りが変わったときに、新しいほうが出る）。
- * 畳み込みそのものはここでしない — ここが返すのは表示の対応であって、型 #6 ではない。
+ * 回答の行から (学籍番号 → 氏名) を作る（表示のためだけ）。
+ * 同じ学籍番号が 2 行あれば、後から来た行の氏名を採る（→ ADR design-doc-0006）。
  */
 function namesFromAnswers(rows) {
   return latestAnswerOf(rows, '氏名')
 }
 
 /**
- * 回答の行から (学籍番号 → 友達欄) を作る（→ issue #200）。氏名と同じく、見出しに出すためだけの対応である。
- *
- * 友達欄は自由記述である（「太郎君」「同期」「先輩」も書ける → form-definition.js）。
- * 担当者が読んで手で寄せるための列なので、書かれたとおりに出す — 学籍番号に解決しない・分けない。
- * 採るのは氏名と同じく後から来た行である。出し直しで友達欄を消した人は、空のまま出る
- * （空の行を飛ばすと、消した友達欄が前の回答から戻ってくる）。
+ * 回答の行から (学籍番号 → 友達欄) を作る（表示のためだけ → issue #200）。自由記述なので書かれたとおりに出す。
+ * 後から来た行を採り、空でも上書きする（飛ばすと、消した友達欄が前の回答から戻ってくる）。
  */
 function friendsFromAnswers(rows) {
   return latestAnswerOf(rows, '一緒に組みたいお友達', true)
