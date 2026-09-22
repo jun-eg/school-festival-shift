@@ -164,6 +164,25 @@ function build(inputs, steps) {
 }
 
 /**
+ * 手直しの後に、違反と未充足と指標を数え直す（→ 5 の #8 ／ issue #155）。
+ *
+ * 生成を走らせない。マス目に書いてあるとおりを、そのまま割り当てとして数える（→ keepAsPlaced）。
+ * 生成を走らせると、担当者が 1 セル書き換えるたびに残りの枠が組み直され、
+ * 「その 1 手で何が変わったか」が見えなくなる。組み直すのはメニューの「生成」を押したときだけである。
+ *
+ * 数える段は build と同じものを通す — 数え方を 2 通りに持たない（→ src/README.md）。
+ * 返すものも build と同じ束である。割り当ては読んだマス目そのもので、殻は書き戻さない（→ shell.js の recountSpreadsheet）。
+ */
+function recount(inputs) {
+  return build(inputs, { '生成する': keepAsPlaced })
+}
+
+/** 「生成する」の段の代わり。前の周の手直し（→ 5-3）をそのまま返し、1 枠も足さない・外さない。 */
+function keepAsPlaced(candidates, conditions, wishes, fixed) {
+  return fixed
+}
+
+/**
  * 入力から条件入力の 6 区画を取り出し、5-1 の型に直す（→ input-types.js の conditionTypes）。
  * キーは型の側の名前である — 段が掴むのは型であって、区画の見出しではない。
  */
@@ -261,6 +280,6 @@ function sheetColumns(name) {
 if (typeof module !== 'undefined') {
   module.exports = {
     coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames, builtInSteps,
-    build, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
+    build, recount, keepAsPlaced, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
   }
 }

@@ -3,12 +3,13 @@
 //
 //   使い方: node src/assignment-grid.test.mjs
 //
-// 見るものは 5 つある。
+// 見るものは 6 つある。
 //   ① 従来の形に敷ける — 行が人、列が 30 分枠、セルが役割名 1 つ（記録の配布物 ◎ と同じ形である）
 //   ② 行の並びが入力から決まる（学籍番号の昇順。同じ入力からは同じ並びが出る → 6 の #3）
 //   ③ 敷いて戻すと元の行に戻る（往復しても割り当てが増えも減りもしない）
 //   ④ 当てるのは位置ではなく見出しの時刻である（営業時刻を動かしても、役割が別の枠へ移らない）
 //   ⑤ 載らないものは黙って捨てず、名指しして止まる
+//   ⑥ 違反の行を、塗るセルに当て戻せる（→ 6 の #2「違反した所はセルの色に出る」・issue #155）
 //
 // これは契約であって実装ではない。何も書き換えない。
 // 記録の側（前回の確定シフトが本当にこの形に敷けるか）は scripts/前回のシフト表.mjs が見る。
@@ -27,8 +28,8 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays } = context
-const { dayLabels, assignmentColumns } = vm.runInContext('({ dayLabels, assignmentColumns })', context)
+const { toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays, violationCells, outputColumns } = context
+const { dayLabels, assignmentColumns, checkKind } = vm.runInContext('({ dayLabels, assignmentColumns, checkKind })', context)
 
 const failed = []
 const passed = []
@@ -227,6 +228,51 @@ check(
     dayLabels[3],
   ))?.includes('その日の行が無い'),
   true,
+)
+
+// ---- ⑥ 違反の行を、塗るセルに当て戻す ---------------------------------------
+// 行の位置は、担当者のシートの行そのものである。途中に空の行があっても詰めない（→ shell.js の readGrid）。
+
+/** 検証結果の 1 行を、列の並びのとおりに組む。 */
+function checkRow(kind, date, start, studentId) {
+  const values = { '種別': kind, '日': date, '開始': start, '終了': '', '役割': '', '学籍番号': studentId, '氏名': '', '内容': '', 'あと何人': '' }
+  return outputColumns('検証結果').map((name) => values[name])
+}
+
+const paintedHeader = ['学籍番号', '氏名', '10:00', '10:30', '11:00']
+const paintedRows = [
+  ['ECK2626643', '森田咲良', '呼び込み', '', ''],
+  ['', '', '', '', ''],
+  ['eed2402549', '高木琴音', '調理', '調理', ''],
+]
+
+check(
+  '⑥ 枠 1 つの違反はその枠のセルに、その人のその日の違反（規則 3）は名前のある 2 列に当たる',
+  violationCells(paintedHeader, paintedRows, day, [
+    checkRow(checkKind.violation, '2025-11-02', '10:30', 'EED2402549'),
+    checkRow(checkKind.violation, '2025-11-02', '', 'ECK2626643'),
+  ]),
+  [{ row: 2, column: 3 }, { row: 0, column: 0 }, { row: 0, column: 1 }],
+)
+
+check(
+  '⑥ 未充足・別の日・どの行にも列にも当たらない違反は塗らない（検証結果の行は残っている）',
+  violationCells(paintedHeader, paintedRows, day, [
+    checkRow(checkKind.unmet, '2025-11-02', '10:00', ''),
+    checkRow(checkKind.violation, '2025-11-03', '10:00', 'EED2402549'),
+    checkRow(checkKind.violation, '2025-11-02', '10:00', 'LTS2390333'),
+    checkRow(checkKind.violation, '2025-11-02', '12:00', 'EED2402549'),
+  ]),
+  [],
+)
+
+check(
+  '⑥ 同じセルに違反が 2 つあっても 1 回だけ塗る。同じ学籍番号の行が 2 つあれば両方に当たる',
+  violationCells(paintedHeader, paintedRows.concat([['EED2402549', '', '', '', '']]), day, [
+    checkRow(checkKind.violation, '2025-11-02', '10:00', 'EED2402549'),
+    checkRow(checkKind.violation, '2025-11-02', '10:00', 'EED2402549'),
+  ]),
+  [{ row: 2, column: 2 }, { row: 3, column: 2 }],
 )
 
 // ---- 結果 ------------------------------------------------------------------

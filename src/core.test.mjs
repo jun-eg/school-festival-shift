@@ -28,7 +28,7 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-viola
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
-const { build, inputNames, conditionNames, sheetColumns, builtInSteps } = context
+const { build, recount, inputNames, conditionNames, sheetColumns, builtInSteps } = context
 const { coreSteps, outputNames, sheetLayout, checkKind, inputTypes } = vm.runInContext(
   '({ coreSteps, outputNames, sheetLayout, checkKind, inputTypes })',
   context,
@@ -289,6 +289,43 @@ check(
   '④-2 生成に希望が渡る。渡るのは型 #6 であって、回答の行ではない（→ 5-1 の #6・5-2）',
   Object.keys(receivedArgs['生成する'][2][0]),
   inputTypes.filter((type) => type.source === '回答')[0].fields,
+)
+
+// ---- ④-3 手直しの後の数え直しは、生成を走らせない（→ 5 の #8・issue #155） ----
+// 片付け（2025-11-04）の 16:00 に 準備 を足した。この人の 11-04 の希望は 8:00-15:00 なので規則 1 の違反になる。
+// 生成を走らせれば、この 1 枠は置かれない（規則 1 を破るくらいなら置かない → 5-4）。数え直しはそのまま数える。
+
+const handEdited = [
+  ['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', ''],
+  ['2025-11-04', '16:00', '16:30', '準備', 'EED2349987', ''],
+]
+const recounted = recount(skeletonInputs({ '割り当て': handEdited }))
+
+check(
+  '④-3 数え直しの割り当ては、担当者が書いたとおりである（1 枠も足さない・外さない）',
+  [recounted['割り当て'], recounted.notBuilt],
+  [handEdited, []],
+)
+
+check(
+  '④-3 手直しで作った規則 1 の違反が、違反として返る（→ 5 の #13 の ①）',
+  recounted['検証結果']
+    .filter((row) => row[kindColumn] === checkKind.violation)
+    .map((row) => [row[checkResultColumns.indexOf('開始')], row[checkResultColumns.indexOf('内容')]]),
+  [['16:00', '規則 1: 希望の時間の外に置いている']],
+)
+
+check(
+  '④-3 指標も、書いたとおりの割り当てから数える（準備 2 枠 → 1 時間 ／ 塊 2 ／ 準備に入った日 2）',
+  recounted['指標'],
+  [['EED2349987', '', 1, 2, 2]],
+)
+
+check(
+  '④-3 同じ入力で生成を押せば、その 1 枠は置かれない（数え直しと生成は別の口である）',
+  build(skeletonInputs({ '割り当て': handEdited }))['割り当て']
+    .filter((row) => row[0] === '2025-11-04' && row[1] === '16:00'),
+  [],
 )
 
 // ---- ⑤ 黙って直さずに止まる -------------------------------------------------

@@ -3,13 +3,14 @@
 //
 //   使い方: node src/shell.test.mjs
 //
-// 見るものは 6 つある。
+// 見るものは 7 つある。
 //   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
 //   ② 読んだ入力が、そのままコアの入口（checkRepresentation）を通る
 //   ③ 見出しの行を読まない。横に並んだ 6 区画を、区画ごとに切って読む（→ src/README.md）
 //   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
 //   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
 //   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
+//   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、違反した所がセルの色に出る（→ 5 の #8・issue #155）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -27,7 +28,14 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // 殻 が使うのは getSheetByName / getLastRow / getRange と、範囲の getValues・setValues・clearContent だけである。
 // 走る前の構造の検証（→ verify-structure.js）が、これに getMaxRows / getMaxColumns / getLastColumn を足す。
 
-const roundTrips = { reads: 0, writes: 0 }
+const roundTrips = { reads: 0, writes: 0, formats: 0 }
+
+/** A1 の書き方を 1 始まりの行と列に戻す（RangeList の偽のため）。 */
+function fromA1(a1) {
+  const [, letters, row] = /^([A-Z]+)(\d+)$/.exec(a1)
+  const column = [...letters].reduce((sum, letter) => sum * 26 + letter.charCodeAt(0) - 64, 0)
+  return { row: Number(row), column }
+}
 
 class FakeRange {
   constructor(sheet, row, column, rowCount, columnCount) {
@@ -55,6 +63,18 @@ class FakeRange {
     }
     return this
   }
+  /** 背景色を変える。値の往復とは別に数える（→ ⑦。1 枚につき消す 1 回・塗る 1 回である）。 */
+  setBackground(color) {
+    roundTrips.formats += 1
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) {
+        if (color === null) this.sheet.backgrounds.delete(`${r},${c}`)
+        else this.sheet.backgrounds.set(`${r},${c}`, color)
+      }
+    }
+    return this
+  }
+  getSheet() { return this.sheet }
   clearContent() {
     roundTrips.writes += 1
     for (let r = this.row; r < this.row + this.rowCount; r++) {
@@ -66,10 +86,23 @@ class FakeRange {
 
 class FakeSheet {
   constructor(name, minColumns = 26) {
-    Object.assign(this, { name, cells: new Map(), alignments: new Map(), minColumns })
+    Object.assign(this, { name, cells: new Map(), alignments: new Map(), backgrounds: new Map(), minColumns })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
+  getRangeList(a1s) {
+    const sheet = this
+    return {
+      setBackground(color) {
+        roundTrips.formats += 1
+        a1s.forEach((a1) => {
+          const { row, column } = fromA1(a1)
+          sheet.backgrounds.set(`${row},${column}`, color)
+        })
+        return this
+      },
+    }
+  }
   getLastRow() {
     return [...this.cells.entries()]
       .filter(([, value]) => value !== '')
@@ -100,10 +133,10 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-viola
 }
 const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
-  sheetsToRead, sectionRightEdge,
+  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation,
 } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels })',
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationBackground } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationBackground })',
   context,
 )
 
@@ -424,6 +457,131 @@ check(
     fullRoundTrips.writes <= gridCount * 4 + (vm.runInContext('outputNames.length', context) - 1) * 2,
   ],
   [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 1), true],
+)
+
+// ---- ⑦ 手直しの後に数え直す -------------------------------------------------
+// 担当者が 片付け（2025-11-04）の 16:00 の枠に 準備 を書いた。この人の 11-04 の希望は 8:00-15:00 なので、
+// 規則 1（希望の時間の外）の違反になる — 生成は作らないが、手直しは作りうる（→ 5 の #13 の ①）。
+// 見出しは 1 列目の時刻から始まっていなくてよい。当てるのは位置ではなく見出しの時刻である（→ issue #213）。
+
+/** マス目 4 枚の、見出しとデータの中身だけを写し取る（色は別に見る）。 */
+function gridSnapshot(book) {
+  return dayLabels.map((label) => [...book.getSheetByName(label).cells.entries()].sort())
+}
+
+/** 全シートの中身を写し取る（書き換わっていないことを見るため）。 */
+function bookSnapshot(book) {
+  return JSON.stringify(book.sheets.map((sheet) => [sheet.name, [...sheet.cells.entries()].sort()]))
+}
+
+function editedBook() {
+  const book = filledBook()
+  const cleanupDay = book.getSheetByName(dayLabels[3])
+  cleanupDay.put(1, 3, new Date(1899, 11, 30, 16, 0, 0))
+  cleanupDay.put(2, 1, 'EED2349987').put(2, 2, '高木琴音').put(2, 3, '準備')
+  // 前の周の印が残っている（数え直した後は消えていなければならない）
+  book.getSheetByName(dayLabels[0]).backgrounds.set('2,3', violationBackground)
+  return book
+}
+
+const recountBook = editedBook()
+const gridsBeforeRecount = JSON.stringify(gridSnapshot(recountBook))
+roundTrips.reads = 0
+roundTrips.writes = 0
+roundTrips.formats = 0
+const said = recountOnEdit({ source: recountBook, range: recountBook.getSheetByName(dayLabels[3]).getRange(2, 3) })
+const recountRoundTrips = { ...roundTrips }
+
+check(
+  '⑦ マス目を 1 セル書き換えると、規則 1 の違反が検証結果に出る（人が数えない → 5 の #8・#13 の ①）',
+  recountBook.getSheetByName('検証結果').getRange(2, 1, 200, 9).getValues().filter((row) => row[0] === checkKind.violation),
+  [
+    [checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '', '規則 1: 希望の時間の外に置いている', ''],
+  ],
+)
+
+check(
+  '⑦ 違反した所が、マス目のセルの色に出る（片付け の 2 行目 3 列目 → 6 の #2）',
+  [...recountBook.getSheetByName(dayLabels[3]).backgrounds.entries()],
+  [['2,3', violationBackground]],
+)
+
+check(
+  '⑦ 前の周の色は消えている（違反でなくなったセルに印が残らない）',
+  recountBook.getSheetByName(dayLabels[0]).backgrounds.size,
+  0,
+)
+
+// 準備 が 11-01 と 11-04 に 1 枠ずつ → 合計 1 時間 ／ 塊 2 つ ／ 準備に入った日 2 日（→ 5-6）
+check(
+  '⑦ 指標も数え直され、書き換えた 1 枠が合計時間に入っている',
+  recountBook.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0],
+  ['EED2349987', '高木琴音', 1, 2, 2],
+)
+
+check(
+  '⑦ 生成を走らせない — マス目は 1 セルも書き換わっていない（担当者のセルそのものを数える）',
+  JSON.stringify(gridSnapshot(recountBook)),
+  gridsBeforeRecount,
+)
+
+check(
+  '⑦ 担当者に見せる一言に、違反の件数と色の在処が入っている',
+  [said.text.includes('違反 1 件'), said.text.includes('マス目の色'), said.seconds],
+  [true, true, 5],
+)
+
+// 読むのは run と同じ（構造の検証 8 ＋ 区画 ＋ 回答 1 ＋ マス目）。マス目は中身のある 2 枚だけが 2 回になる。
+// 書くのは検証結果と指標の「消す」「置く」だけで、マス目には 1 度も値を書かない
+// （検証結果は前の行が無いので「消す」が起きない → 置く 1 ＋ 指標の消す・置く 2 ＝ 3）。
+// 色は 1 枚につき「消す」1 回、塗るセルがある枚だけ「塗る」がもう 1 回である。
+check(
+  '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、色は 1 枚につき 2 回までである',
+  [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats],
+  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + 1],
+)
+
+const conditionEditBook = editedBook()
+const conditionEditBefore = bookSnapshot(conditionEditBook)
+check(
+  '⑦ 条件入力の書き換えでは数え直さない（書きかけの途中で名指しを出さない）',
+  [
+    recountOnEdit({ source: conditionEditBook, range: conditionEditBook.getSheetByName('条件入力').getRange(3, 8) }),
+    bookSnapshot(conditionEditBook),
+  ],
+  [null, conditionEditBefore],
+)
+
+// 見出しの無い列に役割を書いた。どの枠かが決まらないので数えられない（→ assignment-grid.js の fromAssignmentGrid）。
+// 単純トリガーの例外は担当者の画面に出ないので、止まった理由を一言にして返す。
+const strayBook = editedBook()
+strayBook.getSheetByName(dayLabels[3]).put(2, 10, '調理')
+const strayBefore = bookSnapshot(strayBook)
+const straySaid = recountOnEdit({ source: strayBook, range: strayBook.getSheetByName(dayLabels[3]).getRange(2, 10) })
+check(
+  '⑦ 載らない書き換えは、止まった理由を名指しの一言で返し、検証結果も指標も書き換えない',
+  [
+    straySaid.text.startsWith('数え直せなかった'),
+    straySaid.text.includes('シート「片付け」の 2 行目 10 列目に「調理」'),
+    bookSnapshot(strayBook) === strayBefore,
+  ],
+  [true, true, true],
+)
+
+check(
+  '⑦ 生成を押しても、前の周の色は消える（生成は違反を作らない → 5 の #6）',
+  (() => {
+    const book = editedBook()
+    run(book, {})
+    return dayLabels.map((label) => book.getSheetByName(label).backgrounds.size)
+  })(),
+  [0, 0, 0, 0],
+)
+
+check(
+  '⑦ RangeList に渡す A1 の書き方（マス目は 50 列目＝AX 列まである）',
+  [a1Notation(1, 1), a1Notation(3, 26), a1Notation(2, 27), a1Notation(2, 50)],
+  ['A1', 'Z3', 'AA2', 'AX2'],
 )
 
 // ---- シートが無いとき -------------------------------------------------------

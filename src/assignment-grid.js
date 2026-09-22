@@ -169,6 +169,67 @@ function buildAssignmentRow(date, slot, role, studentId) {
 }
 
 /**
+ * 違反の行を、1 日ぶんのマス目のセルに当て戻す（→ 6 の #2「違反した所はセルの色に出る」／ issue #155）。
+ * 返すのは { row, column } の配列で、どちらもマス目の中の 0 始まりの位置である（row はデータの行）。
+ *
+ *   枠 1 つが単位の違反（規則 1・4・5・同じ枠に二重）… その人の行の、その枠の列のセル
+ *   その人のその日が単位の違反（規則 3）… その人の行の、名前のある 2 列（学籍番号・氏名）
+ *     — 規則 3 が壊れているのは枠 1 つではない（→ count-violations.js の countPrepCleanupBroken）。
+ *       準備にも片付けにも入っていない ④ は、塗る枠そのものが無い
+ *
+ * 未充足は当てない。枠の話であって人の話ではないので、塗る行が無い（→ name-unmet.js）。
+ * マス目は名指しを置き換えない — 未充足を名指しするのは検証結果である（→ src/README.md）。
+ *
+ * 行は学籍番号で引く（→ issue #213）。同じ学籍番号の行が 2 つあれば、どちらも塗る
+ * （どちらに書いた役割も同じ人の割り当てとして数えている → fromAssignmentGrid）。
+ * どの行にも列にも当たらない違反は塗らない — 検証結果の行が残っているので、黙って消えるのではない。
+ */
+function violationCells(header, dataRows, day, violations) {
+  if (!day) return []
+  const named = gridNamedColumns()
+  const columns = outputColumns('検証結果')
+  const at = (row, name) => row[columns.indexOf(name)]
+
+  const rowsOf = {}
+  dataRows.forEach((row, rowIndex) => {
+    const studentId = String(row[named.indexOf('学籍番号')] || '').trim().toUpperCase()
+    if (studentId === '') return
+    rowsOf[studentId] = (rowsOf[studentId] || []).concat([rowIndex])
+  })
+
+  const columnOf = {}
+  for (let column = named.length; column < header.length; column++) {
+    const time = String(header[column] || '')
+    if (time !== '') columnOf[time] = column
+  }
+
+  const cells = []
+  const seen = {}
+  function mark(row, column) {
+    const key = `${row},${column}`
+    if (seen[key]) return
+    seen[key] = true
+    cells.push({ row: row, column: column })
+  }
+
+  violations.forEach((violation) => {
+    if (at(violation, '種別') !== checkKind.violation) return
+    if (at(violation, '日') !== day.date) return
+    const rows = rowsOf[String(at(violation, '学籍番号')).toUpperCase()] || []
+    const start = at(violation, '開始')
+    rows.forEach((row) => {
+      if (start === '') {
+        for (let column = 0; column < named.length; column++) mark(row, column)
+        return
+      }
+      if (columnOf[start] !== undefined) mark(row, columnOf[start])
+    })
+  })
+
+  return cells
+}
+
+/**
  * 回答の行から (学籍番号 → 氏名) を作る。見出しに出すためだけの対応である。
  *
  * 同じ学籍番号が 2 行あるときは、後から来た行の氏名を採る
@@ -194,6 +255,6 @@ function namesFromAnswers(rows) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow, namesFromAnswers,
+    gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow, violationCells, namesFromAnswers,
   }
 }
