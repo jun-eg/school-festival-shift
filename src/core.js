@@ -60,12 +60,16 @@ function builtInSteps() {
   if (typeof nameUnmet !== 'function') {
     throw new Error('name-unmet.js が貼られていない（「未充足を名指しする」の中身がそこにある → issue #142）')
   }
+  if (typeof fairnessMetrics !== 'function') {
+    throw new Error('fairness-metrics.js が貼られていない（「指標を出す」の中身がそこにある → issue #154）')
+  }
   return {
     '取り込む': takeIn,
     '展開する': expand,
     '生成する': generate,
     '違反を数える': countViolations,
     '未充足を名指しする': nameUnmet,
+    '指標を出す': fairnessMetrics,
   }
 }
 
@@ -150,7 +154,8 @@ function build(inputs, steps) {
   // 数える側に候補も渡る。規則 1 の違反（希望の時間の外）は、展開した枠と照らさないと見えない。
   const violations = callStep('違反を数える', [assignments, conditions, wishes, candidates])
   const unmet = callStep('未充足を名指しする', [assignments, conditions])
-  const metrics = callStep('指標を出す', [assignments])
+  // 指標に希望が渡るのは、1 枠も置かれなかった人も 0 で並べるためである（→ fairness-metrics.js）。
+  const metrics = callStep('指標を出す', [assignments, conditions, wishes])
 
   const output = { '割り当て': assignments, '検証結果': violations.concat(unmet), '指標': metrics }
   checkOutput(output)

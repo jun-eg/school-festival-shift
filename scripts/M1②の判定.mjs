@@ -62,6 +62,8 @@ class 偽の範囲 {
   }
   setFontWeight() { return this }
   setNote() { return this }
+  // 書き戻しで時刻の見出しを左に寄せる（→ src/shell.js の writeGrids）。書式だけで、値は動かない。
+  setHorizontalAlignment() { return this }
 }
 
 class 偽の保護 {

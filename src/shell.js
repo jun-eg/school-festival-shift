@@ -170,7 +170,26 @@ function writeOutputs(spreadsheet, output, context) {
       sheet.getRange(headerRows + 1, 1, lastRow - headerRows, columnCount).clearContent()
     }
     if (output[name].length === 0) return
-    sheet.getRange(headerRows + 1, 1, output[name].length, columnCount).setValues(output[name])
+    const rows = name === '指標' ? withNamesFromAnswers(output[name], name, (context || {}).nameOf) : output[name]
+    sheet.getRange(headerRows + 1, 1, rows.length, columnCount).setValues(rows)
+  })
+}
+
+/**
+ * 指標の氏名を回答から埋める（→ issue #154）。マス目の氏名と同じ手である（→ writeGrids・namesFromAnswers）。
+ * コアは氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、指標の段が返す行の氏名は空である。
+ * 空でない氏名は上書きしない。返す行は新しい配列で、コアの出力を書き換えない。
+ */
+function withNamesFromAnswers(rows, name, nameOf) {
+  if (!nameOf) return rows
+  const columns = outputColumns(name)
+  const studentIdColumn = columns.indexOf('学籍番号')
+  const nameColumn = columns.indexOf('氏名')
+  return rows.map((row) => {
+    if (row[nameColumn] !== '') return row
+    const filled = row.slice()
+    filled[nameColumn] = nameOf(row[studentIdColumn])
+    return filled
   })
 }
 
@@ -321,7 +340,7 @@ function findSheet(spreadsheet, name) {
 if (typeof module !== 'undefined') {
   module.exports = {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, readGrid, putGridsIntoInputs,
-    writeOutputs, writeGrids, run, runOnActiveSpreadsheet, gridContext,
+    writeOutputs, withNamesFromAnswers, writeGrids, run, runOnActiveSpreadsheet, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }

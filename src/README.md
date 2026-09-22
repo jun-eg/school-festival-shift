@@ -18,6 +18,7 @@
 | [`count-violations.js`](count-violations.js) | **置いた人が条件を破っている所を行にする**（→ 5-4。`違反を数える` の段の中身）。**数える 5 つと、数えない ⑥ を名前で持つ** | **コア** |
 | [`assignment-grid.js`](assignment-grid.js) | **割り当ての行を、従来のシフト表の形に敷く／その形から戻す**（→ [#213](https://github.com/jun-eg/school-festival-shift/issues/213)）。**行が人・列が 30 分枠・セルが役割名 1 つ**で、**1 日 1 枚**である。**段ではない** — 敷き方だけを持ち、規則を 1 つも持たない | **コア** |
 | [`name-unmet.js`](name-unmet.js) | **人数が足りない枠を行にする**（→ 5-4。`未充足を名指しする` の段の中身）。**数えるもと 2 つ（必要人数・委員会の指定枠）を名前で持つ** | **コア** |
+| [`fairness-metrics.js`](fairness-metrics.js) | **人ごとの合計時間・シフト回数・準備回数を行にする**（→ 5 の #7・5-6。`指標を出す` の段の中身）。**何を 1 と数えるか（`metricDefinitions`）を名前で持つ。****並べるだけで、順位付けも閾値も出さない** | **コア** |
 | [`form-definition.js`](form-definition.js) | **フォームの定義一式だけ**（→ 4-1〜4-3。設問 9 つ ＋ 画像アイテム 1 つ・正規表現 3 箇所・エラーメッセージの句点の揺れ ◎）。**ラベル 4 つの値は持たない** — [`sheet-layout.js`](sheet-layout.js) の `dayLabels` を見る | **コア** |
 | [`shell.js`](shell.js) | **シートを読んで値の表現を揃え、コアを呼び、返ってきた行を書く** | **殻** |
 | [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
@@ -103,7 +104,7 @@
 **コアは配列を受けて配列を返す純粋な関数で、`SpreadsheetApp` に触るのは読み書きの殻だけである**（→ 6 の #8）。
 **値の表現を揃えるのも殻の仕事である。**
 
-| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`take-in.js`](take-in.js)・[`expand.js`](expand.js)・[`generate.js`](generate.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`sheet-layout.js`](sheet-layout.js)・[`form-definition.js`](form-definition.js)） | 殻（[`shell.js`](shell.js)） |
+| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`take-in.js`](take-in.js)・[`expand.js`](expand.js)・[`generate.js`](generate.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`fairness-metrics.js`](fairness-metrics.js)・[`sheet-layout.js`](sheet-layout.js)・[`form-definition.js`](form-definition.js)） | 殻（[`shell.js`](shell.js)） |
 | --- | --- | --- |
 | **受け取るもの** | **文字列と数値だけでできた行の配列** | スプレッドシート |
 | **返すもの** | 生成シート 3 枚ぶんの**行の配列** | — |
@@ -153,13 +154,13 @@
 **型に無いものは、型に無い。** **氏名も友達欄もタイムスタンプも型 #6 に乗らない**
 （友達欄は → 5-2、タイムスタンプは規則 2 の畳み込みのキーで畳んだ後には残らない）。
 **割り当ての `氏名` は、生成が空のまま置く**（→ 5-5。**埋めると 5 の #1 が破れる**）。
-**指標の `氏名` をどこから埋めるかは、この型が決めない**（[#154](https://github.com/jun-eg/school-festival-shift/issues/154)）。
+**指標の `氏名` も、コアは空のまま返す。****埋めるのは殻で、回答から引く**（割り当ての 4 枚と同じ手 → [`shell.js`](shell.js) の `writeOutputs` ／ [#154](https://github.com/jun-eg/school-festival-shift/issues/154)）。
 
 **揃っていない値は、黙って直さずに区画・行・列を名指しして止まる**
 （時刻が `HH:MM` でない／時刻が早い順でない／人数が 1 以上の整数でない／学年が選択肢の外／学籍番号が 10 桁英数字でない、など）。
 **値の表現を揃えるのは殻**（→ 上の表）で、**型に乗るかを見るのはここ**である。
 
-### 段は 6 つで、中身は 5 つ入っている
+### 段は 6 つで、中身は全部入っている
 
 **`build` が呼ぶ順である**（→ 8「作業の順序」）。**入っていない段は空の配列を返し、名指しで持ち帰る。黙って走らない。**
 **入っている段は `builtInSteps` が持つ** — **入っているのに「まだ作っていない」と名指しすると、`notBuilt` が嘘になる。**
@@ -171,7 +172,7 @@
 | `生成する` | 候補・条件・希望から割り当ての行を組む（5 の #6。**適用の順序は 5-5**） | **入っている**（[`generate.js`](generate.js) ／ [#151](https://github.com/jun-eg/school-festival-shift/issues/151)） |
 | `違反を数える` | 置いた人が条件を破っている所を行にする（5-4） | **入っている**（[`count-violations.js`](count-violations.js) ／ [#141](https://github.com/jun-eg/school-festival-shift/issues/141)） |
 | `未充足を名指しする` | 人数が足りない枠を行にする（5-4） | **入っている**（[`name-unmet.js`](name-unmet.js) ／ [#142](https://github.com/jun-eg/school-festival-shift/issues/142)） |
-| `指標を出す` | 人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7） | [#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
+| `指標を出す` | 人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7。**数え方は 5-6**） | **入っている**（[`fairness-metrics.js`](fairness-metrics.js) ／ [#154](https://github.com/jun-eg/school-festival-shift/issues/154)） |
 
 **段は差し替えで渡す。**`build(inputs, steps)` の `steps` に入れた段だけが走る —
 **数える側だけを先に入れて、生成が無いまま回せる**（**8 の 3 が 8 の 8 より先にある** ための形である）。
@@ -193,7 +194,7 @@
 **他のファイルの値をファイルの最上位で使うと、並び順で壊れる。**`core.js` も `shell.js` も
 `verify-structure.js` も、[`sheet-layout.js`](sheet-layout.js) を見るのは関数の中だけにしてある。
 **貼り忘れは名指しで止まる** — `builtInSteps` は [`take-in.js`](take-in.js) と [`expand.js`](expand.js) と
-[`generate.js`](generate.js) と [`count-violations.js`](count-violations.js) と [`name-unmet.js`](name-unmet.js) のどれが無くても、
+[`generate.js`](generate.js) と [`count-violations.js`](count-violations.js) と [`name-unmet.js`](name-unmet.js) と [`fairness-metrics.js`](fairness-metrics.js) のどれが無くても、
 **段を「まだ作っていない」に混ぜずに、貼られていないことを名指しする。**
 
 ### 取り込む側は、後から来た行を採る
@@ -436,7 +437,7 @@
 
 **「フォームを作る」の中身は入っている**（→ 上の「フォームは定義から作る」）。**押すと画像を選ぶダイアログが開く。**
 **「生成」の中身も入っている**（→ `runGeneration`）。**押すと殻が 1 周走り**、**段が欠けているあいだは 1 枚も書かずに、
-何が入っていないかを名指しで出す**（→ 上の「段は 6 つで、中身は 5 つ入っている」）。
+何が入っていないかを名指しで出す**（→ 上の「段は 6 つで、中身は全部入っている」）。
 **残るのは「画像を書き出す」1 つである。** 押すと「**まだ作っていない（issue #…）**」と名指しで言う
 （[#157](https://github.com/jun-eg/school-festival-shift/issues/157) が入れる）。**黙って走らせない。**
 
@@ -564,7 +565,7 @@
 | **ファイル名が 1 対 1 で対応する** | **貼った名前がそのまま付く**ので、リポジトリの `.js` と Apps Script の `.gs` が名前で突き合わせられる（**日本語の名前でもそのまま通った** → [`real-device-log.md`](real-device-log.md)。**いまは英字である** → [#175](https://github.com/jun-eg/school-festival-shift/issues/175)） |
 
 **却下ではない** — clasp を使いたい実装者が使うのは構わない。**手順の原本がどちらかを決めただけである。**
-**`src/` のファイルが増えたら、この判断は見直す。****4 つから 15 になったが、動かしていない**
+**`src/` のファイルが増えたら、この判断は見直す。****4 つから 16 になったが、動かしていない**
 （`core.js` と `shell.js` → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)、
 `verify-structure.js` → [#138](https://github.com/jun-eg/school-festival-shift/issues/138)、
 `input-types.js` → [#140](https://github.com/jun-eg/school-festival-shift/issues/140)、
@@ -573,6 +574,7 @@
 `take-in.js` → [#146](https://github.com/jun-eg/school-festival-shift/issues/146)、
 `expand.js` → [#149](https://github.com/jun-eg/school-festival-shift/issues/149)、
 `generate.js` → [#151](https://github.com/jun-eg/school-festival-shift/issues/151)、
+`fairness-metrics.js` → [#154](https://github.com/jun-eg/school-festival-shift/issues/154)、
 `form-definition.js` と `build-form.js` ＋ `form-picker.html` → [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）
 — **貼る回数はまだ手で追える**し、**貼るのが 1 回だけであることも、インストールが 0 であることも変わっていない。**
 **clasp の導入を担当者に要求することは、どちらにしても無い。**
@@ -589,6 +591,7 @@ node src/expand.test.mjs
 node src/generate.test.mjs
 node src/count-violations.test.mjs
 node src/name-unmet.test.mjs
+node src/fairness-metrics.test.mjs
 node src/form-definition.test.mjs
 node src/shell.test.mjs
 node src/verify-structure.test.mjs
@@ -610,13 +613,14 @@ node src/build-form.test.mjs
 | [`count-violations.test.mjs`](count-violations.test.mjs) | **数えるのは 5 つで ⑥ を数えないこと／違反を 1 件ずつ仕込むとそれぞれが名指しで出ること／未充足を 1 件も混ぜないこと／割り当ての学籍番号が小文字でもその人の希望に繋がること／判定できない行で止まること／コアの段として繋がっていること** | 32 |
 | [`assignment-grid.test.mjs`](assignment-grid.test.mjs) | **従来の形に敷けるか**（行が人・列が 30 分枠・セルが役割名 1 つ）**／行の並びが学籍番号の昇順で、割り当ての順を入れ替えても同じマス目が出るか／敷いて戻すと元の行に戻るか／当てるのが位置ではなく見出しの時刻か／載らないもので名指しして止まるか**（枠に無い時刻・1 セルに 2 役割・学籍番号が空／形式違い・いまの枠に無い見出し・その日の行が無い）。**記録がこの形に載るか（→ [`scripts/前回のシフト表.mjs`](../scripts/前回のシフト表.mjs)）はここでは数えない** | 18 |
 | [`name-unmet.test.mjs`](name-unmet.test.mjs) | **数えるもとは 2 つで、切り方が希望と逆向きであること／必要人数と指定枠の不足がどちらも名指しで出ること／名指しされていない未充足が 0 件であること／数えられない需要で止まること／コアの段として繋がっていること** | 32 |
+| [`fairness-metrics.test.mjs`](fairness-metrics.test.mjs) | **3 つの値が 5-6 のとおりに数えられるか**（合計時間に準備・片付けが入る ／ シフト回数は塊の数で、役割が変わる・時刻が飛ぶ・日が変わると切れる ／ 準備回数は準備か片付けに入った日の数）**／1 枠も置かれない人も 0 で並ぶか／並びが学籍番号の昇順で値に依らないか／順位・平均・閾値の列を足していないか／二重を 2 回数えないか／枠に乗らない行で止まるか／コアの段として繋がっているか** | 16 |
 | [`form-definition.test.mjs`](form-definition.test.mjs) | **前回の日付と営業時刻を入れた定義を、4-1〜4-3 の表と 1 行ずつ突き合わせて差分が 0 か**（設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。**→ 仕様 #2 の判定**）／**正規表現が 3 箇所で希望時間の 4 設問は同じ 1 本か**／**句点の揺れ ◎ を揃えずに写しているか**／**説明文が例 3 つと営業時間を持つか**／**入る側から数え直すと 6 項目か**／**今年の日付を入れれば題も営業時間も今年のものになり、空・4 行でないときは組まずに止まるか**。**[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 50 行を通し、正規表現も選択肢も必須も 1 件も弾かないことを見る** | 28 |
-| [`shell.test.mjs`](shell.test.mjs) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか**／**構造が崩れていれば 1 行も読まず 1 枚も書かずに止まるか**／**マス目の 4 枚がまとまって「割り当て」1 つに戻るか**／**割り当てがマス目で書かれ、氏名が回答から入るか** | 28 |
+| [`shell.test.mjs`](shell.test.mjs) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか**／**構造が崩れていれば 1 行も読まず 1 枚も書かずに止まるか**／**マス目の 4 枚がまとまって「割り当て」1 つに戻るか**／**割り当てがマス目で書かれ、氏名が回答から入るか**／**段を差し替えずに回すと指標が書かれ、氏名が回答から入るか** | 30 |
 | [`verify-structure.test.mjs`](verify-structure.test.mjs) | **読むだけの偽のスプレッドシートの上で構造を照らす。****シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える／行を 1 つ消す／生成シートを上書きする／行と列をまとめて消す、のそれぞれで名指しの行が出るか**／**セルが 1 つも変わっていないか**／読むのがシートごとに 1 回か／**マス目の 4 枚は名前のある 2 列だけを照らし、広げられていなければ読む前に列数を名指しするか** | 18 |
 | [`build-template.test.mjs`](build-template.test.mjs) | **偽のスプレッドシートの上で組み立てを走らせる。**8 枚できるか（**「回答」に置くのは構成が名前で持つ 6 列だけである** — 後ろ 4 列は題が決まってから埋まる）／保護が 3 枚に警告のみでかかるか／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか** | 9 |
 | [`build-form.test.mjs`](build-form.test.mjs) | **偽のフォームと偽のスプレッドシートの上でフォームを作る。**定義の順に置かれるか（必須・選択肢・正規表現・文言ごと）／**選んだ画像が画像アイテムに入るか**／**回答先がこのスプレッドシート自身に向くか**／**フォームが作った回答シートが構成の「回答」になるか**（見出し・位置・保護・8 枚のまま）／**2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まるか**／**題と営業時間が条件入力の「日ごとの営業時刻」から出るか**（前回の値で 4 の表、今年の値で今年のもの）**・空／4 行でない／早い順でない ときにフォームを 1 つも作らずに止まるか** | 34 |
 
-**この 14 本で分かるのは、手元で回る範囲だけである。**
+**この 15 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
 [`real-device-log.md`](real-device-log.md) が持つ。ここに二重に書かない。**
 
@@ -634,7 +638,5 @@ node src/build-form.test.mjs
 | 何 | どこが決めるか |
 | --- | --- |
 | **担当者が初回承認の画面を自力で越えられるか**（**出る画面は上で決まっている。越えられるかは実地でしか分からない**） | [#160](https://github.com/jun-eg/school-festival-shift/issues/160)（M5 → 6-1 の #4） |
-| **コアの段の残り 1 つの中身**（指標を出す。→「コアと殻の境目」の段の表） | [#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
 | **本物の Google フォームで、正規表現とエラーメッセージの文言（句点の揺れ ◎ を含む）が設定できるか**（**繋ぎ方と作り方は入った** → 上の「フォームは定義から作る」） | [#145](https://github.com/jun-eg/school-festival-shift/issues/145)（→ 6-1 の #1。**外れたら「完成品の複製」に切り替える**） |
-| **指標に実際に何行書くか**（**割り当て・検証結果の中身は入った** — 生成と、違反・未充足の両方である） | [#154](https://github.com/jun-eg/school-festival-shift/issues/154) |
 | **崩したシートで構造の検証が実機でも名指しして止まるか**（**崩さずに 1 周通るほうは、生成を実機で走らせたときに見た** → [`real-device-log.md`](real-device-log.md) の項目 14） | [`real-device-log.md`](real-device-log.md)（**崩す操作をしたときに見る**） |

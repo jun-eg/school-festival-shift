@@ -21,6 +21,7 @@
       "src/generate.js",
       "src/count-violations.js",
       "src/name-unmet.js",
+      "src/fairness-metrics.js",
       "src/shell.js"
     ],
     "実装をどう読むか": "SpreadsheetApp を置かない文脈でそのまま走らせ、src/core.js の build を 1 周させる。判定の側で規則も数え方も書き直さない — 書き直した規則で 0 件になっても、M2 の答えにならない。shell.js を読むのは、モックの CSV を回答シートに貼ったときの表現（タイムスタンプ）に揃えるためだけである。",
@@ -130,8 +131,8 @@
     },
     {
       "何": "指標（人ごとの合計時間・シフト回数・準備回数）",
-      "なぜ": "まだ中身が入っていない（→ docs/tech-requirements.md 8 の 9 ／ issue #154）。M2 の合格の線に指標は入っていない（入るのは M3 である → 7）。",
-      "どこが持つか": "この手が「未了の段」として名指しで出す。"
+      "なぜ": "M2 の合格の線に指標は入っていない（入るのは M3 である → 7）。段の中身は入っていて（→ docs/tech-requirements.md 8 の 9 ／ issue #154）、1 周の中で走るが、この手は値を見ない。",
+      "どこが持つか": "src/fairness-metrics.js ／ src/fairness-metrics.test.mjs"
     },
     {
       "何": "上限（360 秒）に収まっているか",

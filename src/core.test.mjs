@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -183,20 +183,19 @@ check(
 
 check(
   '③ 中身が入っている段は、未了に出ない'
-    + '（5 つ → take-in.js ／ expand.js ／ generate.js ／ count-violations.js ／ name-unmet.js）',
+    + '（6 つ → take-in.js ／ expand.js ／ generate.js ／ count-violations.js ／ name-unmet.js ／ fairness-metrics.js）',
   [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
-  [['取り込む', '展開する', '生成する', '違反を数える', '未充足を名指しする'], []],
+  [['取り込む', '展開する', '生成する', '違反を数える', '未充足を名指しする', '指標を出す'], []],
 )
 
 check(
-  '③ 指標の段が入っていないので、指標は空の配列で返る（何も書かない）。'
-    + '割り当ても空である — この 1 人は 調理担当ですか？ が いいえ で、調理の枠に置けない（→ 規則 5）',
+  '③ 割り当てが空でも、指標には 1 枠も置かれなかった人が 0 で並ぶ（→ fairness-metrics.js）。'
+    + '割り当てが空なのは、この 1 人が 調理担当ですか？ が いいえ で、調理の枠に置けないからである（→ 規則 5）',
   [skeletonOutput['割り当て'], skeletonOutput['指標']],
-  [[], []],
+  [[], [['EED2349987', '', 0, 0, 0]]],
 )
 
 // 置いた行が 1 つも無いのは、足りていないことである。未充足の側だけは 0 件にならない（→ 5-4・#142）。
-// 段が欠けているあいだ、殻はこの行を 1 枚も書かない（→ src/README.md・shell.test.mjs）。
 // 要る枠は 64 である — 時間帯を空けた需要が効くのはその日の調理帯（10:00-18:00 の 16 枠）で、
 // 準備帯（08:00-10:00）にも片付け帯（18:00-20:00）にも立たない（16 枠 × 4 日 → 5-1 の #2・issue #210）。
 check(

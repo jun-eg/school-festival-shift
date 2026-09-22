@@ -95,11 +95,11 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const {
-  readInputs, run, normalizeValue, checkRepresentation, sheetColumns, builtInSteps,
+  readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
   sheetsToRead, sectionRightEdge,
 } = context
 const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels } = vm.runInContext(
@@ -276,10 +276,14 @@ function checkResultRow(kind, detail) {
   return row
 }
 
+// 6 段とも中身が入っている（→ core.js の builtInSteps）ので、欠けた段は差し替えで作る。
+// 関数でないものを渡せば、その段は「まだ作っていない」として名指しされる（→ core.js の build）。
+const withoutMetrics = { '指標を出す': null }
+
 const skeletonBook = filledBook()
 roundTrips.reads = 0
 roundTrips.writes = 0
-const notBuilt = run(skeletonBook, {})
+const notBuilt = run(skeletonBook, withoutMetrics)
 
 check(
   '⑤ 骨組みのまま走らせても、マス目の手直しが残っている（→ 5-3）',
@@ -297,15 +301,15 @@ check(
   '⑤ 何が入っていないかは、issue 番号つきで返る（中身が入っている段は出ない → core.js の builtInSteps）',
   notBuilt.map((step) => `${step.name}#${step.issue}`),
   coreSteps
-    .filter((step) => Object.keys(builtInSteps()).indexOf(step.name) === -1)
+    .filter((step) => Object.keys(withoutMetrics).indexOf(step.name) !== -1)
     .map((step) => `${step.name}#${step.issue}`),
 )
 
 // 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）。
-// いま欠けているのは 指標を出す（→ #154）だけで、残る 5 段は中身が入っている（→ core.js の builtInSteps）。
+// 欠けているのは差し替えで外した 指標を出す だけで、残る 5 段は中身が入っている（→ core.js の builtInSteps）。
 const partialBook = filledBook()
 roundTrips.writes = 0
-run(partialBook, {})
+run(partialBook, withoutMetrics)
 
 check(
   '⑤ 段が 1 つでも欠けていれば、残りが入っていても 1 枚も書かない',
@@ -350,6 +354,24 @@ check(
     fullBook.getSheetByName(dayLabels[0]).getRange(2, 2, 1, 1).getValues()[0][0],
   ],
   ['function', '高木琴音'],
+)
+
+// 差し替えずに 6 段の中身で回す。指標の段は氏名を空で返す（→ fairness-metrics.js）ので、埋まっていれば殻が引いている。
+const builtInBook = filledBook()
+check(
+  '④ 段を差し替えずに回すと、指標が 1 人 1 行で書かれ、氏名は回答から引いてある（→ issue #154）',
+  [run(builtInBook, {}), builtInBook.getSheetByName('指標').getRange(2, 1, 1, 2).getValues()[0]],
+  [[], ['EED2349987', '高木琴音']],
+)
+
+check(
+  '④ 氏名を引くのは空の欄だけで、コアの出力を書き換えない',
+  (() => {
+    const rows = [['EED2349987', '', 1, 1, 0], ['EED0000000', '手で書いた名前', 1, 1, 0]]
+    const filled = withNamesFromAnswers(rows, '指標', () => '回答の名前')
+    return [filled.map((row) => row[1]), rows[0][1]]
+  })(),
+  [['回答の名前', '手で書いた名前'], ''],
 )
 
 check(
