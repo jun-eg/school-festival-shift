@@ -183,7 +183,7 @@ function readSection(sheet, layout, section) {
  * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
  * 書き戻すときは、手直しの印（メモ）も付け直す（→ writeGrids）。
  * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
- * 検証結果も、書くたびに行の背景を塗り直す — 店の役割の行が黄色である（→ paintCheckResults ／ issue #220）。
+ * 検証結果も、書くたびに行の背景を塗り直す — 違反の行が赤、店の役割の行が黄色である（→ paintCheckResults ／ issue #220）。
  *
  * 返すのは塗ったマス目である（{ layout, grid } の配列。1 枚も書かなかったときは空）。控えを置き直す側が使う（→ keepSeenGrids）。
  */
@@ -258,11 +258,11 @@ function paintGrids(spreadsheet, grids, violations, days) {
 }
 
 /**
- * 検証結果の行の背景を塗り直す — 店の役割の違反・未充足の行が黄色である（→ issue #220）。
+ * 検証結果の行の背景を塗り直す — 違反の行が赤、違反でない店の役割の行が黄色である（→ issue #220）。
  * どの行を塗るかはコアの側が決める（→ assignment-grid.js の checkResultBackgrounds）。
  *
  * 背景だけを置く。clearFormat は使わない — 数値や日付の書式まで消え、値の見え方が変わる（値は 1 セルも変えない → issue #220）。
- * 下の端（getMaxRows）まで 1 回で置き直すので、行が減っても前の周の黄色が残らない。
+ * 下の端（getMaxRows）まで 1 回で置き直すので、行が減っても前の周の赤も黄色も残らない。
  */
 function paintCheckResults(sheet, rows, headerRows, width) {
   const height = Math.max(sheet.getMaxRows() - headerRows, rows.length)

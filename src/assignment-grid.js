@@ -449,26 +449,37 @@ function gridBackgrounds(dataRows, width) {
 }
 
 /**
- * 検証結果の行の背景色（→ issue #220）。店の役割の違反・未充足の行を、行ぜんぶ黄色にする。
+ * 検証結果の行の背景色（→ issue #220）。2 色である。
  *
- * 準備・片付けの行は塗らない。未充足のほとんどはこの 2 つで、何十行も並ぶ（→ 5-4）ので、
- * 塗ると店の役割の行が埋もれる。役割が空の行（規則 3 の違反 → count-violations.js の countPrepCleanupBroken）も
- * 準備・片付けの決まりなので塗らない。
+ *   違反の行 … 役割が何であっても、行ぜんぶ赤。置いた人が条件を破っている所で、担当者が直すものである
+ *   それ以外 … 店の役割（準備・片付け以外）の行だけ、行ぜんぶ黄色（未充足と食い違った固定）
+ *
+ * 違反を先に見る。準備・片付けの違反も、役割が空の違反（規則 3 → count-violations.js の countPrepCleanupBroken）も赤にする。
+ * 違反でない準備・片付けの行は塗らない。未充足のほとんどはこの 2 つで、何十行も並ぶ（→ 5-4）ので、
+ * 塗ると店の役割の行が埋もれる。
  * 検証結果はマス目と別のシートなので、調理の黄（roleColors）と同じ色でも意味は重ならない。
- * 標準の黄にしてあるのは、淡い黄だと白い行と見分けにくいからである。
+ * 黄は標準の黄にしてある — 淡い黄だと白い行と見分けにくい。赤は背景なので、黒い字が読める明るい赤にしてある
+ * （マス目の違反の赤い太字 → shell.js の violationMark とは、塗る所が違う）。
  */
-const checkRowHighlight = { name: '黄', color: '#ffff00' }
+const checkRowHighlights = {
+  violation: { name: '赤', color: '#ea9999' },
+  storeRole: { name: '黄', color: '#ffff00' },
+}
 
 /**
  * 検証結果の行ぜんぶの背景色を、行と列の並びのまま返す（setBackgrounds にそのまま渡す形）。
  * 塗らない行は null である。値は見ない側の列にも同じ色を置く — 行ぜんぶを塗る（→ issue #220 のコメント）。
  */
 function checkResultBackgrounds(rows, width) {
-  const roleColumn = sheetColumns('検証結果').indexOf('役割')
+  const columns = sheetColumns('検証結果')
+  const kindColumn = columns.indexOf('種別')
+  const roleColumn = columns.indexOf('役割')
   const prepCleanup = prepCleanupRoles()
   return rows.map((row) => {
     const role = String(row[roleColumn] || '').trim()
-    const color = role !== '' && prepCleanup.indexOf(role) === -1 ? checkRowHighlight.color : null
+    let color = null
+    if (row[kindColumn] === checkKind.violation) color = checkRowHighlights.violation.color
+    else if (role !== '' && prepCleanup.indexOf(role) === -1) color = checkRowHighlights.storeRole.color
     const colors = []
     for (let column = 0; column < width; column++) colors.push(color)
     return colors
@@ -582,7 +593,7 @@ function latestAnswerOf(rows, columnName, keepBlank) {
 if (typeof module !== 'undefined') {
   module.exports = {
     gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow,
-    fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, checkRowHighlight, checkResultBackgrounds, violationCells, namesFromAnswers,
+    fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, checkRowHighlights, checkResultBackgrounds, violationCells, namesFromAnswers,
     friendsFromAnswers,
   }
 }

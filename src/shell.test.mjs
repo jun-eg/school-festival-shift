@@ -14,7 +14,7 @@
 //   ⑧ 書き換えたセルに手直しの印（メモ）が付き、生成し直しても残る。残せないものは名指しで返る（→ 5-3・issue #156）
 //   ⑨ 配る画像の中身は、いまのマス目のとおりに組まれ、1 セルも書き換えない（→ 5 の #9・issue #157）
 //   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ 5-3・issue #226）
-//   ⑪ 検証結果の、準備・片付け以外の役割の行が、値を変えずに行ぜんぶ黄色になる（→ issue #220）
+//   ⑪ 検証結果の違反の行が赤、違反でない準備・片付け以外の役割の行が黄色に、値を変えずに行ぜんぶ塗られる（→ issue #220）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -932,9 +932,9 @@ check(
   [true, [['2,8', fixedNote]], true],
 )
 
-// ---- ⑪ 検証結果の黄色（→ issue #220） ---------------------------------------
-// 店の役割（準備・片付け以外）の行だけを、行ぜんぶ黄色にする。値は 1 セルも変えない。
-// 役割が空の行は規則 3（準備・片付けの決まり）の違反なので塗らない（→ assignment-grid.js の checkResultBackgrounds）。
+// ---- ⑪ 検証結果の赤と黄色（→ issue #220） -----------------------------------
+// 違反の行は、役割に関係なく行ぜんぶ赤にする。違反でない行は、店の役割（準備・片付け以外）の行だけを行ぜんぶ黄色にする。
+// 値は 1 セルも変えない（→ assignment-grid.js の checkResultBackgrounds）。
 
 function checkRow(kind, role, detail) {
   const row = checkResultRow(kind, detail)
@@ -954,8 +954,8 @@ function runWithChecks(book, violations, unmet) {
   })
 }
 
-/** 検証結果の、塗った行の番号（1 始まり）と、その行で塗ったセルの数。 */
-function yellowRows(book) {
+/** 検証結果の、塗った行の番号（1 始まり）と、その行で塗ったセルの数と色。 */
+function paintedRows(book) {
   const byRow = {}
   ;[...book.getSheetByName('検証結果').backgrounds.entries()].forEach(([key, color]) => {
     const row = Number(key.split(',')[0])
@@ -965,54 +965,61 @@ function yellowRows(book) {
   return Object.keys(byRow).map((row) => [Number(row), byRow[row].length, [...new Set(byRow[row])]])
 }
 
-const yellowOf = vm.runInContext('checkRowHighlight', context).color
+const { violation: { color: redOf }, storeRole: { color: yellowOf } } = vm.runInContext('checkRowHighlights', context)
 const mixedViolations = [
   checkRow(checkKind.violation, '調理', '規則 5: 検便を通っていない'),
   checkRow(checkKind.violation, '', '規則 3: 午前だけなのに準備に入っていない'),
+  checkRow(checkKind.violation, '準備', '規則 1: 希望の時間の外に置いている'),
 ]
 const mixedUnmet = [
   checkRow(checkKind.unmet, '準備', 'あと 3 人'),
   checkRow(checkKind.unmet, '会計', 'あと 1 人'),
   checkRow(checkKind.unmet, '片付け', 'あと 2 人'),
 ]
-const yellowBook = filledBook()
-roundTrips.formats = 0
-runWithChecks(yellowBook, mixedViolations, mixedUnmet)
+const paintedBook = filledBook()
+runWithChecks(paintedBook, mixedViolations, mixedUnmet)
+const checkWidth = checkResultColumns.length
 
 check(
-  '⑪ 準備・片付け以外の行だけが、行ぜんぶ（9 列）黄色になる（調理の違反 2 行目 ／ 会計の未充足 5 行目 → issue #220）',
-  yellowRows(yellowBook),
-  [[2, checkResultColumns.length, [yellowOf]], [5, checkResultColumns.length, [yellowOf]]],
+  '⑪ 違反の行は役割に関係なく行ぜんぶ（9 列）赤、違反でない店の役割の行は行ぜんぶ黄色、ほかは塗らない（→ issue #220）',
+  paintedRows(paintedBook),
+  [[2, checkWidth, [redOf]], [3, checkWidth, [redOf]], [4, checkWidth, [redOf]], [6, checkWidth, [yellowOf]]],
 )
 
 check(
-  '⑪ 値は書いた行のとおりで、黄色を足しても 1 セルも変わらない',
-  yellowBook.getSheetByName('検証結果').getRange(2, 1, 6, checkResultColumns.length).getValues(),
+  '⑪ 値は書いた行のとおりで、色を足しても 1 セルも変わらない',
+  paintedBook.getSheetByName('検証結果').getRange(2, 1, 7, checkWidth).getValues(),
   mixedViolations.concat(mixedUnmet).concat([checkResultColumns.map(() => '')]),
 )
 
-// 生成し直して、店の役割の行が無くなった。前の周の黄色が残ってはいけない。
-runWithChecks(yellowBook, [], [checkRow(checkKind.unmet, '準備', 'あと 3 人')])
-check('⑪ 生成し直して店の役割の行が無くなれば、前の周の黄色は残らない', yellowRows(yellowBook), [])
+// 生成し直して、違反も店の役割の行も無くなった。前の周の赤も黄色も残ってはいけない。
+runWithChecks(paintedBook, [], [checkRow(checkKind.unmet, '準備', 'あと 3 人')])
+check('⑪ 生成し直して違反も店の役割の行も無くなれば、前の周の赤も黄色も残らない', paintedRows(paintedBook), [])
 
-// 手直しの後の数え直しでも塗る。⑦ と同じ書き換え（片付けの日に準備）は、未充足に会計を出さない入力なので、
-// 役割と必要人数に 会計 を 1 行足して、会計の未充足を出させる。
-const recountYellowBook = editedBook()
-recountYellowBook.getSheetByName('条件入力').put(4, 11, '会計').put(4, 12, 1)
-recountOnEdit({ source: recountYellowBook, range: recountYellowBook.getSheetByName(dayLabels[3]).getRange(2, 3) })
-const recountChecks = recountYellowBook.getSheetByName('検証結果').getRange(2, 1, 200, checkResultColumns.length).getValues()
+// 手直しの後の数え直しでも塗る。⑦ と同じ書き換え（片付けの日に準備）は規則 1 の違反を 1 行出す。
+// 役割と必要人数に 会計 を 1 行足して、会計の未充足も出させる。
+const recountPaintedBook = editedBook()
+recountPaintedBook.getSheetByName('条件入力').put(4, 11, '会計').put(4, 12, 1)
+recountOnEdit({ source: recountPaintedBook, range: recountPaintedBook.getSheetByName(dayLabels[3]).getRange(2, 3) })
+const recountChecks = recountPaintedBook.getSheetByName('検証結果').getRange(2, 1, 200, checkWidth).getValues()
   .filter((row) => row[0] !== '')
+const kindColumnIndex = checkResultColumns.indexOf('種別')
 const roleColumnIndex = checkResultColumns.indexOf('役割')
 check(
-  '⑪ 数え直しでも塗り直す — 黄色の行は、役割が準備・片付け・空のどれでもない行とちょうど一致する',
+  '⑪ 数え直しでも塗り直す — 違反の行は赤、違反でない店の役割の行は黄色、ほかは塗らない',
   [
-    recountChecks.some((row) => row[roleColumnIndex] === '会計'),
-    yellowRows(recountYellowBook).map(([row]) => row),
+    recountChecks.some((row) => row[kindColumnIndex] === checkKind.violation),
+    recountChecks.some((row) => row[kindColumnIndex] !== checkKind.violation && row[roleColumnIndex] === '会計'),
+    paintedRows(recountPaintedBook).map(([row, , colors]) => [row, colors]),
   ],
   [
     true,
+    true,
     recountChecks
-      .map((row, i) => (['準備', '片付け', ''].indexOf(row[roleColumnIndex]) === -1 ? i + 2 : null))
+      .map((row, i) => {
+        if (row[kindColumnIndex] === checkKind.violation) return [i + 2, [redOf]]
+        return ['準備', '片付け', ''].indexOf(row[roleColumnIndex]) === -1 ? [i + 2, [yellowOf]] : null
+      })
       .filter((row) => row !== null),
   ],
 )
