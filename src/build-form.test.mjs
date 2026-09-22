@@ -4,21 +4,15 @@
 //   使い方: node src/build-form.test.mjs
 //
 // 見るものは 6 つある。
-//   ① 定義の順どおりに置かれる（設問 9 つ ＋ 画像アイテム 1 つ。必須・選択肢・正規表現・文言ごと）
-//   ② 担当者が選んだ画像が、そのまま画像アイテムに入る（選ばれていなければ名指しで止まる）
-//   ③ 回答先がこのスプレッドシート自身に向く（担当者が紐付けない → 6 の #6）
-//   ④ フォームが作った回答シートが構成の「回答」になる（見出し・位置・保護・5 枚のまま）
-//   ⑤ 2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まる（黙って直さない）
-//   ⑥ 設問の題と説明文の営業時間が、条件入力の「日ごとの営業時刻」から出る（→ 4-1・4-2）。
-//      空／4 行でない／5 時刻が早い順でない ときは、フォームを 1 つも作らずに名指しして止まる
+//   ① 定義の順どおりに置かれる（設問 9 つ ＋ 画像アイテム 1 つ）
+//   ② 選んだ画像が画像アイテムに入る（選ばれていなければ止まる）
+//   ③ 回答先がこのスプレッドシート自身に向く
+//   ④ フォームが作った回答シートが構成の「回答」になる
+//   ⑤ 2 回目・回答がある・見出しが違う、で名指しして止まる
+//   ⑥ 題と営業時間が「日ごとの営業時刻」から出る。不正な入力ならフォームを作らずに止まる
 //
-// 条件入力に入れるのは前回の日付と営業時刻である。前回の値を入れたのだから、
-// 出来上がるフォームは 4 の表と一致する — 一致しないなら、入力から組む側が壊れている（→ 仕様 #2）。
-//
-// ここで分かるのは手順だけである。
-// 本物の Google フォームで正規表現とエラーメッセージ（句点の揺れ ◎）が設定できるかは
-// issue #145（6-1 の #1）が、setDestination が 1 スコープで通るかは実機が持つ
-// （→ src/real-device-log.md）。
+// 条件入力には前回の値を入れるので、出来上がるフォームは 4 の表と一致するはずである（→ 仕様 #2）。
+// 本物の Google フォームでの振る舞いは実機が持つ（→ src/real-device-log.md）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -121,10 +115,7 @@ class FakeSpreadsheet {
 
 // ---- 偽のフォーム -----------------------------------------------------------
 //
-// 本物の Google フォームがやることのうち、この検査が見るものだけを真似る。
-//   ・置かれた設問を順に覚える
-//   ・setDestination で、回答先のスプレッドシートに回答シートを 1 枚作る
-//     （名前は Google が決める「フォームの回答 1」、見出しはタイムスタンプ ＋ 設問の題である）
+// 設問を順に覚え、setDestination で回答シート「フォームの回答 1」を 1 枚作る。
 
 class FakeValidationBuilder {
   constructor(kind) { this.built = { kind } }
@@ -185,8 +176,7 @@ const context = vm.createContext({
   },
   console: { log() {} },
 })
-// 読む側（shell.js の readSection）と型（input-types.js の toDays）も一緒に読む。
-// フォームは条件入力の「日ごとの営業時刻」を、その 2 つを通して読む（→ build-form.js）。
+// 「日ごとの営業時刻」を読む readSection（shell.js）と toDays（input-types.js）も読む。
 for (const name of [
   'sheet-layout.js', 'form-definition.js', 'input-types.js', 'shell.js', 'build-template.js', 'build-form.js',
 ]) {
@@ -217,11 +207,7 @@ function whyItStopped(run) {
   }
 }
 
-/**
- * 前回の日付と営業時刻（→ docs/tech-requirements.md 7「前回の 5 時刻の置き方」の M1 ①・フォームの側）。
- * 始まりの 4 つをその日の営業開始に、片付け終了を営業終了に置く。
- * これを入れて 4 の表が出ることが、仕様 #2 の判定である。
- */
+/** 前回の日付と営業時刻。始まりの 4 つを営業開始に、片付け終了を営業終了に置く（→ 仕様 #2）。 */
 const lastYearRows = [
   ['2025-11-01', '08:00', '08:00', '08:00', '08:00', '21:00'],
   ['2025-11-02', '08:00', '08:00', '08:00', '08:00', '20:00'],
@@ -236,11 +222,7 @@ function putBusinessHours(book, rows) {
   return book
 }
 
-/**
- * 組み立て済みのテンプレートを 1 つ用意する（build-template.js そのものを通す）。
- * 担当者は「フォームを作る」の前に「日ごとの営業時刻」を入れている（→ 2 の一覧 3・5）ので、
- * 既定では前回の 4 行を入れた状態にする。入れない状態は rows に [] を渡して作る。
- */
+/** 組み立て済みのテンプレートに「日ごとの営業時刻」を入れて用意する。空にするなら rows に [] を渡す。 */
 function freshTemplate(id = 'this-spreadsheet', rows = lastYearRows) {
   const book = new FakeSpreadsheet(['シート1'], id)
   buildTemplateInto(book)
@@ -250,7 +232,7 @@ function freshTemplate(id = 'this-spreadsheet', rows = lastYearRows) {
 
 const rosterImage = { bytes: [1, 2, 3], mimeType: 'image/png', fileName: '調理名簿.png' }
 
-// 前回の 4 行を入れたときに出るはずの定義。突き合わせる相手はこれである（→ 仕様 #2）。
+// 前回の 4 行を入れたときに出るはずの定義。
 const lastYearItems = formItemsFor(toDays(lastYearRows, '日ごとの営業時刻'))
 const lastYearTitles = lastYearItems.filter((item) => item.kind !== '画像アイテム').map((item) => item.title)
 

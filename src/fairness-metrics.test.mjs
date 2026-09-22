@@ -4,14 +4,12 @@
 //   使い方: node src/fairness-metrics.test.mjs
 //
 // 見るものは 6 つある。
-//   ① 合計時間は、置いた枠の長さの合計である。準備・片付けの枠も含める（→ 5-6）
-//   ② シフト回数は塊の数である。役割が変われば別の塊で、時刻が飛べば切れる（→ 5-5 の「まとまり」）
+//   ① 合計時間は、置いた枠の長さの合計である（準備・片付けも含む）
+//   ② シフト回数は塊の数である。役割が変われば別の塊で、時刻が飛べば切れる
 //   ③ 準備回数は、準備か片付けに入った日の数である
-//   ④ 人ごとに 3 つの値が出る。1 枠も置かれない人も 0 で並ぶ。順位付けも閾値も出ない（→ issue #154 の受け入れ条件）
+//   ④ 人ごとに 3 つの値が出る。1 枠も置かれない人も 0 で並ぶ。順位付けも閾値も出ない
 //   ⑤ 同じ枠の二重を 2 回数えない ／ 枠に乗らない行は名指しして止まる
-//   ⑥ コアの段として繋がっていて、返った行が指標シートの形に合っている（→ core.js の checkOutput）
-//
-// これは契約であって実装ではない。何も書き換えない。
+//   ⑥ コアの段として繋がっていて、返った行が指標シートの形に合っている
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -21,7 +19,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 読み込む ---------------------------------------------------------------
-// SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
+// SpreadsheetApp は置かない。置かずに通ることを見る。
 
 const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js']) {
@@ -72,7 +70,7 @@ const people = {
   c: { id: 'CCC1234567', name: '' },
 }
 
-/** 割り当て 1 行（列は assignmentColumns）。開始から 30 分の枠である。氏名は生成と同じく空である。 */
+/** 割り当て 1 行（開始から 30 分の枠。氏名は生成と同じく空）。 */
 function placed(date, start, role, who) {
   const minutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3)) + 30
   const end = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`

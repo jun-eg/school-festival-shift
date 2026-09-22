@@ -5,16 +5,12 @@
 //
 // 見るものは 5 つある。
 //   ① 規則 2 の 3 つを踏む（学籍番号でまとめる／タイムスタンプで畳む／採るのは後から来た行）
-//      — まとめるときの学籍番号は大文字に揃っている（大文字・小文字に意味は無い ◎ → 3 の規則 2 の ①）
-//   ② data/前回の希望データ-モック.csv の 50 行が 39 件になり、学籍番号の重複が 0 である（→ 仕様 #4）
-//   ③ 返るのは型 #6 だけである（タイムスタンプも氏名も友達欄も乗らない → 5-1 の #6・5-2）
-//   ④ 1 行に決まらない行・揃っていない行は、黙って選ばずに名指しして止まる
+//   ② モック CSV の 50 行が 39 件になり、学籍番号の重複が 0 である（→ 仕様 #4）
+//   ③ 返るのは型 #6 だけである
+//   ④ 1 行に決まらない行・揃っていない行は、名指しして止まる
 //   ⑤ コアの段として繋がっていて、回答の行がそのまま下流へ流れない
 //
-// 採る向き（後から来た行）は上流の決めである（→ ADR design-doc-0006）。
-// 向きが動いたら、ここの ① と src/take-in.js の foldDirection が一緒に動く。
-//
-// これは契約であって実装ではない。何も書き換えない。
+// 採る向きが動いたら、ここの ① と src/take-in.js の foldDirection が一緒に動く。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -25,8 +21,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
 
 // ---- 読み込む ---------------------------------------------------------------
-// SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
-// shell.js を読むのは、モックの CSV を回答シートに貼ったときの表現に揃えるためである（→ ②）。
+// SpreadsheetApp は置かない。shell.js はモックを回答シートの表現に揃えるために読む（→ ②）。
 
 const coreFiles = ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js']
 
@@ -61,8 +56,7 @@ function whyItStopped(work) {
 }
 
 // ---- 入力を組む -------------------------------------------------------------
-// 回答シートの 1 行は、タイムスタンプ ＋ 設問 9 つである（→ 4-1・sheet-layout.js の「回答」）。
-// 値は殻が揃えたあとの表現で置く（日時は YYYY-MM-DD HH:MM:SS → shell.js の valueRepresentation）。
+// 回答シートの 1 行（タイムスタンプ ＋ 設問 9 つ）を、殻が揃えたあとの表現で置く。
 
 function answerRow(at, studentId, answers, more) {
   const one = more || {}
@@ -182,8 +176,7 @@ function readCsv(text) {
   })
 }
 
-// モックを回答シートに貼ると、タイムスタンプのセルは日時になる（→ 7「判定のときは、このファイルを
-// 回答シートに貼って入力にする」）。殻が揃えたあとの表現に直してから食わせる — 直す手は殻のものを使う。
+// 貼るとタイムスタンプは日時になるので、殻の formatDateTime で揃えてから食わせる。
 function asSheetRow(row) {
   const [year, month, day] = row[0].split(' ')[0].split('/').map(Number)
   const [hour, minute, second] = row[0].split(' ')[1].split(':').map(Number)
@@ -214,8 +207,7 @@ check(
   11,
 )
 
-// 出し直した 11 人について、採った行が「その人の行のうち最も新しいタイムスタンプの行」かを、
-// モックの側から数え直す。向き（③）が実データで効いていることを、ここで見る。
+// 採った行が、その人の最も新しい行かをモックの側から数え直す（③ の向きを実データで見る）。
 const latestByHand = {}
 mockRows.forEach((row) => {
   if (!latestByHand[row[1]] || row[0] > latestByHand[row[1]][0]) latestByHand[row[1]] = row
@@ -355,7 +347,7 @@ check(
   [true, -1],
 )
 
-// 回答の行は、そのまま先へ流れない。展開する段（#149）に渡るのは、畳んだあとの型 #6 である。
+// 展開する段に渡るのは、畳んだあとの型 #6 である。
 let receivedByExpand = null
 build(skeletonInputs([
   answerRow(early, 'LTR2569911', earlyAnswers),

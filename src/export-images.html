@@ -4,12 +4,8 @@
     <base target="_top" />
     <meta charset="utf-8" />
     <!--
-      「画像を書き出す」で出る画面（docs/tech-requirements.md 2 の一覧 9 ／ 5 の #9・#10 ／ 6 の #5 ／ issue #157）。
-      担当者がやるのは、保存を押して LINE ノートに貼ることだけである。
-      外から読み込むファイルは 0 個である（→ 6 の #5）。描画のライブラリも字体も読まない — 字体は端末に依存してよい（→ 2 の「止まる箇所」#7）。
-
-      ここは塗るだけである。何をどこに描くかは distribution-image.js（コア）が決めて、図形の一覧で渡してくる。
-      位置をここで決めないのは、手元の検査で形まで見るためである（→ distribution-image.test.mjs）。
+      「画像を書き出す」で出る画面（→ issue #157）。外から読み込むファイルは 0 個である（→ 6 の #5）。
+      ここは塗るだけで、何をどこに描くかは distribution-image.js が図形の一覧で渡す（検査で形まで見るため）。
     -->
     <style>
       body {
@@ -44,7 +40,7 @@
         state.className = stopped ? 'stopped' : 'note'
       }
 
-      // 図形の一覧を canvas に塗る。寸法は px で来るので、scale 倍して画素を増やす（→ distribution-image.js の imageScale）。
+      // 図形の一覧を canvas に塗る。寸法は px で来るので、scale 倍して画素を増やす。
       function paint(drawing) {
         var canvas = document.createElement('canvas')
         canvas.width = drawing.width * drawing.scale
@@ -71,7 +67,7 @@
         drawing.texts.forEach(function (text) {
           ctx.font = (text.bold ? 'bold ' : '') + text.size + 'px sans-serif'
           ctx.textAlign = text.align
-          // 幅はコアが見積もっている。端末の字体で溢れる分は、ここで詰めて収める。
+          // 端末の字体で溢れる分は、maxWidth で詰めて収める。
           ctx.fillText(text.text, text.x, text.y, text.maxWidth)
         })
 
@@ -89,7 +85,7 @@
           if (!image.drawing) {
             var empty = document.createElement('p')
             empty.className = 'note'
-            empty.textContent = 'この日は 1 人も入っていないので、描いていない。'
+            empty.textContent = 'この日は 1 人も入っていない（描いていない）。'
             section.appendChild(empty)
             list.appendChild(section)
             return
@@ -111,8 +107,8 @@
         })
 
         say(
-          drawn + ' 枚描いた。保存して、LINE ノートに貼る。'
-            + '保存が始まらないときは、画像を右クリック（スマホは長押し）して保存する。',
+          drawn + ' 枚描いた。保存して LINE ノートに貼る。'
+            + '保存が始まらないときは、画像を右クリック（スマホは長押し）で保存する。',
         )
         if (drawn > 1) {
           saveAll.textContent = drawn + ' 枚とも保存する'

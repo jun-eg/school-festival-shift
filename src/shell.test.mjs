@@ -4,22 +4,20 @@
 //   使い方: node src/shell.test.mjs
 //
 // 見るものは 11 ある。
-//   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
-//   ② 読んだ入力が、そのままコアの入口（checkRepresentation）を通る
-//   ③ 見出しの行を読まない。横に並んだ 6 区画を、区画ごとに切って読む（→ src/README.md）
-//   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
-//   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
-//   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
-//   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、背景に役割の色・違反した所に赤い太字が出る（→ 5 の #8・issue #155）
-//   ⑧ 書き換えたセルに手直しの印（メモ）が付き、生成し直しても残る。残せないものは名指しで返る（→ 5-3・issue #156）
-//   ⑨ 配る画像の中身は、いまのマス目のとおりに組まれ、1 セルも書き換えない（→ 5 の #9・issue #157）
-//   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ 5-3・issue #226）
-//   ⑪ 検証結果の違反の行が赤、違反でない準備・片付け以外の役割の行が黄色に、値を変えずに行ぜんぶ塗られる（→ issue #220）
+//   ① 値の表現が揃う（Date・真偽値・空白・空のセル）
+//   ② 読んだ入力が、そのままコアの入口を通る
+//   ③ 見出しの行を読まず、横に並んだ区画を区画ごとに切って読む
+//   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2）
+//   ⑤ 段が 1 つでも欠けていれば 1 枚も書かない（→ 5-3）
+//   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ issue #138）
+//   ⑦ マス目を書き換えると、生成せずに数え直し、役割の色と違反の赤い太字が出る（→ issue #155）
+//   ⑧ 書き換えたセルに手直しの印が付き、生成し直しても残る（→ issue #156）
+//   ⑨ 配る画像はいまのマス目のとおりに組まれ、1 セルも書き換えない（→ issue #157）
+//   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ issue #226）
+//   ⑪ 検証結果の違反の行が赤、店の役割の行が黄色に、値を変えずに塗られる（→ issue #220）
 //
-// 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
-//
-// これは契約であって実装ではない。何も書き換えない。
-// 本物のスプレッドシートで Date がどう返ってくるかはここでは分からない（→ src/real-device-log.md）。
+// 崩れの名指しのしかたは src/verify-structure.test.mjs が見る。
+// 本物で Date がどう返るかはここでは分からない（→ src/real-device-log.md）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -29,10 +27,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 // ---- 偽のスプレッドシート ---------------------------------------------------
-// 殻 が使うのは getSheetByName / getLastRow / getRange と、範囲の getValues・setValues・clearContent だけである。
-// 走る前の構造の検証（→ verify-structure.js）が、これに getMaxRows / getMaxColumns / getLastColumn を足す。
-// 手直しの印（→ 5-3）が、範囲の getNotes・setNotes・clearNote と、編集された範囲の位置（getRow など）を足す。
-// 取りこぼした書き換えの控え（→ issue #226）が、シートの getDeveloperMetadata・addDeveloperMetadata を足す。
+// 殻と構造の検証が使う SpreadsheetApp の口だけを持つ。
 
 const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0 }
 
@@ -62,14 +57,14 @@ class FakeRange {
     table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
     return this
   }
-  /** 書式だけを変える。往復には数えない — 値を持って行き来していないからである。 */
+  /** 書式だけを変える。値を運ばないので往復には数えない。 */
   setHorizontalAlignment(alignment) {
     for (let r = this.row; r < this.row + this.rowCount; r++) {
       for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.alignments.set(`${r},${c}`, alignment)
     }
     return this
   }
-  /** 書式を消す（背景色・文字の色・太さ）。値の往復とは別に数える（→ ⑦。1 枚につき 4 回までである）。 */
+  /** 書式を消す（背景色・文字の色・太さ）。値の往復とは別に数える（→ ⑦）。 */
   clearFormat() {
     roundTrips.formats += 1
     for (let r = this.row; r < this.row + this.rowCount; r++) {
@@ -161,7 +156,6 @@ class FakeSheet {
       .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
   }
   // 1000 行 26 列は新しいスプレッドシートの既定の大きさである
-  // （構造の検証が、読む範囲をシートの外に出さないために見る → verify-structure.js）
   getMaxRows() { return Math.max(1000, this.getLastRow()) }
   getMaxColumns() { return Math.max(this.minColumns, this.getLastColumn()) }
   put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
@@ -238,8 +232,7 @@ function filledBook() {
   const book = emptyTemplate()
   const conditions = book.getSheetByName('条件入力')
 
-  // 日ごとの営業時刻（A〜F）— 4 日ぶん。時刻だけのセルは Date で返ってくる
-  // （4 行なのは、回答の日ごとの列 4 つと上から順に 1 対 1 で当たるからである → 4-1・規則 1）
+  // 日ごとの営業時刻（A〜F）— 4 日ぶん（回答の日ごとの列 4 つと 1 対 1）。時刻だけのセルは Date で返る
   ;[[1, 8, 10, 18, 18, 20], [2, 8, 10, 18, 18, 20], [3, 8, 10, 18, 18, 20], [4, 8, 10, 18, 18, 20]].forEach((row, i) => {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
     row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
@@ -255,15 +248,13 @@ function filledBook() {
 
   const answers = book.getSheetByName('回答')
   const answerRow = [
-    // 友達欄は自由記述である（→ issue #200）。マス目の 3 列目に、書かれたとおりに出る。
+    // 友達欄は自由記述で、マス目の 3 列目に書かれたとおりに出る（→ issue #200）
     new Date(2025, 8, 23, 16, 31, 9), 'EED2349987', '高木琴音', '3年生', 'いいえ', '太郎君、同期',
     '8:00-21:00', '8:00-20:00', '8:00-22:00', '8:00-15:00',
   ]
   answerRow.forEach((value, j) => answers.put(2, 1 + j, value))
 
-  // 前の周の割り当て。マス目の 1 セルである — 行が人、列が枠、セルが役割名（→ issue #213）。
-  // 2025-11-01 の枠は 08:00 から 30 分ずつなので、4 列目が 08:00-08:30 である（3 列目は友達欄）。
-  // メモが無いので、前の周に機械が置いたセルである（手直しではない → ⑧）。
+  // 前の周の割り当て 1 セル（4 列目 ＝ 08:00-08:30）。メモが無いので機械が置いたセルである（→ ⑧）。
   const prepDay = book.getSheetByName(dayLabels[0])
   prepDay.put(1, 4, '08:00').put(1, 5, '08:30').put(1, 6, '09:00')
   prepDay.put(2, 1, 'EED2349987').put(2, 2, '高木琴音').put(2, 4, '準備')
@@ -344,8 +335,7 @@ check(
   ['2025-09-23 16:31:09', 'EED2349987', '高木琴音', '3年生', 'いいえ'],
 )
 
-// マス目のセル 1 つが、割り当ての行 1 本に戻る。当てるのは位置ではなく見出しの時刻である。
-// 氏名は空である — 表示のための列で、生成が見ると 5 の #1 が破れる（→ assignment-grid.js）。
+// マス目のセル 1 つが、割り当ての行 1 本に戻る。氏名は表示のための列なので空である（→ 5 の #1）。
 check(
   '③ マス目の 4 枚が、まとまって「割り当て」1 つに戻る（→ issue #213）',
   inputs['割り当て'],
@@ -378,8 +368,7 @@ function checkResultRow(kind, detail) {
   return row
 }
 
-// 6 段とも中身が入っている（→ core.js の builtInSteps）ので、欠けた段は差し替えで作る。
-// 関数でないものを渡せば、その段は「まだ作っていない」として名指しされる（→ core.js の build）。
+// 欠けた段は差し替えで作る。関数でないものを渡せば「まだ作っていない」段になる（→ core.js の build）。
 const withoutMetrics = { '指標を出す': null }
 
 const skeletonBook = filledBook()
@@ -407,8 +396,7 @@ check(
     .map((step) => `${step.name}#${step.issue}`),
 )
 
-// 段が 1 つでも欠けていれば、残りが入っていても書かない（欠けた段の先は空で返るため）。
-// 欠けているのは差し替えで外した 指標を出す だけで、残る 5 段は中身が入っている（→ core.js の builtInSteps）。
+// 欠けているのは 指標を出す だけで、残る 5 段は中身が入っている。
 const partialBook = filledBook()
 roundTrips.writes = 0
 run(partialBook, withoutMetrics)
@@ -435,7 +423,6 @@ const fullRoundTrips = { reads: roundTrips.reads, writes: roundTrips.writes }
 
 check('④ 全部そろえば、未了は 1 つも無い', fullNotBuilt, [])
 
-// 2025-11-01 の枠は 08:00・08:30・09:00・09:30 ／ 10:00 … と刻まれる（→ 規則 1 の ①）。
 // 10:00-10:30 は 5 つ目の枠なので、名前のある 3 列の右の 5 列目 ＝ 8 列目に落ちる。
 check(
   '④ 割り当てがマス目で書かれている（見出しは時刻、セルは役割名 1 つ → issue #213）',
@@ -467,7 +454,7 @@ check(
   ['function', '高木琴音'],
 )
 
-// 差し替えずに 6 段の中身で回す。指標の段は氏名を空で返す（→ fairness-metrics.js）ので、埋まっていれば殻が引いている。
+// 差し替えずに回す。指標の段は氏名を空で返すので、埋まっていれば殻が引いている。
 const builtInBook = filledBook()
 check(
   '④ 段を差し替えずに回すと、指標が 1 人 1 行で書かれ、氏名は回答から引いてある（→ issue #154）',
@@ -535,11 +522,8 @@ check(
   [''],
 )
 
-// 読むのは、走る前の構造の検証がシートごとに 1 回（8 枚）＋ 入力が区画ごとに 1 回である。
-// マス目は見出しの行とデータの行を分けて読むので、中身のある日だけ 2 回になる
-// （filledBook で中身があるのは 準備日 の 1 枚だけ → 条件入力の区画 ＋ 回答 1 ＋ マス目 5）。
-// 区画の数をここに書かない — 区画が 1 つ増えれば読む回数も 1 つ増える（→ sheetLayout）。
-// 書くのは、シート 1 枚につき「消す」と「置く」である。マス目は見出しとデータで 2 組ある。
+// 読むのは、構造の検証がシートごとに 1 回 ＋ 区画ごとに 1 回 ＋ 回答 1 ＋ マス目（中身のある 準備日 だけ 2 回）。
+// 書くのは、シート 1 枚につき「消す」と「置く」。マス目は見出しとデータで 2 組ある。
 const gridCount = dayLabels.length
 check(
   '④ 読み書きはどちらも範囲ごとに 1 回で、セル単位で往復していない（→ 6 の #2）',
@@ -551,9 +535,7 @@ check(
 )
 
 // ---- ⑦ 手直しの後に数え直す -------------------------------------------------
-// 担当者が 片付け（2025-11-04）の 16:00 の枠に 準備 を書いた。この人の 11-04 の希望は 8:00-15:00 なので、
-// 規則 1（希望の時間の外）の違反になる — 生成は作らないが、手直しは作りうる（→ 5 の #13 の ①）。
-// 見出しは 1 列目の時刻から始まっていなくてよい。当てるのは位置ではなく見出しの時刻である（→ issue #213）。
+// 担当者が 片付け（2025-11-04）の 16:00 に 準備 を書いた。希望は 8:00-15:00 なので規則 1 の違反になる。
 
 /** マス目 4 枚の、見出しとデータの中身だけを写し取る（色は別に見る）。 */
 function gridSnapshot(book) {
@@ -637,12 +619,9 @@ check(
   [true, true, 5],
 )
 
-// 読むのは run と同じ（構造の検証 8 ＋ 区画 ＋ 回答 1 ＋ マス目）。マス目は中身のある 2 枚だけが 2 回になる。
-// 書くのは検証結果と指標の「消す」「置く」だけで、マス目には 1 度も値を書かない
-// （検証結果は前の行が無いので「消す」が起きない → 置く 1 ＋ 指標の消す・置く 2 ＝ 3）。
-// 書式は 1 枚につき「消す」1 回、行がある枚だけ「背景を置く」1 回、違反がある枚だけ「文字の色」「太さ」の 2 回である
-// （行があるのは 準備日 と 片付け の 2 枚、違反があるのは 片付け の 1 枚 → 4 ＋ 2 ＋ 2）。
-// ほかに、検証結果の行の背景を 1 回で置き直す（→ ⑪ ／ issue #220）。
+// 読むのは run と同じで、マス目は中身のある 2 枚だけが 2 回。
+// 書くのは検証結果の置く 1 ＋ 指標の消す・置く 2 ＝ 3 で、マス目には書かない。
+// 書式は 消す 4 ＋ 背景 2（準備日・片付け）＋ 文字の色と太さ 2（片付け）＋ 検証結果の背景 1。
 check(
   '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 4 回までである',
   [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats],
@@ -660,8 +639,7 @@ check(
   [null, conditionEditBefore],
 )
 
-// 見出しの無い列に役割を書いた。どの枠かが決まらないので数えられない（→ assignment-grid.js の fromAssignmentGrid）。
-// 単純トリガーの例外は担当者の画面に出ないので、止まった理由を一言にして返す。
+// 見出しの無い列に役割を書いた。どの枠かが決まらないので数えられない。
 const strayBook = editedBook()
 strayBook.getSheetByName(dayLabels[3]).put(2, 11, '調理')
 const strayBefore = bookSnapshot(strayBook)
@@ -697,8 +675,7 @@ check(
 )
 
 // ---- ⑧ 手直しの印（→ 5-3 ／ issue #156） -----------------------------------
-// 担当者が書き換えたセルにだけメモが付き、生成はそのセルを固定として先に置く。
-// 前の周に機械が置いたセル（メモが無い）は、生成し直せば組み直される。
+// 書き換えたセルにだけメモが付き、生成はそこを固定として先に置く。メモの無いセルは組み直される。
 
 /** onEdit と同じ形で、1 セルを書き換える（値を置いてから、その範囲でイベントを起こす）。 */
 function edit(book, label, row, column, value) {
@@ -744,8 +721,7 @@ check(
   ['準備', [['2,6', fixedNote]]],
 )
 
-// 11-02 10:00 に 調理 と書いた。この人は 調理担当ですか？ が いいえ なので、置けば規則 5 の違反である。
-// 11-03 は、営業時刻を動かす前の列（07:00）に 会計 が書いてあり、印も付いている。
+// 11-02 10:00 の 調理 は規則 5 の違反（調理担当ですか？ が いいえ）。11-03 は営業時刻を動かす前の列（07:00）に印がある。
 const conflictBook = filledBook()
 edit(conflictBook, dayLabels[1], 1, 4, '10:00')
 edit(conflictBook, dayLabels[1], 2, 1, 'EED2349987')
@@ -795,8 +771,7 @@ check(
   [[], []],
 )
 
-// 会計 を 11-01 の調理帯に 1 人立てた。この人は 11-01 の 8:00-21:00 を希望しているので、生成は 10:00 から置く。
-// 10:00 のセルを空にした（＝ この人をここに置かない）。空のセルにも印が付き、生成はそこへ置かない。
+// 会計 を 11-01 に 1 人立て（生成は 10:00 から置く）、10:00 のセルを空にした。
 const removalBook = filledBook()
 removalBook.getSheetByName('条件入力').put(3, 11, '会計').put(3, 12, 1)
 run(removalBook, {})
@@ -814,7 +789,6 @@ check(
   [['会計', '会計'], ['', '会計'], [fixedNote]],
 )
 
-// 学籍番号を書き換えた行は、行の持ち主を替えたことになる。役割の入っているセルぜんぶに印が付く。
 const ownerBook = filledBook()
 edit(ownerBook, dayLabels[0], 2, 1, 'EED2349987')
 check(
@@ -823,9 +797,8 @@ check(
   [['2,4', fixedNote]],
 )
 
-// ---- ⑩ 取りこぼした書き換え（→ 5-3 ／ issue #226） ---------------------------
-// 本物で間を置かずに 2 セル書き換えると、onEdit が 1 回しか走らない（→ real-device-log.md）。
-// 2 手目は値だけを置き、イベントを起こさない。次に数え直すか生成するときに、控えと違うセルとして印が付くか。
+// ---- ⑩ 取りこぼした書き換え（→ issue #226） ---------------------------------
+// 間を置かずに 2 セル書き換えると onEdit が 1 回しか走らない。2 手目は値だけを置き、イベントを起こさない。
 
 /** 値だけを置く（onEdit が落ちた 2 手目）。 */
 function editWithoutEvent(book, label, row, column, value) {
@@ -933,8 +906,6 @@ check(
 )
 
 // ---- ⑪ 検証結果の赤と黄色（→ issue #220） -----------------------------------
-// 違反の行は、役割に関係なく行ぜんぶ赤にする。違反でない行は、店の役割（準備・片付け以外）の行だけを行ぜんぶ黄色にする。
-// 値は 1 セルも変えない（→ assignment-grid.js の checkResultBackgrounds）。
 
 function checkRow(kind, role, detail) {
   const row = checkResultRow(kind, detail)
@@ -992,12 +963,10 @@ check(
   mixedViolations.concat(mixedUnmet).concat([checkResultColumns.map(() => '')]),
 )
 
-// 生成し直して、違反も店の役割の行も無くなった。前の周の赤も黄色も残ってはいけない。
 runWithChecks(paintedBook, [], [checkRow(checkKind.unmet, '準備', 'あと 3 人')])
 check('⑪ 生成し直して違反も店の役割の行も無くなれば、前の周の赤も黄色も残らない', paintedRows(paintedBook), [])
 
-// 手直しの後の数え直しでも塗る。⑦ と同じ書き換え（片付けの日に準備）は規則 1 の違反を 1 行出す。
-// 役割と必要人数に 会計 を 1 行足して、会計の未充足も出させる。
+// ⑦ と同じ書き換えで違反を 1 行、会計 を 1 行足して会計の未充足を出させる。
 const recountPaintedBook = editedBook()
 recountPaintedBook.getSheetByName('条件入力').put(4, 11, '会計').put(4, 12, 1)
 recountOnEdit({ source: recountPaintedBook, range: recountPaintedBook.getSheetByName(dayLabels[3]).getRange(2, 3) })
@@ -1025,7 +994,6 @@ check(
 )
 
 // ---- ⑨ 配る画像の中身（→ 5 の #9 ／ issue #157） -----------------------------
-// 描くのは、いまシートに見えているとおりである。生成も数え直しも走らせず、何も書かない。
 
 const imageBook = filledBook()
 const everyNote = (book) => JSON.stringify(book.sheets.map((sheet) => notesOf(book, sheet.name)))
@@ -1068,8 +1036,7 @@ check(
 )
 
 // ---- ⑥ 構造が崩れているとき -------------------------------------------------
-// run は、読む前に checkStructure を呼ぶ（→ verify-structure.js）。
-// 崩れたまま走ると、担当者の手直し（→ 5-3）が黙って消えるか、列がずれたまま書かれる。
+// 崩れたまま走ると、手直しが黙って消えるか、列がずれたまま書かれる。
 
 const brokenBook = filledBook()
 brokenBook.getSheetByName('検証結果').put(1, 1, '区分')
