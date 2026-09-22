@@ -183,6 +183,7 @@ function readSection(sheet, layout, section) {
  * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
  * 書き戻すときは、手直しの印（メモ）も付け直す（→ writeGrids）。
  * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
+ * 検証結果も、書くたびに行の背景を塗り直す — 違反の行が赤、店の役割の行が黄色である（→ paintCheckResults ／ issue #220）。
  *
  * 返すのは塗ったマス目である（{ layout, grid } の配列。1 枚も書かなかったときは空）。控えを置き直す側が使う（→ keepSeenGrids）。
  */
@@ -207,6 +208,7 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
     if (lastRow > headerRows) {
       sheet.getRange(headerRows + 1, 1, lastRow - headerRows, columnCount).clearContent()
     }
+    if (name === '検証結果') paintCheckResults(sheet, output[name], headerRows, columnCount)
     if (output[name].length === 0) return
     // ここに来るのは検証結果と指標で、どちらも氏名を空で返す。違反も指標も、人を学籍番号だけで名指しさせない（→ issue #229）
     const rows = withNamesFromAnswers(output[name], name, (context || {}).nameOf)
@@ -253,6 +255,21 @@ function paintGrids(spreadsheet, grids, violations, days) {
     marked.setFontColor(violationMark.fontColor)
     marked.setFontWeight(violationMark.fontWeight)
   })
+}
+
+/**
+ * 検証結果の行の背景を塗り直す — 違反の行が赤、違反でない店の役割の行が黄色である（→ issue #220）。
+ * どの行を塗るかはコアの側が決める（→ assignment-grid.js の checkResultBackgrounds）。
+ *
+ * 背景だけを置く。clearFormat は使わない — 数値や日付の書式まで消え、値の見え方が変わる（値は 1 セルも変えない → issue #220）。
+ * 下の端（getMaxRows）まで 1 回で置き直すので、行が減っても前の周の赤も黄色も残らない。
+ */
+function paintCheckResults(sheet, rows, headerRows, width) {
+  const height = Math.max(sheet.getMaxRows() - headerRows, rows.length)
+  if (height <= 0) return
+  const colors = checkResultBackgrounds(rows, width)
+  while (colors.length < height) colors.push(new Array(width).fill(null))
+  sheet.getRange(headerRows + 1, 1, height, width).setBackgrounds(colors)
 }
 
 /** 行と列の番号（1 始まり）を A1 の書き方にする。RangeList は A1 の書き方でしか受けない。 */
@@ -658,7 +675,7 @@ function findSheet(spreadsheet, name) {
 if (typeof module !== 'undefined') {
   module.exports = {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readInputsAndGrids, readSection, readGrid,
-    putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids,
+    putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids, paintCheckResults,
     a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, distributionImagesOn, recountOnEdit, markFixedCells, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }

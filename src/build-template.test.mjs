@@ -12,7 +12,7 @@
 //
 // ここで分かるのは組み立ての手順だけである。
 // 本物の Google スプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
-// コピーした先で「持ち主だけ」が誰に効くかは分からない（→ src/README.md・issue #136・real-device-log.md の項目 21）。
+// コピーした先で「持ち主だけ」が誰に効くかは分からない（→ src/README.md・issue #136・real-device-log.md の項目 22）。
 
 import fs from 'node:fs'
 import path from 'node:path'
