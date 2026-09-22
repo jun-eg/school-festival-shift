@@ -58,8 +58,8 @@ class FakeRange {
 }
 
 class FakeSheet {
-  constructor(name) {
-    Object.assign(this, { name, cells: new Map() })
+  constructor(name, minColumns = 26) {
+    Object.assign(this, { name, cells: new Map(), minColumns })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
@@ -76,7 +76,7 @@ class FakeSheet {
   // 1000 行 26 列は新しいスプレッドシートの既定の大きさである
   // （構造の検証が、読む範囲をシートの外に出さないために見る → verify-structure.js）
   getMaxRows() { return Math.max(1000, this.getLastRow()) }
-  getMaxColumns() { return Math.max(26, this.getLastColumn()) }
+  getMaxColumns() { return Math.max(this.minColumns, this.getLastColumn()) }
   put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
 }
 
@@ -88,12 +88,15 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { readInputs, run, normalizeValue, checkRepresentation, sheetColumns, builtInSteps } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps })',
+const {
+  readInputs, run, normalizeValue, checkRepresentation, sheetColumns, builtInSteps,
+  sheetsToRead, sectionRightEdge,
+} = context
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels })',
   context,
 )
 
@@ -114,10 +117,11 @@ function whyItStopped(work) {
   }
 }
 
-/** sheetLayout どおりに見出しを置いた、空の 5 枚を作る。 */
+/** sheetLayout どおりに見出しを置いた、空の 8 枚を作る（テンプレートを組んだ直後の形である）。 */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
-    const sheet = new FakeSheet(layout.name)
+    // マス目の 4 枚は既定の 26 列に収まらない（→ build-template.js の widenTo）
+    const sheet = new FakeSheet(layout.name, Math.max(26, sectionRightEdge(layout)))
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
@@ -153,9 +157,11 @@ function filledBook() {
   ]
   answerRow.forEach((value, j) => answers.put(2, 1 + j, value))
 
-  const assignments = book.getSheetByName('割り当て')
-  ;['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']
-    .forEach((value, j) => assignments.put(2, 1 + j, value))
+  // 前の周の手直し（→ 5-3）。マス目の 1 セルである — 行が人、列が枠、セルが役割名（→ issue #213）。
+  // 2025-11-01 の枠は 08:00 から 30 分ずつなので、3 列目が 08:00-08:30 である。
+  const prepDay = book.getSheetByName(dayLabels[0])
+  prepDay.put(1, 3, '08:00').put(1, 4, '08:30').put(1, 5, '09:00')
+  prepDay.put(2, 1, 'EED2349987').put(2, 2, '高木琴音').put(2, 3, '準備')
 
   // 前の周の残りかす。段が入っていれば消える、入っていなければ触らない
   book.getSheetByName('指標').put(2, 1, '古い行')
@@ -228,18 +234,26 @@ check(
 )
 
 check(
-  '③ 回答と割り当ては 1 行目が見出しなので、2 行目から読む',
-  [inputs['回答'][0].slice(0, 5), inputs['割り当て']],
-  [
-    ['2025-09-23 16:31:09', 'EED2349987', '高木琴音', '3年生'].concat(['いいえ']),
-    [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']],
-  ],
+  '③ 回答は 1 行目が見出しなので、2 行目から読む',
+  inputs['回答'][0].slice(0, 5),
+  ['2025-09-23 16:31:09', 'EED2349987', '高木琴音', '3年生', 'いいえ'],
+)
+
+// マス目のセル 1 つが、割り当ての行 1 本に戻る。当てるのは位置ではなく見出しの時刻である。
+// 氏名は空である — 表示のための列で、生成が見ると 5 の #1 が破れる（→ assignment-grid.js）。
+check(
+  '③ マス目の 4 枚が、まとまって「割り当て」1 つに戻る（→ issue #213）',
+  inputs['割り当て'],
+  [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '']],
 )
 
 check(
-  '③ 読むのは 3 枚だけである（検証結果と指標は生成しか書かないので読まない）',
-  Object.keys(inputs).length,
-  sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 2,
+  '③ 読むのは 6 枚（条件入力・回答・マス目の 4 枚）で、入力の名前は 7 つである',
+  [sheetsToRead(), Object.keys(inputs).length],
+  [
+    ['条件入力', '回答'].concat(dayLabels),
+    sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 2,
+  ],
 )
 
 // ---- ④⑤ 書く ---------------------------------------------------------------
@@ -259,9 +273,9 @@ roundTrips.writes = 0
 const notBuilt = run(skeletonBook, {})
 
 check(
-  '⑤ 骨組みのまま走らせても、割り当てシートの手直しが残っている（→ 5-3）',
-  skeletonBook.getSheetByName('割り当て').getRange(2, 1, 1, 6).getValues()[0],
-  ['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音'],
+  '⑤ 骨組みのまま走らせても、マス目の手直しが残っている（→ 5-3）',
+  skeletonBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 3).getValues()[0],
+  ['EED2349987', '高木琴音', '準備'],
 )
 
 check(
@@ -306,15 +320,45 @@ const fullRoundTrips = { reads: roundTrips.reads, writes: roundTrips.writes }
 
 check('④ 全部そろえば、未了は 1 つも無い', fullNotBuilt, [])
 
+// 2025-11-01 の枠は 08:00・08:30・09:00・09:30 ／ 10:00 … と刻まれる（→ 規則 1 の ①）。
+// 10:00-10:30 は 5 つ目の枠なので、名前のある 2 列の右の 5 列目 ＝ 7 列目に落ちる。
 check(
-  '④ 生成シート 3 枚に、見出しの次の行から書かれている',
+  '④ 割り当てがマス目で書かれている（見出しは時刻、セルは役割名 1 つ → issue #213）',
   [
-    fullBook.getSheetByName('割り当て').getRange(2, 1, 1, 6).getValues()[0],
+    fullBook.getSheetByName(dayLabels[0]).getRange(1, 1, 1, 7).getValues()[0],
+    fullBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 7).getValues()[0],
+  ],
+  [
+    ['学籍番号', '氏名', '08:00', '08:30', '09:00', '09:30', '10:00'],
+    ['EED2349987', '高木琴音', '', '', '', '', '調理'],
+  ],
+)
+
+check(
+  '④ 氏名は回答から引く（生成は氏名を空で置いている → 5 の #1・assignment-grid.js）',
+  [
+    vm.runInContext('typeof namesFromAnswers', context),
+    fullBook.getSheetByName(dayLabels[0]).getRange(2, 2, 1, 1).getValues()[0][0],
+  ],
+  ['function', '高木琴音'],
+)
+
+check(
+  '④ 割り当ての無い日も、見出しだけは書き直される（前の周の列が残らない）',
+  [
+    fullBook.getSheetByName(dayLabels[1]).getRange(1, 1, 1, 4).getValues()[0],
+    fullBook.getSheetByName(dayLabels[1]).getLastRow(),
+  ],
+  [['学籍番号', '氏名', '08:00', '08:30'], 1],
+)
+
+check(
+  '④ 検証結果と指標は、見出しの次の行から書かれている',
+  [
     fullBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => row[0]),
     fullBook.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0],
   ],
   [
-    ['2025-11-01', '10:00', '10:30', '調理', 'EED2349987', '高木琴音'],
     [checkKind.violation, checkKind.unmet],
     ['EED2349987', '高木琴音', 0.5, 1, 0],
   ],
@@ -326,12 +370,18 @@ check(
   [''],
 )
 
-// 読むのは、走る前の構造の検証がシートごとに 1 回（5 枚）＋ 入力が区画ごとに 1 回である。
-// 書くのは生成シートごとに「消す」と「置く」の 2 回までである
+// 読むのは、走る前の構造の検証がシートごとに 1 回（8 枚）＋ 入力が区画ごとに 1 回である。
+// マス目は見出しの行とデータの行を分けて読むので、中身のある日だけ 2 回になる
+// （filledBook で中身があるのは 準備日 の 1 枚だけ → 5 区画 ＋ 回答 1 ＋ マス目 5）。
+// 書くのは、シート 1 枚につき「消す」と「置く」である。マス目は見出しとデータで 2 組ある。
+const gridCount = dayLabels.length
 check(
   '④ 読み書きはどちらも範囲ごとに 1 回で、セル単位で往復していない（→ 6 の #2）',
-  [fullRoundTrips.reads, fullRoundTrips.writes <= vm.runInContext('outputNames.length', context) * 2],
-  [sheetLayout.length + Object.keys(inputs).length, true],
+  [
+    fullRoundTrips.reads,
+    fullRoundTrips.writes <= gridCount * 4 + (vm.runInContext('outputNames.length', context) - 1) * 2,
+  ],
+  [sheetLayout.length + 5 + 1 + (gridCount + 1), true],
 )
 
 // ---- シートが無いとき -------------------------------------------------------

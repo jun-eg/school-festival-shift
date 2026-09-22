@@ -32,8 +32,10 @@ function buildTemplateInto(spreadsheet) {
       sheet = spreadsheet.insertSheet(layout.name)
       log.push(`シート「${layout.name}」を作った`)
     }
+    widenTo(sheet, layout, log)
     putHeaders(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
+    sheet.setFrozenColumns(layout.frozenColumns || 0)
     spreadsheet.setActiveSheet(sheet)
     spreadsheet.moveActiveSheet(index + 1)
     applyProtection(sheet, layout, log)
@@ -41,8 +43,27 @@ function buildTemplateInto(spreadsheet) {
 
   removeDefaultSheet(spreadsheet, log)
   spreadsheet.setActiveSheet(spreadsheet.getSheetByName(sheetLayout[0].name))
-  log.push(`5 枚のうち保護したのは ${sheetLayout.filter((c) => c.protect).length} 枚である`)
+  log.push(
+    `${sheetLayout.length} 枚のうち保護したのは ${sheetLayout.filter((c) => c.protect).length} 枚である`
+    + `（割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚である → issue #213）`,
+  )
   return log
+}
+
+/**
+ * 構成が要る列数まで、シートを広げる。
+ *
+ * 新しいシートは 26 列しかないが、マス目の 4 枚は 50 列を取る（→ sheet-layout.js の maxSlotsPerDay）。
+ * 足りないまま置くと、走る前の検証が「列が足りない」で止まる（→ verify-structure.js）。
+ * 減らさない — 余分な列があること自体は、構造の崩れではない。
+ */
+function widenTo(sheet, layout, log) {
+  const rightEdge = sectionRightEdge(layout)
+  const missing = rightEdge - sheet.getMaxColumns()
+  if (missing <= 0) return
+
+  sheet.insertColumnsAfter(sheet.getMaxColumns(), missing)
+  log.push(`「${layout.name}」を ${rightEdge} 列に広げた（${missing} 列足した）`)
 }
 
 /**

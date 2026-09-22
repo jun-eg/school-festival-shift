@@ -6,6 +6,10 @@
  *   ② コア（core.js の build）を呼ぶ
  *   ③ 返ってきた行を生成シートに書く
  *
+ * 割り当てだけは、シート 1 枚と 1 対 1 でない。日ごとの 4 枚にマス目で載る
+ * （→ sheet-layout.js の dayLabels ／ issue #213）。敷き方と戻し方は assignment-grid.js が持つ
+ * — 殻がやるのは範囲を決めて読み書きすることだけで、どの列が何時かはコアの側が決める。
+ *
  * 走る前の構造の検証（シートの有無・見出し・列数）は verify-structure.js が持つ。
  * run が最初に呼ぶ — 崩れていれば、読む前に名指しして止まる。
  *
@@ -49,14 +53,66 @@ function headerRowCount(layout) {
  */
 function readInputs(spreadsheet) {
   const inputs = {}
+  const grids = []
+
   sheetsToRead().forEach((name) => {
     const layout = findLayout(name)
     const sheet = findSheet(spreadsheet, name)
+    // マス目の 4 枚は、条件入力を読んでからでないと列が何時かが決まらないので、後回しにする。
+    if (layout.grid) {
+      grids.push({ layout: layout, grid: readGrid(sheet, layout) })
+      inputs[layout.grid.of] = inputs[layout.grid.of] || []
+      return
+    }
     layout.sections.forEach((section) => {
       inputs[layout.hasSectionHeadings ? section.heading : name] = readSection(sheet, layout, section)
     })
   })
+
+  putGridsIntoInputs(inputs, grids)
   return inputs
+}
+
+/**
+ * 読んだマス目 4 枚を、割り当ての行に戻して入力に積む（前の周の手直し ＝ 5-3 の固定である）。
+ *
+ * どの列が何時かは、条件入力の「日ごとの営業時刻」から刻んだ枠で決まる（→ 規則 1 の ①）。
+ * 4 枚とも空なら、枠を刻まずに済ませる — 条件入力がまだ空のテンプレートでも、
+ * ここで止まらないようにするためである（型の名指しは、コアの入口が出す → input-types.js）。
+ */
+function putGridsIntoInputs(inputs, grids) {
+  if (grids.length === 0) return
+  const hasAnyRow = grids.some((one) => one.grid.rows.length > 0)
+  const days = hasAnyRow ? toDays(inputs['日ごとの営業時刻'], '日ごとの営業時刻') : []
+
+  grids.forEach((one) => {
+    const name = one.layout.grid.of
+    inputs[name] = inputs[name].concat(
+      fromAssignmentGrid(one.grid.header, one.grid.rows, days[one.layout.grid.dayIndex], one.layout.name),
+    )
+  })
+}
+
+/**
+ * マス目のシート 1 枚を、見出しの行とデータの行に分けて読む。
+ *
+ * 見出しの行も読むのが、区画を読むのと違うところである — 何時の枠かは見出しに書いてある。
+ * 読む幅は区画の幅（名前のある 2 列 ＋ 時刻の 48 列 → sheet-layout.js の maxSlotsPerDay）で、
+ * 列がそれだけあることは走る前に確かめてある（→ verify-structure.js の checkColumnCount）。
+ */
+function readGrid(sheet, layout) {
+  const section = layout.sections[0]
+  const width = sectionWidth(section)
+  const headerRows = headerRowCount(layout)
+  const lastRow = sheet.getLastRow()
+
+  const header = sheet.getRange(1, 1, 1, width).getValues()[0].map(normalizeValue)
+  const rows = lastRow > headerRows
+    ? sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).getValues().map((row) => row.map(normalizeValue))
+    : []
+
+  while (rows.length > 0 && rows[rows.length - 1].every((cell) => cell === '')) rows.pop()
+  return { header: header, rows: rows }
 }
 
 /**
@@ -94,10 +150,16 @@ function readSection(sheet, layout, section) {
  * 空の配列で上書きすると、担当者が割り当てシートに入れた手直し（→ 5-3）が黙って消える。
  * 何が入っていないかは notBuilt が名指しで持っている（→ core.js の coreSteps）。
  */
-function writeOutputs(spreadsheet, output) {
+function writeOutputs(spreadsheet, output, context) {
   if ((output.notBuilt || []).length > 0) return
 
   outputNames.forEach((name) => {
+    // 割り当てはシート 1 枚でない。日ごとの 4 枚にマス目で敷く（→ writeGrids ／ issue #213）。
+    const grids = gridLayouts(name)
+    if (grids.length > 0) {
+      writeGrids(spreadsheet, grids, output[name], context || { days: [], nameOf: null })
+      return
+    }
     const layout = findLayout(name)
     const sheet = findSheet(spreadsheet, name)
     const columnCount = sectionWidth(layout.sections[0])
@@ -109,6 +171,46 @@ function writeOutputs(spreadsheet, output) {
     }
     if (output[name].length === 0) return
     sheet.getRange(headerRows + 1, 1, output[name].length, columnCount).setValues(output[name])
+  })
+}
+
+/**
+ * 割り当てを、日ごとの 4 枚のマス目に敷く。
+ *
+ * 見出しの時刻も毎回書き直す — 枠は条件入力から刻むので、営業時刻を動かせば列も変わる。
+ * 前の周の列が残ると、次に読むときに「いまの枠に無い見出し」として名指しになる
+ * （→ assignment-grid.js の fromAssignmentGrid）。
+ *
+ * 条件入力に行が無い日は、名前のある 2 列だけを残して空にする。黙って別の日に寄せない。
+ */
+function writeGrids(spreadsheet, grids, assignments, context) {
+  grids.forEach((layout) => {
+    const sheet = findSheet(spreadsheet, layout.name)
+    const section = layout.sections[0]
+    const namedCount = section.columns.length
+    const width = sectionWidth(section)
+    const headerRows = headerRowCount(layout)
+    const lastRow = sheet.getLastRow()
+    const grid = toAssignmentGrid(assignments, context.days[layout.grid.dayIndex], context.nameOf)
+
+    if (grid.header.length > width) {
+      throw new Error(
+        `シート「${layout.name}」に ${grid.header.length - namedCount} 枠を敷こうとしたが、`
+          + `時刻の列は ${width - namedCount} 列しかない（→ sheet-layout.js の maxSlotsPerDay）`,
+      )
+    }
+
+    sheet.getRange(1, namedCount + 1, 1, width - namedCount).clearContent()
+    if (lastRow > headerRows) sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).clearContent()
+
+    if (grid.header.length > namedCount) {
+      sheet
+        .getRange(1, namedCount + 1, 1, grid.header.length - namedCount)
+        .setValues([grid.header.slice(namedCount)])
+    }
+    if (grid.rows.length > 0) {
+      sheet.getRange(headerRows + 1, 1, grid.rows.length, grid.header.length).setValues(grid.rows)
+    }
   })
 }
 
@@ -133,9 +235,24 @@ function runOnActiveSpreadsheet(steps) {
  */
 function run(spreadsheet, steps) {
   checkStructure(spreadsheet)
-  const output = build(readInputs(spreadsheet), steps)
-  writeOutputs(spreadsheet, output)
+  const inputs = readInputs(spreadsheet)
+  const output = build(inputs, steps)
+  writeOutputs(spreadsheet, output, gridContext(inputs))
   return output.notBuilt
+}
+
+/**
+ * マス目を敷くのに要る 2 つ — その日の枠と、学籍番号から引く氏名である。
+ *
+ * どちらも入力から出る。build を通った後に組んでいるので、枠の刻み直しはここでは起きない
+ * （崩れていればコアの入口がすでに名指しして止まっている → input-types.js）。
+ * 氏名は回答から引く。生成は氏名を 1 度も見ない（→ 5 の #1・assignment-grid.js の namesFromAnswers）。
+ */
+function gridContext(inputs) {
+  return {
+    days: toDays(inputs['日ごとの営業時刻'], '日ごとの営業時刻'),
+    nameOf: namesFromAnswers(inputs['回答']),
+  }
 }
 
 /**
@@ -199,7 +316,8 @@ function findSheet(spreadsheet, name) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, writeOutputs, run, runOnActiveSpreadsheet,
+    valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, readGrid, putGridsIntoInputs,
+    writeOutputs, writeGrids, run, runOnActiveSpreadsheet, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }

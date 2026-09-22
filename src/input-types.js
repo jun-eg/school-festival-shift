@@ -378,11 +378,21 @@ function eachFilledRow(source, section, rows, use) {
  * 区画の中の行番号と、担当者のシートの行番号を両方出す — 担当者が直すのはシートの上である。
  */
 function whereIs(source, rowIndex) {
-  return `「${source}」の ${rowIndex + 1} 行目（シートの ${rowIndex + 1 + headerRowsOf(source)} 行目）`
+  const headerRows = headerRowsOf(source)
+  if (headerRows === null) return `「${source}」の ${rowIndex + 1} 行目`
+  return `「${source}」の ${rowIndex + 1} 行目（シートの ${rowIndex + 1 + headerRows} 行目）`
 }
 
-/** 見出しが何行あるか。区画の見出しを置くシートは 2 行、置かないシートは 1 行である（→ shell.js の headerRowCount）。 */
+/**
+ * 見出しが何行あるか。区画の見出しを置くシートは 2 行、置かないシートは 1 行である
+ * （→ shell.js の headerRowCount）。
+ *
+ * 割り当てだけは null を返す。シート 1 枚に対応せず、日ごとの 4 枚にマス目で載る（→ issue #213）ので、
+ * 区画の中の行番号を、担当者のシートの行番号に読み替えられない。
+ * マス目の側の名指し（何枚目の何行目か）は assignment-grid.js が持つ。
+ */
 function headerRowsOf(source) {
+  if (source === assignmentName) return null
   const layout = sheetLayout.filter((candidate) => (
     candidate.name === source || candidate.sections.some((section) => section.heading === source)
   ))[0]

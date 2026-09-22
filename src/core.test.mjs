@@ -24,7 +24,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
@@ -361,9 +361,15 @@ check(
 )
 
 check(
-  '出力の名前は、どれも シートの構成 にあるシートである',
-  outputNames.filter((name) => !sheetLayout.some((layout) => layout.name === name)),
+  '出力の名前は、どれも シートの構成 が置き場を持っている（1 枚か、マス目の 4 枚か）',
+  outputNames.filter((name) => !sheetLayout.some((layout) => layout.name === name || (layout.grid && layout.grid.of === name))),
   [],
+)
+
+check(
+  '割り当てだけがシート 1 枚に対応しない — 日ごとの 4 枚にマス目で載る（→ issue #213）',
+  outputNames.filter((name) => !sheetLayout.some((layout) => layout.name === name)),
+  ['割り当て'],
 )
 
 // ---- 結果 ------------------------------------------------------------------

@@ -77,10 +77,11 @@ class FakeProtection {
 let nextSheetId = 1
 
 class FakeSheet {
+  // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
   constructor(name) {
     Object.assign(this, {
       name, id: nextSheetId++, cells: new Map(), bold: new Map(), notes: new Map(),
-      protections: [], frozenRows: 0, formUrl: null,
+      protections: [], frozenRows: 0, frozenColumns: 0, maxColumns: 26, formUrl: null,
     })
   }
   getName() { return this.name }
@@ -88,6 +89,9 @@ class FakeSheet {
   getSheetId() { return this.id }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   setFrozenRows(count) { this.frozenRows = count }
+  setFrozenColumns(count) { this.frozenColumns = count }
+  getMaxColumns() { return this.maxColumns }
+  insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
   getProtections() { return [...this.protections] }
   protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
   getFormUrl() { return this.formUrl }
@@ -574,13 +578,13 @@ check(
 )
 
 check(
-  '⑥ 止まったとき、テンプレートの「回答」はそのままで、シートも 5 枚のままである',
+  '⑥ 止まったとき、テンプレートの「回答」はそのままで、シートも 8 枚のままである',
   [onEmpty.book, onThreeRows.book, onReversed.book].map((one) => [
     one.getSheets().length,
     one.getSheetByName('回答') !== null,
     one.getSheetByName('回答').getFormUrl(),
   ]),
-  [[5, true, null], [5, true, null], [5, true, null]],
+  [[8, true, null], [8, true, null], [8, true, null]],
 )
 
 // ---- 結果 -------------------------------------------------------------------

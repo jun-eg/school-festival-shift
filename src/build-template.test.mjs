@@ -68,12 +68,19 @@ class FakeProtection {
 }
 
 class FakeSheet {
+  // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
   constructor(name) {
-    Object.assign(this, { name, cells: new Map(), bold: new Map(), notes: new Map(), protections: [], frozenRows: 0 })
+    Object.assign(this, {
+      name, cells: new Map(), bold: new Map(), notes: new Map(), protections: [],
+      frozenRows: 0, frozenColumns: 0, maxColumns: 26,
+    })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   setFrozenRows(count) { this.frozenRows = count }
+  setFrozenColumns(count) { this.frozenColumns = count }
+  getMaxColumns() { return this.maxColumns }
+  insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
   getProtections() { return [...this.protections] }
   protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
   getLastRow() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[0])), 0) }

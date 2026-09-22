@@ -194,11 +194,6 @@ function checkUnknownColumns(layout, headerRows, breakages) {
   })
 }
 
-/** 区画の右端の列。構成が要る列数である（名前を持たない列も数に入る → sheet-layout.js の sectionWidth）。 */
-function sectionRightEdge(layout) {
-  return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + sectionWidth(section) - 1), 0)
-}
-
 /** 読んだ見出しの行から 1 セル取る。読んだ範囲の外は空として扱う（列を消された側である）。 */
 function cellAt(headerRows, row, column) {
   const rowValues = headerRows[row - 1] || []
@@ -212,5 +207,5 @@ function showBlank(value) {
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
-  module.exports = { breakageKind, nameBreakages, checkStructure, breakageToText, sectionRightEdge }
+  module.exports = { breakageKind, nameBreakages, checkStructure, breakageToText }
 }

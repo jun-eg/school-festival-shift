@@ -35,8 +35,14 @@ const wishTimePattern =
  * 学祭は例年この 4 日である ◎（2026-09-21 → docs/interviews/02-作る側.md）。
  * 毎年変わるのは日付のほうだけで、日数と並びは変わらない ◎ ので、ここは転記のままでよい。
  * 上から順に、条件入力の「日ごとの営業時刻」の 4 行と 1 対 1 で当てる（→ formItemsFor）。
+ *
+ * 値そのものは sheet-layout.js が持つ（→ dayLabels）。割り当ての 4 枚の名前も同じ 4 つで、
+ * 同じ値を 2 か所に書かせると、食い違ったときにどちらが正かが決まらない（→ issue #213）。
+ * 関数にしてあるのは、他のファイルの値をこのファイルの最上位で使わないためである。
  */
-const wishTimeLabels = ['準備日', '学祭1日目', '学祭2日目', '片付け']
+function wishTimeLabels() {
+  return dayLabels
+}
 
 /** 4-2. 設問の説明文に書かれた例 ◎。3 つとも記録にある。 */
 const wishTimeExamples = [
@@ -50,7 +56,8 @@ const wishTimeExamples = [
  *
  *   number       4-1 の # の列（画像アイテムは設問ではないので持たない）
  *   title        4-1 の「項目」。希望時間 4 設問だけは持たない — 今年の入力から組む（→ formItemsFor）
- *   label        希望時間 4 設問のラベル ◎（→ wishTimeLabels）。題はこれと今年の日付で組む
+ *   dayIndex     希望時間 4 設問が、上から何日目か。ラベル ◎（→ wishTimeLabels）と題は
+ *                ここから引く（→ formItemsFor）。この表はラベルを持たない — 値は 1 か所である
  *   kind         4-1 の「形式」
  *   required     4-1 の「必須」
  *   pattern      4-1・4-2 の正規表現（3 箇所。無い設問は持たない）
@@ -112,7 +119,7 @@ const formItems = [
   // — 今年の入力から組む（→ formItemsFor）。持つのはラベル ◎ のほうである。
   {
     number: 6,
-    label: wishTimeLabels[0],
+    dayIndex: 0,
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
@@ -121,7 +128,7 @@ const formItems = [
   },
   {
     number: 7,
-    label: wishTimeLabels[1],
+    dayIndex: 1,
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
@@ -130,7 +137,7 @@ const formItems = [
   },
   {
     number: 8,
-    label: wishTimeLabels[2],
+    dayIndex: 2,
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
@@ -140,7 +147,7 @@ const formItems = [
   },
   {
     number: 9,
-    label: wishTimeLabels[3],
+    dayIndex: 3,
     kind: formItemKind.paragraph,
     required: true,
     pattern: wishTimePattern,
@@ -176,13 +183,14 @@ function wishTimeDescription(item) {
 function formItemsFor(days) {
   checkDaysForForm(days)
 
-  let at = 0
+  const labels = wishTimeLabels()
   return formItems.map((item) => {
-    if (!item.label) return item
-    const day = days[at++]
-    // 表の行はそのまま持ち上げて、題と営業時間だけを足す。表の側を書き換えない。
+    if (item.dayIndex === undefined) return item
+    const day = days[item.dayIndex]
+    // 表の行はそのまま持ち上げて、ラベルと題と営業時間だけを足す。表の側を書き換えない。
     return Object.assign({}, item, {
-      title: wishTimeTitle(day.date, item.label),
+      label: labels[item.dayIndex],
+      title: wishTimeTitle(day.date, labels[item.dayIndex]),
       businessHours: businessHoursOf(day),
     })
   })
@@ -193,19 +201,20 @@ function formItemsFor(days) {
  * 空のまま押されたときと、行数が違うときで言うことが違う — 担当者がやることが違うからである。
  */
 function checkDaysForForm(days) {
+  const labels = wishTimeLabels()
   const rows = (days || []).length
   if (rows === 0) {
     throw new Error(
       '条件入力の「日ごとの営業時刻」が空である。'
         + '設問の題の日付も、説明文の営業時間も、ここから出る（→ 4-1・4-2）ので、'
-        + `先に ${wishTimeLabels.length} 日ぶん入れてから、もう一度「フォームを作る」を押す（→ 2 の一覧 5）`,
+        + `先に ${labels.length} 日ぶん入れてから、もう一度「フォームを作る」を押す（→ 2 の一覧 5）`,
     )
   }
-  if (rows !== wishTimeLabels.length) {
+  if (rows !== labels.length) {
     throw new Error(
       `条件入力の「日ごとの営業時刻」が ${rows} 行である。`
-        + `ラベル ${wishTimeLabels.length} つ（${wishTimeLabels.join(' / ')}）と上から順に当てる（→ 4-1）ので、`
-        + `${wishTimeLabels.length} 行でなければ、どのラベルがどの日かが決まらない。フォームを 1 つも作らずに止まる`,
+        + `ラベル ${labels.length} つ（${labels.join(' / ')}）と上から順に当てる（→ 4-1）ので、`
+        + `${labels.length} 行でなければ、どのラベルがどの日かが決まらない。フォームを 1 つも作らずに止まる`,
     )
   }
 }
