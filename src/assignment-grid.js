@@ -47,8 +47,12 @@ function gridSlotKey(start, end) {
  *
  * 氏名は回答から引く（nameOf）。生成は氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、
  * ここで足している。見出しに出すためだけの列である（→ input-types.js の columnsOutsideWish）。
+ *
+ * alsoStudentIds は、その日に 1 枠も置いていなくても行を残す人である（→ 5-3 ／ issue #156）。
+ * 「この人をここに置かない」という手直し（空のセルに付いた印）と、残せなかった手直しの名指しは、
+ * 置いた枠が 1 つも無い人にも付く。行が無いと、印を載せるセルが無くなり、手直しが黙って消える。
  */
-function toAssignmentGrid(assignments, day, nameOf) {
+function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds) {
   const named = gridNamedColumns()
   const header = named.concat((day ? day.slots : []).map((slot) => slot.start))
   if (!day) return { header: header, rows: [] }
@@ -89,6 +93,13 @@ function toAssignmentGrid(assignments, day, nameOf) {
     people[studentId][index] = role
   })
 
+  ;(alsoStudentIds || []).forEach((studentId) => {
+    const id = String(studentId)
+    if (people[id]) return
+    people[id] = day.slots.map(() => '')
+    order.push(id)
+  })
+
   const rows = order
     .sort()
     .map((studentId) => [studentId, nameOf ? (nameOf(studentId) || '') : ''].concat(people[studentId]))
@@ -97,7 +108,8 @@ function toAssignmentGrid(assignments, day, nameOf) {
 }
 
 /**
- * 1 日ぶんのマス目を、割り当ての行に戻す（前の周の手直し ＝ 5-3 の固定を読む口である）。
+ * 1 日ぶんのマス目を、割り当ての行に戻す（手直しの後の数え直しが読む口である → core.js の recount）。
+ * 担当者が書き換えたセルだけを読むのは、ここではなく fixedFromAssignmentGrid である（→ 5-3）。
  *
  * 列に当てるのは位置ではなく、見出しに書いてある時刻そのものである。
  * 位置で当てると、条件入力の営業時刻を動かしたときに、前の周の役割が別の枠へ黙って移る。
@@ -151,8 +163,9 @@ function fromAssignmentGrid(header, dataRows, day, label) {
         throw new Error(
           `シート「${label}」の ${rowIndex + 2} 行目 ${cell.column + 1} 列目に「${cell.role}」が入っているが、`
             + `見出しの「${headerTime === '' ? '（空）' : headerTime}」が、いまの ${day.date} の枠に無い。`
-            + '条件入力の「日ごとの営業時刻」を動かしたのなら、'
-            + 'その手直しをどう扱うかが決まっていない（黙って外さない → 5-3 ／ issue #156）',
+            + '条件入力の「日ごとの営業時刻」を動かしたのなら、メニューの「生成」を押す。'
+            + '手直しの印（メモ）が付いたセルは残し、いまの枠に無くて残せないものは検証結果に名指しで出る'
+            + '（→ 5-3 ／ issue #156）。数え直しは、いま書いてあるとおりしか数えない',
         )
       }
       rows.push(buildAssignmentRow(day.date, slot, cell.role, studentId))
@@ -166,6 +179,136 @@ function fromAssignmentGrid(header, dataRows, day, label) {
 function buildAssignmentRow(date, slot, role, studentId) {
   const values = { '日': date, '開始': slot.start, '終了': slot.end, '役割': role, '学籍番号': studentId, '氏名': '' }
   return assignmentColumns.map((columnName) => values[columnName])
+}
+
+/**
+ * 手直しの印（→ 5-3 ／ issue #156）。**担当者が書き換えたセルに付くメモである。**
+ *
+ * どのセルが担当者の手で、どのセルが前の周に機械が置いたものかは、値だけでは分からない。
+ * 印をセルそのものに付けるのは、次の 3 つのためである。
+ *   ・入力の側にある — 割り当ての 4 枚の中にあるので、再実行は「入力が 1 つ増えた状態でもう一度通す」ことになる（→ 5-3）
+ *   ・担当者に見える — セルの右上に印が出る。どこを固定したかを、別の画面を開かずに読める（→ 6 の #2）
+ *   ・担当者が外せる — メモを消せば、次の生成でそのセルは組み直される
+ * 付けるのは onEdit である（→ shell.js の markFixedCells）。スクリプトの書き戻しでは付かない — 単純トリガーは人の編集でしか走らない。
+ *
+ * 印かどうかは頭の文字で見る（→ isFixedNote）。担当者が自分で書いたメモは印にならない。
+ */
+const fixedNoteHead = '手直し'
+const fixedNote = `${fixedNoteHead} — 生成し直しても残る（このメモを消すと、次の生成で組み直す）`
+
+/** そのメモが手直しの印か。頭が「手直し」なら印である（後ろに担当者が書き足しても外れない）。 */
+function isFixedNote(note) {
+  return String(note || '').trim().indexOf(fixedNoteHead) === 0
+}
+
+/**
+ * 残せなかった手直しのメモ（→ 5-3「食い違った固定は、名指しで返す」）。
+ * 頭が「手直し」でないので、次に読むときには印にならない — 同じ食い違いを生成のたびに名指しし直さない。
+ * 担当者がそのセルをもう一度書き換えれば、印に置き換わる（→ shell.js の markFixedCells）。
+ */
+function conflictNote(role, detail) {
+  return `残せなかった手直し「${role}」— ${detail}`
+}
+
+/**
+ * 1 日ぶんのマス目から、手直しの印が付いたセルだけを手直しの行にする（→ fixedColumns ／ 5-3）。
+ *
+ * 前の周に機械が置いたセルは読まない。**読むと、却下した「前回の案全体を初期解にする」になる**
+ * — どこが人の意思で、どこが機械の都合かが消える（→ 5-3 の却下した形）。
+ *
+ * 役割が空のセルに付いた印も読む。「この人をこの枠に置かない」という手直しである（役割は空で乗る）。
+ * 見出しの時刻がいまの枠に無くても止まらない。そのまま乗せ、生成の側が名指しで返す（→ generate.js の placeFixed）。
+ * 誰の行かが決まらない印（学籍番号が空・形式が違う）は、fromAssignmentGrid と同じに止まる。
+ */
+function fixedFromAssignmentGrid(header, dataRows, notes, day, label) {
+  const named = gridNamedColumns()
+  const studentIdColumn = named.indexOf('学籍番号')
+  const rows = []
+
+  dataRows.forEach((row, rowIndex) => {
+    const rowNotes = (notes || [])[rowIndex] || []
+    const studentId = String(row[studentIdColumn] || '').trim().toUpperCase()
+
+    for (let column = named.length; column < row.length; column++) {
+      if (!isFixedNote(rowNotes[column])) continue
+      const role = String(row[column] || '').trim()
+      // 誰の行でもない空のセルの印は、外す相手がいないので読まない。
+      if (studentId === '' && role === '') continue
+      if (!day) {
+        throw new Error(
+          `シート「${label}」に手直しの印があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。`
+            + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す（→ 4-1）`,
+        )
+      }
+      if (studentId === '') {
+        throw new Error(
+          `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である。`
+            + '誰の行かが決まらない（行は学籍番号で引く → issue #213）',
+        )
+      }
+      if (!studentIdPattern.test(studentId)) {
+        throw new Error(
+          `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う。`
+            + '10 桁の英数字である（→ 4-1 の #1）',
+        )
+      }
+      const values = { '日': day.date, '開始': String(header[column] || ''), '役割': role, '学籍番号': studentId }
+      rows.push(fixedColumns.map((columnName) => values[columnName]))
+    }
+  })
+
+  return rows
+}
+
+/**
+ * 書き戻すマス目のメモを、行と列の並びのまま返す（setNotes にそのまま渡す形 → shell.js の writeGrids）。
+ *
+ *   残せた手直し … その人の行の、その枠のセルに印（→ fixedNote）。書き戻しても印が残るので、次の周でも固定である
+ *   残せなかった手直し … 同じセルに、何が食い違ったかのメモ（→ conflictNote）。
+ *     見出しがいまの枠に無いときは列が無いので、その人の学籍番号のセルに付ける
+ *
+ * 残せなかったかどうかは、検証結果の「食い違った固定」の行で見る（→ generate.js の nameFixedConflicts）。
+ * 同じセルに 2 つ付くときは、改行でつなぐ。それ以外のセルは空（メモなし）である。
+ */
+function gridNotes(grid, day, fixed, checks) {
+  const named = gridNamedColumns()
+  const notes = grid.rows.map(() => grid.header.map(() => ''))
+  if (!day) return notes
+
+  const rowsOf = {}
+  grid.rows.forEach((row, rowIndex) => {
+    const studentId = String(row[named.indexOf('学籍番号')] || '').toUpperCase()
+    rowsOf[studentId] = (rowsOf[studentId] || []).concat([rowIndex])
+  })
+  const columnOf = {}
+  for (let column = named.length; column < grid.header.length; column++) columnOf[String(grid.header[column])] = column
+
+  function put(studentId, start, text, replace) {
+    const column = columnOf[start] !== undefined ? columnOf[start] : named.indexOf('学籍番号')
+    ;(rowsOf[String(studentId).toUpperCase()] || []).forEach((rowIndex) => {
+      const now = notes[rowIndex][column]
+      notes[rowIndex][column] = replace || now === '' ? text : `${now}\n${text}`
+    })
+  }
+
+  const fixedAt = (row, name) => row[fixedColumns.indexOf(name)]
+  ;(fixed || []).forEach((row) => {
+    if (fixedAt(row, '日') !== day.date) return
+    if (columnOf[fixedAt(row, '開始')] === undefined) return // いまの枠に無い印は、残せなかった側で名指しされる
+    put(fixedAt(row, '学籍番号'), fixedAt(row, '開始'), fixedNote, true)
+  })
+
+  const columns = outputColumns('検証結果')
+  const checkAt = (row, name) => row[columns.indexOf(name)]
+  const conflicted = {}
+  ;(checks || []).forEach((row) => {
+    if (checkAt(row, '種別') !== checkKind.fixConflict || checkAt(row, '日') !== day.date) return
+    const key = `${checkAt(row, '学籍番号')} ${checkAt(row, '開始')}`
+    put(checkAt(row, '学籍番号'), checkAt(row, '開始'), conflictNote(checkAt(row, '役割'), checkAt(row, '内容')), !conflicted[key])
+    conflicted[key] = true
+  })
+
+  return notes
 }
 
 /**
@@ -299,6 +442,7 @@ function namesFromAnswers(rows) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
+    gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow,
+    fixedNote, isFixedNote, conflictNote, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
   }
 }

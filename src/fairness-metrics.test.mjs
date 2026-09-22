@@ -237,6 +237,7 @@ const output = build({
   ...conditionRows(),
   '回答': [],
   '割り当て': [],
+  '手直し': [],
 }, {
   '取り込む': () => [wishOf(people.a)],
   '展開する': () => [],

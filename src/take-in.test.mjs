@@ -342,6 +342,7 @@ function skeletonInputs(answers) {
     '置き方のルール': [],
     '回答': answers,
     '割り当て': [],
+    '手直し': [],
   }
 }
 

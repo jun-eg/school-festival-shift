@@ -67,6 +67,11 @@ class 偽の範囲 {
   // 書き戻しの最後に、マス目の色を塗り直す（→ src/shell.js の paintGrids）。書式だけで、値は動かない。
   clearFormat() { return this }
   setBackgrounds() { return this }
+  // 手直しの印はセルのメモである（→ src/assignment-grid.js の fixedNote ／ issue #156）。
+  // この手が見るのは値だけなので、メモは持たない（読めば空、書けば捨てる）。
+  getNotes() { return this.getValues().map((行) => 行.map(() => '')) }
+  setNotes() { return this }
+  clearNote() { return this }
 }
 
 class 偽の保護 {
@@ -302,7 +307,7 @@ function 経路を通す() {
   try {
     見たもの.notBuilt = run(帳, {
       '展開する': (希望) => { 見たもの.希望 = 希望; return [] },
-    })
+    }).notBuilt
     見たもの.回答の行 = 文脈.readInputs(帳)['回答']
   } catch (どこが) { 見たもの.止まった.push({ 段: '回答シートを読む', 文: String(どこが.message) }) }
 

@@ -128,9 +128,9 @@ check('列名に空が無い', blankColumnNames, [])
 check('1 つの区画の中で列名が重なっていない', duplicateColumnNames, [])
 
 check(
-  '検証結果は違反と未充足を種別で分けて持つ（→ 5-4）',
+  '検証結果は違反と未充足を種別で分けて持ち（→ 5-4）、残せなかった手直しは 3 つ目の種別で持つ（→ 5-3）',
   [sheetSectionOf('検証結果').columns[0], ...Object.values(checkKind)],
-  ['種別', '違反', '未充足'],
+  ['種別', '違反', '未充足', '食い違った固定'],
 )
 
 check(

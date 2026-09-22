@@ -428,6 +428,7 @@ const output = build({
   ...conditionRows(),
   '回答': [answerRow(people.a.id, people.a.name, '3年生', 'はい')],
   '割り当て': [],
+  '手直し': [],
 }, {
   '取り込む': () => wishes,
   '展開する': () => candidatesOf(),

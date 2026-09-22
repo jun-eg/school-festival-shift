@@ -23,10 +23,15 @@
  */
 
 /**
- * 生成が踏む 4 段（→ 5-5 ／ 6 の #3）。踏む順である。
+ * 生成が踏む 5 段（→ 5-5 ／ 6 の #3 ／ 5-3）。踏む順である。
  * 名前で置いてあるのは、どこで何をしているかを隠さないためである。
  */
 const generationOrder = [
+  {
+    key: 'fixed',
+    what: '担当者の手直し（固定）を先に置く。条件を破る固定は置かず、名指しで返す（→ 5-3・placeFixed）。'
+      + '空のセルの手直しは、その人をその枠の候補から外す',
+  },
   {
     key: 'fill',
     what: '制約のきつい枠から順に、営業の役割を埋める（貪欲法 → 5-5 の「埋める順」）。'
@@ -65,8 +70,9 @@ const generationNotAimed = [
       + 'どこで切るかは上流の △ 5 に触る（→ 9 の △ 5・issue #215 の「決まっていないこと」）',
   },
   {
-    what: '5-3 の固定（担当者が割り当てシートに入れた手直し）',
-    why: '積むのは別の段である（→ 8 の 11 ／ issue #156）。引数では受け取るが、いまは 1 行も見ない',
+    what: '前の周に機械が置いたセル',
+    why: '見るのは担当者が書き換えたセル（手直しの印 → assignment-grid.js の fixedNote）だけである。'
+      + '前の周の案全体を初期解にすると、どこが人の意思でどこが機械の都合かが消える（→ 5-3 の却下した形）',
   },
   {
     what: '割り当ての 氏名',
@@ -122,15 +128,25 @@ const runExceptions = [
  *   candidates … その人がその日に入れる候補の枠（展開する段の出力 → #149）
  *   conditions … 条件入力の 6 区画を直した型（→ core.js の takeConditions・input-types.js）
  *   wishes     … 希望（型 #6。取り込む段の出力 → #146）。規則 4 の学年と規則 5 の調理可否がここにある
- *   fixed      … 前の周の割り当ての行（→ 5-3）。いまは 1 行も見ない（→ generationNotAimed）
+ *   fixed      … 担当者の手直し（→ 5-3。形は sheet-layout.js の fixedColumns）。先に置き、残りを生成する
  *
- * 需要が 1 行も無い年・枠が 1 つも無い年は、置く先が無いので 0 行である（「解なし」では止まらない）。
+ * 枠が 1 つも無い年と、需要も手直しも 1 行も無い年は、置く先が無いので 0 行である（「解なし」では止まらない）。
+ * 置けなかった手直しは、ここでは返さない — 名指しするのは「固定を照らす」の段である（→ nameFixedConflicts）。
+ * どちらも generatePlan を通るので、ここで置かなかったものと、そこで名指しされるものは同じである。
  */
 function generate(candidates, conditions, wishes, fixed) {
+  return generatePlan(candidates, conditions, wishes, fixed).rows
+}
+
+/**
+ * 生成の本体。割り当ての行（rows）と、置けなかった手直し（notPlaced。{ fix, why } の配列）の 2 つを返す。
+ * 段の関数が返すのは行の配列だけなので（→ core.js の build）、出口を 2 つに分けてある（→ generate ／ nameFixedConflicts）。
+ */
+function generatePlan(candidates, conditions, wishes, fixed) {
   const held = conditions || {}
   const days = held.days || []
   const needs = allNeeds(held) // → name-unmet.js。必要人数と委員会の指定枠を 1 本に並べる
-  if (days.length === 0 || needs.length === 0) return []
+  if (days.length === 0 || (needs.length === 0 && (fixed || []).length === 0)) return { rows: [], notPlaced: [] }
 
   // 数えられない需要を黙って落とさない（未充足の側と同じ口で止まる → 5-4）。
   checkEveryNeedLands(needs, days)
@@ -139,14 +155,23 @@ function generate(candidates, conditions, wishes, fixed) {
   const minRun = minRunSlotsToPlaceBy(held)
   const people = peopleToPlace(candidates, wishes)
   const board = { placed: {} }
+  // 需要の単位より先に置く。空のセルの手直しは候補から外すので、置ける人（able）が変わる。
+  const notPlaced = placeFixed(board, people, fixed, days, held, wishes, boundary)
   const units = demandUnits(needs, days, people, held)
 
   fillTightestFirst(board, units, boundary, minRun)
   swapWithinSlot(board, units, boundary)
+  // 店の役割が出そろったところで、規則 3 を満たせない日の手直しを外す（→ releaseFixesBreakingRule3）。
+  // 外した枠は空くので、もう 1 度埋める。外していなければ、埋め直さない（手直しが無い年の案は動かない）。
+  const released = releaseFixesBreakingRule3(board, people, days, boundary)
+  if (released.length > 0) {
+    fillTightestFirst(board, units, boundary, minRun)
+    swapWithinSlot(board, units, boundary)
+  }
   addPrepCleanup(board, needs, days, people, boundary)
   fillPrepCleanupDemand(board, prepCleanupUnits(needs, days, people, held), minRun)
 
-  return assignmentRows(needs, days, people)
+  return { rows: assignmentRows(needs, days, people), notPlaced: notPlaced.concat(released) }
 }
 
 /**
@@ -211,6 +236,7 @@ function peopleToPlace(candidates, wishes) {
         at: {}, // 「日 枠」→ 役割（置いた）
         count: 0,
         on: {}, // 日 → その日に置いた枠の数（散らしの鍵 → nextToPlace）
+        fixed: {}, // 「日 枠」→ true（担当者の手直しで置いた。入れ替えで動かさない → swapOnce）
       }
       people.push(byStudentId[candidate.studentId])
     }
@@ -303,10 +329,28 @@ function canStandAt(person, day, slot, role, conditions) {
  *
  * 置くたびにこれを見ておくと、帯の枠が最後まで 1 つ残る。
  * 後から準備・片付けを置く段（→ addPrepCleanup）が置き場所に困らないのは、このためである。
+ *
+ * role を渡すと、その役割で置いたものとして見る（→ whyPrepCleanupBreaks）。渡さなければ店の役割である。
  */
-function prepCleanupStaysPossible(person, day, slot, boundary) {
-  const after = dayStateOf(person, day, boundary, slot)
-  if (!after.morning && !after.afternoon) return true
+function prepCleanupStaysPossible(person, day, slot, boundary, role) {
+  return whyPrepCleanupBreaks(person, day, slot, boundary, role) === null
+}
+
+/**
+ * 規則 3 を満たせなくなるなら、どう満たせないかの文を返す。満たせるなら null である。
+ *
+ * 準備・片付けにもう入っているなら、向きはそこで決まっている（→ count-violations.js の prepCleanupDetail）。
+ * 入っているのは担当者の手直しだけである — 生成が準備・片付けを置くのは 3 段目からで、店の役割より後だからである。
+ * 手直しは後から外さないので、向きが合わない置き方はしない
+ * （午前だけの日に片付けが固定されている人を、午前の枠にだけ置く、など）。
+ */
+function whyPrepCleanupBreaks(person, day, slot, boundary, role) {
+  const toBand = prepCleanupRoles().indexOf(role) !== -1
+  const after = dayStateOf(person, day, boundary, toBand ? null : slot)
+  if (role === ruleRoles.prep) after.prep = true
+  if (role === ruleRoles.cleanup) after.cleanup = true
+  if (!after.morning && !after.afternoon) return null
+  if (after.prep || after.cleanup) return prepCleanupDetail(after, boundary)
 
   let free = 0
   if (after.morning) free += freeBandSlots(person, day, ruleRoles.prep).length
@@ -316,7 +360,9 @@ function prepCleanupStaysPossible(person, day, slot, boundary) {
   if (after.morning && isInBand(day, slot, ruleRoles.prep)) free -= 1
   else if (after.afternoon && isInBand(day, slot, ruleRoles.cleanup)) free -= 1
 
-  return free > 0
+  if (free > 0) return null
+  const bands = [after.morning ? ruleRoles.prep : null, after.afternoon ? ruleRoles.cleanup : null].filter(Boolean)
+  return `その日の ${bands.join(' ／ ')} の帯に、希望にあって空いている枠が残らない`
 }
 
 /**
@@ -473,7 +519,7 @@ function nextToPlace(unit, boundary) {
  */
 function isOpenFor(person, unit, boundary) {
   return isFreeAt(person, unit.day.date, unit.slot)
-    && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary)
+    && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary, unit.role)
     && prepCleanupNotBothBands(person, unit.day, unit.role)
 }
 
@@ -500,11 +546,13 @@ function swapWithinSlot(board, units, boundary) {
  * 新しく置く側だけ、帯が残るかを見る（→ prepCleanupStaysPossible）。
  *
  * 準備・片付けに入っている人は動かさない。動かすと、その人のその日の規則 3 が崩れる。
+ * 手直しで置いた人も動かさない。担当者が意図して置いた 1 手である（→ 5-3）。
  */
 function swapOnce(board, unit, units, boundary) {
   const movable = unit.able.filter((person) => {
-    const role = person.at[whereKey(unit.day.date, unit.slot)]
-    return role && role !== unit.role && prepCleanupRoles().indexOf(role) === -1
+    const key = whereKey(unit.day.date, unit.slot)
+    const role = person.at[key]
+    return role && role !== unit.role && prepCleanupRoles().indexOf(role) === -1 && !person.fixed[key]
   })
   movable.sort((a, b) => a.order - b.order)
 
@@ -551,6 +599,8 @@ function addPrepCleanup(board, needs, days, people, boundary) {
     people.forEach((person) => {
       const state = dayStateOf(person, day, boundary)
       if (!state.morning && !state.afternoon) return // ⑤ どちらも無い日は、どちらにも入れない
+      // 手直しで準備・片付けに入っていて、もう満たしている日は足さない（→ placeFixed・whyPrepCleanupBreaks）。
+      if (prepCleanupDetail(state, boundary) === null) return
 
       const role = prepOrCleanupFor(board, needs, person, day, state)
       if (!role) {
@@ -653,6 +703,234 @@ function placeInBand(board, needs, person, day, role) {
   const wanted = wantedBandSlots(board, needs, person, day, role)
   const slots = wanted.length > 0 ? wanted : [freeBandSlots(person, day, role)[0]]
   slots.forEach((slot) => place(board, person, day.date, slot, role))
+}
+
+/**
+ * 担当者の手直し（固定）を先に置く（→ generationOrder の 1 段目・5-3 ／ issue #156）。
+ * 返すのは、置けなかった手直しと、その理由である（{ fix, why } の配列）。
+ *
+ * **5-3 の 3 つの決めのとおりである。**
+ *   ・固定を優先して条件を破ることはしない — 規則 1・4・5 と同じ枠に二重はここで、規則 3 は店の割り当てが出そろってから
+ *     （→ releaseFixesBreakingRule3）、生成と同じ見方で見て、破るなら置かない
+ *   ・固定を黙って外すこともしない — 置かなかったものは理由と一緒に返り、「固定を照らす」の段が名指しする
+ *   ・食い違った固定は、名指しで返す
+ *
+ * 置く順は 外す印 → 店の役割 → 準備・片付け で、同じ中は 日 → 枠 → 入力の順である（並びは入力だけで決まる → 6 の #3）。
+ * 外す印が先なのは、候補から外してから置くためである。準備・片付けが後なのは、同じ日に両方の手直しがあるとき、
+ * 名指しされるのが日の後ろのほうに決まるようにするためである（→ whyFixedCannotStay の ④）。
+ *
+ * **規則 3 は、ここでは見ない。** 規則 3 はその人のその日ぜんぶで決まり、店の割り当てが出そろうまで決まらない
+ * — 午前だけの店の手直しでも、生成が午後の枠を足せば ④ で満たす（準備の帯が 0 枠の日でも、片付けで満たせる）。
+ * ここで外すと、満たせたはずの 1 手を外すことになる。置いておけば、生成は満たせる向きにしか店の枠を足さない
+ * （→ whyPrepCleanupBreaks）。出そろっても満たせない日の手直しは、3 段目の前に外して名指しする
+ * （→ releaseFixesBreakingRule3）。
+ *
+ * 見ないものが 2 つある。**人数の超過**と**帯の外の準備・片付け**である。どちらも違反ではない（→ 5-4）
+ * — 超過も帯も生成の置き方であって規則ではなく、担当者の 1 手のほうが先である。
+ * 超過になった枠には、生成は人を足さない（要る人数に届いているので → fillTightestFirst）。
+ */
+function placeFixed(board, people, fixed, days, conditions, wishes, boundary) {
+  const byStudentId = {}
+  people.forEach((person) => { byStudentId[person.studentId] = person })
+  const wishBy = wishesByStudentId(wishes) // → count-violations.js
+  const claimed = {}
+  const notPlaced = []
+
+  fixedToPlace(fixed, days).forEach((one) => {
+    const person = byStudentId[one.studentId]
+    const claimKey = `${one.studentId} ${one.date} ${one.start}`
+
+    // 空のセルの手直し — その人をその枠の候補から外す。外す先が無ければ（いまの枠に無い・回答に無い）何もしない。
+    if (one.role === '') {
+      claimed[claimKey] = true
+      if (person && one.slot) delete person.slots[whereKey(one.date, one.slot)]
+      return
+    }
+
+    const why = whyFixedCannotStay(one, person, wishBy[one.studentId], conditions, boundary, claimed[claimKey])
+    claimed[claimKey] = true
+    if (why) {
+      notPlaced.push({ fix: one, why: why })
+      return
+    }
+    place(board, person, one.date, one.slot, one.role)
+    person.fixed[whereKey(one.date, one.slot)] = true
+  })
+
+  return notPlaced
+}
+
+/** 手直しの行をほどき、置く順に並べる（→ placeFixed の注意）。 */
+function fixedToPlace(fixed, days) {
+  const at = (row, name) => row[fixedColumns.indexOf(name)]
+  const stage = (one) => {
+    if (one.role === '') return 0
+    return prepCleanupRoles().indexOf(one.role) === -1 ? 1 : 2
+  }
+  // いまの枠に無い見出しは、その日の枠の後ろに回す（名指しが枠の順に並ぶ）。
+  const slotRank = (one) => (one.slotIndex === -1 ? Number.MAX_SAFE_INTEGER : one.slotIndex)
+
+  return (fixed || [])
+    .map((row, index) => {
+      const date = String(at(row, '日'))
+      const start = String(at(row, '開始'))
+      const dayIndex = days.map((day) => day.date).indexOf(date)
+      const day = days[dayIndex]
+      const slotIndex = day ? day.slots.map((slot) => slot.start).indexOf(start) : -1
+      return {
+        index: index,
+        date: date,
+        start: start,
+        role: String(at(row, '役割')).trim(),
+        studentId: String(at(row, '学籍番号')).trim().toUpperCase(),
+        day: day,
+        dayIndex: dayIndex,
+        slot: slotIndex === -1 ? null : day.slots[slotIndex],
+        slotIndex: slotIndex,
+      }
+    })
+    .sort((a, b) => stage(a) - stage(b) || a.dayIndex - b.dayIndex || slotRank(a) - slotRank(b) || a.index - b.index)
+}
+
+/**
+ * 手直し 1 つを置けない理由を返す。置けるなら null である。
+ * 見る順は 枠 → 二重 → 規則 1 → 規則 5 → 規則 4 → 規則 3 の ④（準備と片付けの両方）で、最初に当たった 1 つだけを返す。
+ * 規則 3 の残り（向きと帯の空き）はここで見ない（→ placeFixed の注意）。
+ * 文の頭の名前は、違反を数える側と同じである（→ count-violations.js の violationRules）。
+ */
+function whyFixedCannotStay(one, person, wish, conditions, boundary, alreadyClaimed) {
+  if (!one.slot) {
+    return `いまの ${one.date} の枠に「${one.start === '' ? '（空）' : one.start}」が無い`
+      + '（条件入力の「日ごとの営業時刻」が動いた）'
+  }
+  if (alreadyClaimed) return `${labelOf('doubleBooked')}: 同じ人の同じ 30 分枠に、手直しがもう 1 つある`
+  if (!wish) return `${labelOf('rule1')}: この人の回答が無い`
+  if (!person || !person.slots[whereKey(one.date, one.slot)]) return `${labelOf('rule1')}: 希望の時間の外である`
+  if (cookRoles.indexOf(one.role) !== -1 && !person.canCook) {
+    return `${labelOf('rule5')}: 調理の枠（${one.role}）だが、${wishColumns.canCook} が ${cookAnswerText(false)} である`
+  }
+  if (one.role === ruleRoles.cookLeader) {
+    const allowed = (conditions || {}).cookLeaderGrades || []
+    if (allowed.length === 0) {
+      throw new Error(
+        `条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の手直しがある。`
+          + '規則 4 を満たすかが決まらないので、違反を作らずに止まる（→ 5-1 の #3）',
+      )
+    }
+    if (allowed.indexOf(person.grade) === -1) {
+      return `${labelOf('rule4')}: ${ruleRoles.cookLeader} の枠だが、学年が ${allowed.join(' / ')} でない（いま: ${person.grade}）`
+    }
+  }
+  if (!prepCleanupNotBothBands(person, one.day, one.role)) {
+    const other = prepCleanupRoles().filter((role) => role !== one.role)[0]
+    return `${labelOf('rule3')}: その日の ${other} にも手直しで入っていて、片方だけにならない`
+  }
+  // 規則 3 の残り（向きと帯の空き）は、店の割り当てが出そろってから見る（→ placeFixed の注意・releaseFixesBreakingRule3）。
+  return null
+}
+
+/**
+ * 店の役割が出そろった後で、規則 3 を満たせない日の手直しを外す（→ 5-3 ／ 3 の規則 3）。
+ * 返すのは外した手直しと、その理由である（placeFixed と同じ { fix, why } の形）。
+ *
+ * 満たせないのは、手直しだけで決まった日である。生成は、満たせない向きには店の枠を足さない（→ whyPrepCleanupBreaks）
+ * — だから満たせない日に入っているのは手直しだけで、外せば元に戻る。
+ *
+ * 外す順は、外す手直しが少ないほうからである。
+ *   ① 向きの合わない準備・片付け（午前だけの日の片付け ／ 午後だけの日の準備 → ②③）
+ *   ② 午前にかかる店の役割（残りが午後だけになり、片付けで満たせるなら）
+ *   ③ 午後にかかる店の役割（残りが午前だけになり、準備で満たせるなら）
+ *   ④ その日の店の役割ぜんぶ
+ * 外した後は、3 段目がその日の正しい側を置く。
+ */
+function releaseFixesBreakingRule3(board, people, days, boundary) {
+  const released = []
+  days.forEach((day) => {
+    people.forEach((person) => {
+      const fixedSlots = day.slots.filter((slot) => person.fixed[whereKey(day.date, slot)])
+      if (fixedSlots.length === 0) return
+      const gap = rule3Gap(person, day, boundary)
+      if (gap === null) return
+      const why = `${labelOf('rule3')}: ${gap}`
+
+      const state = dayStateOf(person, day, boundary)
+      const misfit = state.morning && !state.afternoon ? ruleRoles.cleanup : ruleRoles.prep
+      const isShop = (slot) => prepCleanupRoles().indexOf(person.at[whereKey(day.date, slot)]) === -1
+      const tries = [
+        fixedSlots.filter((slot) => person.at[whereKey(day.date, slot)] === misfit && (state.morning !== state.afternoon)),
+        fixedSlots.filter((slot) => isShop(slot) && toMinutes(slot.start) < toMinutes(boundary)),
+        fixedSlots.filter((slot) => isShop(slot) && toMinutes(slot.end) > toMinutes(boundary)),
+        fixedSlots.filter(isShop),
+      ]
+      for (let i = 0; i < tries.length; i++) {
+        if (tries[i].length === 0) continue
+        const taken = tries[i].map((slot) => ({ slot: slot, role: unplace(board, person, day.date, slot) }))
+        if (rule3Gap(person, day, boundary) === null || i === tries.length - 1) {
+          taken.forEach((one) => {
+            delete person.fixed[whereKey(day.date, one.slot)]
+            released.push({
+              fix: { date: day.date, start: one.slot.start, role: one.role, studentId: person.studentId, slot: one.slot },
+              why: why,
+            })
+          })
+          return
+        }
+        taken.forEach((one) => place(board, person, day.date, one.slot, one.role))
+      }
+    })
+  })
+  return released
+}
+
+/**
+ * その人のその日が、規則 3 を満たせないなら、どう満たせないかの文を返す。満たせるなら null である。
+ * 「満たせる」は、3 段目が準備・片付けを置けば満たすことを含む（帯に、希望にあって空いている枠がある）。
+ */
+function rule3Gap(person, day, boundary) {
+  const state = dayStateOf(person, day, boundary)
+  if (!state.morning && !state.afternoon) return null
+  if (state.prep || state.cleanup) return prepCleanupDetail(state, boundary)
+
+  const prepFree = freeBandSlots(person, day, ruleRoles.prep).length > 0
+  const cleanupFree = freeBandSlots(person, day, ruleRoles.cleanup).length > 0
+  if (state.morning && state.afternoon && (prepFree || cleanupFree)) return null
+  if (state.morning && !state.afternoon && prepFree) return null
+  if (!state.morning && state.afternoon && cleanupFree) return null
+
+  const half = state.morning && state.afternoon ? '午前と午後の両方' : (state.morning ? '午前だけ' : '午後だけ')
+  const bands = [state.morning ? ruleRoles.prep : null, state.afternoon ? ruleRoles.cleanup : null].filter(Boolean)
+  return `その日の割り当てが${half}にあるが、${bands.join(' ／ ')} の帯に希望にあって空いている枠が無い`
+}
+
+/**
+ * 「固定を照らす」の段の中身（→ core.js の coreSteps ／ 5-3「食い違った固定は、名指しで返す」／ issue #156）。
+ * いまの入力で置けない手直しを、検証結果の行にする。種別は「食い違った固定」である（→ sheet-layout.js の checkKind）。
+ *
+ * 置けるかどうかは、生成そのもの（generatePlan）を通して見る — 見方を 2 通りに持たない（→ src/README.md）。
+ * 規則 3 は、店の割り当てが出そろうまで置けるかが決まらない（→ releaseFixesBreakingRule3）ので、
+ * 途中までを別に写すと食い違う。手直しがあるときだけ、生成をもう 1 回通すことになる（手直しが無ければ通さない）。
+ * 生成は置けなかった手直しを返さないので、名指しはここだけが持つ。
+ * 違反にも未充足にも数えない — 置いていないので、どの枠の人数にも、どの人の割り当てにも入っていない。
+ */
+function nameFixedConflicts(fixed, candidates, conditions, wishes) {
+  if ((fixed || []).length === 0) return []
+  return generatePlan(candidates, conditions, wishes, fixed).notPlaced.map((one) => fixedConflictRow(one.fix, one.why))
+}
+
+/** 置けなかった手直し 1 つを、検証結果の行にする。終了は、いまの枠に無ければ空である。 */
+function fixedConflictRow(one, why) {
+  const found = {
+    '種別': checkKind.fixConflict,
+    '日': one.date,
+    '開始': one.start,
+    '終了': one.slot ? one.slot.end : '',
+    '役割': one.role,
+    '学籍番号': one.studentId,
+    '氏名': '',
+    '内容': why,
+    'あと何人': '',
+  }
+  return sheetColumns('検証結果').map((name) => found[name])
 }
 
 /** 置く。台帳と、その人の持ち分（通しの数とその日の数）の両方を動かす。 */
@@ -762,7 +1040,8 @@ if (typeof module !== 'undefined') {
   module.exports = {
     generationOrder, generationNotAimed, runExceptions,
     generate, noonBoundaryToPlaceBy, minRunSlotsToPlaceBy, peopleToPlace, demandUnits, canStandAt,
-    prepCleanupStaysPossible,
+    prepCleanupStaysPossible, whyPrepCleanupBreaks,
+    generatePlan, placeFixed, fixedToPlace, whyFixedCannotStay, releaseFixesBreakingRule3, rule3Gap, nameFixedConflicts, fixedConflictRow,
     dayStateOf, markHalfOfDay, freeBandSlots, prepCleanupNotBothBands,
     prepCleanupUnits, fillPrepCleanupDemand,
     fillTightestFirst, placeRun, extendRun, nextRunSlot, nextToPlace, isOpenFor, sortToTake, placedOn,

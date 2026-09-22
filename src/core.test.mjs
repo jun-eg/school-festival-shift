@@ -8,6 +8,7 @@
 //   ② 配列を渡すと配列が返る。偽のスプレッドシートすら要らない（→ issue #137 の受け入れ条件）
 //   ③ 中身の入っていない段は、空の配列を返して名指しで持ち帰る（黙って走らない）
 //   ④ 段を差し替えると、その段だけを先に回せる（8 の 3 が 8 の 8 より先にある）
+//      生成に渡る固定は、担当者が書き換えたセル（手直し）だけである（→ 5-3 ／ issue #156）
 //   ⑤ 表現の揺れ・列数の違い・決めていない種別は、黙って直さずに名指しで止まる
 //
 // これは契約であって実装ではない。何も書き換えない。
@@ -74,6 +75,7 @@ function skeletonInputs(overrides) {
       '8:00-21:00', '8:00-20:00', '8:00-22:00', '8:00-15:00',
     ]],
     '割り当て': [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '高木琴音']],
+    '手直し': [],
   }
   Object.keys(overrides || {}).forEach((name) => { inputs[name] = overrides[name] })
   return inputs
@@ -183,9 +185,9 @@ check(
 
 check(
   '③ 中身が入っている段は、未了に出ない'
-    + '（6 つ → take-in.js ／ expand.js ／ generate.js ／ count-violations.js ／ name-unmet.js ／ fairness-metrics.js）',
+    + '（7 つ → take-in.js ／ expand.js ／ generate.js（固定を照らす・生成する）／ count-violations.js ／ name-unmet.js ／ fairness-metrics.js）',
   [stepsAlreadyIn, skeletonOutput.notBuilt.filter((step) => stepsAlreadyIn.indexOf(step.name) !== -1)],
-  [['取り込む', '展開する', '生成する', '違反を数える', '未充足を名指しする', '指標を出す'], []],
+  [['取り込む', '展開する', '固定を照らす', '生成する', '違反を数える', '未充足を名指しする', '指標を出す'], []],
 )
 
 check(
@@ -236,8 +238,10 @@ check(
 // ---- ④-2 友達欄は生成の側へ渡らない（→ 5-2） --------------------------------
 
 const receivedArgs = {}
-build(skeletonInputs(), {
+const oneFix = [['2025-11-01', '08:00', '準備', 'EED2349987']]
+build(skeletonInputs({ '手直し': oneFix }), {
   '展開する': (wishes, days) => { receivedArgs['展開する'] = [wishes, days]; return [] },
+  '固定を照らす': (fixed) => { receivedArgs['固定を照らす'] = [fixed]; return [] },
   '生成する': (candidates, conditions, wishes, fixed) => {
     receivedArgs['生成する'] = [candidates, conditions, wishes, fixed]
     return []
@@ -278,9 +282,9 @@ check(
 )
 
 check(
-  '④-2 固定として渡るのは、前の周の割り当てシートの行である（→ 5-3）',
-  receivedArgs['生成する'][3],
-  skeletonInputs()['割り当て'],
+  '④-2 固定として渡るのは手直し（担当者が書き換えたセル）だけで、前の周の割り当てではない（→ 5-3 の却下した形）',
+  [receivedArgs['生成する'][3], receivedArgs['固定を照らす'][0]],
+  [oneFix, oneFix],
 )
 
 // 規則 4 の学年と規則 5 の調理可否は候補に乗っていない（→ #149）ので、生成にも型 #6 が渡る。
@@ -325,6 +329,51 @@ check(
   '④-3 同じ入力で生成を押せば、その 1 枠は置かれない（数え直しと生成は別の口である）',
   build(skeletonInputs({ '割り当て': handEdited }))['割り当て']
     .filter((row) => row[0] === '2025-11-04' && row[1] === '16:00'),
+  [],
+)
+
+// ---- ④-4 固定を先に置き、置けないものは名指しで返す（→ 5-3 ／ issue #156） ----
+// この 1 人は 3 年生・調理担当ですか？ が いいえ・11-01 の希望は 8:00-21:00 である（→ skeletonInputs）。
+//   11-01 08:00 準備 … 置ける（規則 3 は店の役割の無い日には当たらない）
+//   11-02 10:00 調理 … 規則 5 で置けない
+//   11-03 07:00 会計 … 07:00 の枠がいまの 11-03 に無い（営業時刻を動かした後の、前の周の列）
+
+const fixes = [
+  ['2025-11-01', '08:00', '準備', 'EED2349987'],
+  ['2025-11-02', '10:00', '調理', 'EED2349987'],
+  ['2025-11-03', '07:00', '会計', 'EED2349987'],
+]
+const withFixes = build(skeletonInputs({ '手直し': fixes }))
+
+check(
+  '④-4 置ける固定は、生成の案にそのまま入る（担当者が置いたとおり）',
+  withFixes['割り当て'],
+  [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '']],
+)
+
+check(
+  '④-4 置けない固定は置かれず、食い違った固定として検証結果の先頭に理由つきで並ぶ（黙って外さない・条件も破らない）',
+  withFixes['検証結果']
+    .filter((row) => row[kindColumn] === checkKind.fixConflict)
+    .map((row) => [row[checkResultColumns.indexOf('日')], row[checkResultColumns.indexOf('開始')], row[checkResultColumns.indexOf('内容')]]),
+  [
+    ['2025-11-02', '10:00', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
+    ['2025-11-03', '07:00', 'いまの 2025-11-03 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+  ],
+)
+
+check(
+  '④-4 食い違った固定は検証結果の先頭にあり、固定のせいで違反は 1 件も作られていない',
+  [
+    withFixes['検証結果'].slice(0, 2).map((row) => row[kindColumn]),
+    withFixes['検証結果'].filter((row) => row[kindColumn] === checkKind.violation).length,
+  ],
+  [[checkKind.fixConflict, checkKind.fixConflict], 0],
+)
+
+check(
+  '④-4 数え直しでは固定を照らさない（マス目に書いてあるものは違反として数える → recount）',
+  recount(skeletonInputs({ '手直し': fixes }))['検証結果'].filter((row) => row[kindColumn] === checkKind.fixConflict),
   [],
 )
 
@@ -392,9 +441,9 @@ check(
 // ---- 入力の名前が sheet-layout.js から引かれているか ------------------------
 
 check(
-  '入力の名前は、条件入力の 5 区画 ＋ 回答 ＋ 割り当てである（検証結果と指標は入らない）',
+  '入力の名前は、条件入力の 6 区画 ＋ 回答 ＋ 割り当て ＋ 手直しである（検証結果と指標は入らない）',
   inputNames(),
-  [...conditionNames(), '回答', '割り当て'],
+  [...conditionNames(), '回答', '割り当て', '手直し'],
 )
 
 check(

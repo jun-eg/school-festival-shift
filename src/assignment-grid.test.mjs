@@ -11,6 +11,7 @@
 //   ⑤ 載らないものは黙って捨てず、名指しして止まる
 //   ⑥ 違反の行を、塗るセルに当て戻せる（→ 6 の #2「違反した所はセルの色に出る」・issue #155）
 //   ⑦ 背景は役割の色である（記録の配布物 ◎ の 8 役割・7 色 → issue #213）
+//   ⑧ 手直しの印（メモ）が付いたセルだけを手直しとして読み、書き戻すときに印を付け直す（→ 5-3・issue #156）
 //
 // これは契約であって実装ではない。何も書き換えない。
 // 記録の側（前回の確定シフトが本当にこの形に敷けるか）は scripts/前回のシフト表.mjs が見る。
@@ -29,8 +30,14 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf } = context
-const { dayLabels, assignmentColumns, checkKind, roleColors } = vm.runInContext('({ dayLabels, assignmentColumns, checkKind, roleColors })', context)
+const {
+  toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf,
+  fixedFromAssignmentGrid, gridNotes, isFixedNote, conflictNote,
+} = context
+const { dayLabels, assignmentColumns, checkKind, roleColors, fixedNote } = vm.runInContext(
+  '({ dayLabels, assignmentColumns, checkKind, roleColors, fixedNote })',
+  context,
+)
 
 const failed = []
 const passed = []
@@ -295,6 +302,74 @@ check(
   '⑦ 背景の行列は、名前のある 2 列と空のセルと表に無い役割名を塗らず、幅に届かない右を null で埋める',
   gridBackgrounds([['EED2402549', '高木琴音', '調理', '', ' 準備 ', '委員会の見回り']], 7),
   [[null, null, roleColorOf('調理'), null, roleColorOf('準備'), null, null]],
+)
+
+// ---- ⑧ 手直しの印 -----------------------------------------------------------
+// マス目の中身は上の grid と同じで、メモだけを足す。2 行目（EED2402549）の 10:00 と 10:30、4 行目の空の 08:30 に印がある。
+// 3 行目（ECK2626643）の 10:00 には、担当者が自分で書いたメモがある（印ではない）。
+
+const withNotes = grid.rows.map((one) => one.map(() => ''))
+const column = (time) => grid.header.indexOf(time)
+const rowOf = (studentId) => grid.rows.findIndex((one) => one[0] === studentId)
+withNotes[rowOf('EED2402549')][column('10:00')] = fixedNote
+withNotes[rowOf('EED2402549')][column('10:30')] = `${fixedNote}（担当者が書き足した）`
+withNotes[rowOf('ECK2626643')][column('10:00')] = '森田さんは 10 時から来られないかも'
+withNotes[rowOf('LTS2390333')][column('08:30')] = fixedNote
+
+check(
+  '⑧ 印の付いたセルだけが手直しになる。空のセルの印は役割が空で乗り、担当者が自分で書いたメモは印にならない',
+  fixedFromAssignmentGrid(grid.header, grid.rows, withNotes, day, dayLabels[2]),
+  [
+    ['2025-11-02', '10:00', '調理', 'EED2402549'],
+    ['2025-11-02', '10:30', '調理', 'EED2402549'],
+    ['2025-11-02', '08:30', '', 'LTS2390333'],
+  ],
+)
+
+check(
+  '⑧ 印かどうかは頭の文字で見る（残せなかった手直しのメモは印にならない）',
+  [isFixedNote(fixedNote), isFixedNote(`  ${fixedNote}`), isFixedNote(conflictNote('調理', '規則 5: …')), isFixedNote('')],
+  [true, true, false, false],
+)
+
+check(
+  '⑧ 見出しがいまの枠に無い印は、止まらずにそのまま乗る（名指しは生成の側 → generate.js の placeFixed）',
+  fixedFromAssignmentGrid(['学籍番号', '氏名', '07:00'], [['EED2402549', '', '会計']], [['', '', fixedNote]], day, dayLabels[2]),
+  [['2025-11-02', '07:00', '会計', 'EED2402549']],
+)
+
+check(
+  '⑧ 誰の行か決まらない印は、fromAssignmentGrid と同じに名指しして止まる',
+  whyItStopped(() => fixedFromAssignmentGrid(grid.header, [['', '', '調理']], [['', '', fixedNote]], day, dayLabels[2]))
+    ?.includes('学籍番号が空である'),
+  true,
+)
+
+const fixedRows = [['2025-11-02', '10:00', '調理', 'EED2402549'], ['2025-11-02', '12:00', '', 'LTS2403003']]
+const conflictRow = outputColumns('検証結果').map(() => '')
+conflictRow[outputColumns('検証結果').indexOf('種別')] = checkKind.fixConflict
+conflictRow[outputColumns('検証結果').indexOf('日')] = '2025-11-02'
+conflictRow[outputColumns('検証結果').indexOf('開始')] = '07:00'
+conflictRow[outputColumns('検証結果').indexOf('役割')] = '会計'
+conflictRow[outputColumns('検証結果').indexOf('学籍番号')] = 'LTS2403003'
+conflictRow[outputColumns('検証結果').indexOf('内容')] = 'いまの 2025-11-02 の枠に「07:00」が無い'
+const regrid = toAssignmentGrid(assignments, day, nameOf, ['LTS2403003'])
+const notes = gridNotes(regrid, day, fixedRows, [conflictRow])
+
+check(
+  '⑧ 1 枠も置いていない人でも、手直しがあれば行が残る（印を載せるセルが無くならない）',
+  regrid.rows.map((one) => one[0]),
+  ['ECK2626643', 'EED2402549', 'LTS2390333', 'LTS2403003'],
+)
+
+check(
+  '⑧ 書き戻すメモ — 残せた手直しはそのセルに印、残せなかったものは理由（いまの枠に無ければ学籍番号のセル）',
+  notes.flatMap((one, r) => one.map((note, c) => [r, regrid.header[c], note]).filter(([, , note]) => note !== '')),
+  [
+    [1, '10:00', fixedNote],
+    [3, '学籍番号', conflictNote('会計', 'いまの 2025-11-02 の枠に「07:00」が無い')],
+    [3, '12:00', fixedNote],
+  ],
 )
 
 // ---- 結果 ------------------------------------------------------------------
