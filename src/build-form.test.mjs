@@ -68,9 +68,14 @@ class FakeProtection {
     this.sheet = sheet
     this.description = null
     this.warningOnly = false
+    this.editors = ['owner@example.com']
   }
   setDescription(description) { this.description = description; return this }
   setWarningOnly(value) { this.warningOnly = value; return this }
+  getEditors() { return [...this.editors] }
+  removeEditors() { return this }
+  canDomainEdit() { return false }
+  setUnprotectedRanges() { return this }
   remove() { this.sheet.protections = this.sheet.protections.filter((p) => p !== this) }
 }
 
@@ -81,7 +86,7 @@ class FakeSheet {
   constructor(name) {
     Object.assign(this, {
       name, id: nextSheetId++, cells: new Map(), bold: new Map(), notes: new Map(),
-      protections: [], frozenRows: 0, frozenColumns: 0, maxColumns: 26, formUrl: null,
+      protections: [], frozenRows: 0, frozenColumns: 0, maxRows: 1000, maxColumns: 26, formUrl: null,
     })
   }
   getName() { return this.name }
@@ -90,6 +95,7 @@ class FakeSheet {
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   setFrozenRows(count) { this.frozenRows = count }
   setFrozenColumns(count) { this.frozenColumns = count }
+  getMaxRows() { return this.maxRows }
   getMaxColumns() { return this.maxColumns }
   insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
   getProtections() { return [...this.protections] }
@@ -389,9 +395,9 @@ check(
 )
 
 check(
-  '④ 保護がかかっているのは生成シートの 3 枚だけのままである',
-  book.getSheets().filter((sheet) => sheet.protections.length > 0).map((sheet) => sheet.getName()),
-  ['回答', '検証結果', '指標'],
+  '④ 8 枚とも保護が 1 つずつかかったままである',
+  book.getSheets().map((sheet) => [sheet.getName(), sheet.protections.length]),
+  sheetLayout.map((layout) => [layout.name, 1]),
 )
 
 // ---- ⑤ 止まる ---------------------------------------------------------------

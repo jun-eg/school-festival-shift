@@ -24,7 +24,7 @@ const require = createRequire(import.meta.url)
 
 const {
   sheetLayout, checkKind, sectionWidth,
-  dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts,
+  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts,
 } = require('./sheet-layout.js')
 
 /** 名前でシート 1 枚の区画を引く。並びの番号で当てない（並びが動くと検査が別の枚を見てしまう）。 */
@@ -74,15 +74,21 @@ check(
 )
 
 check(
-  '保護をかけるのは生成シートの 3 枚だけである（割り当ては外れる）',
+  '8 枚とも保護をかける（→ issue #234）',
   sheetLayout.filter((s) => s.protect).map((s) => s.name),
-  ['回答', '検証結果', '指標'],
+  sheetLayout.map((s) => s.name),
 )
 
 check(
-  '担当者が書くシートに保護をかけていない',
-  sheetLayout.filter((s) => s.staffWrites && s.protect).map((s) => s.name),
-  [],
+  '担当者が書くシートに「警告のみ」を全面にはかけない — 割り当ては持ち主だけ、条件入力は入力欄を外す',
+  sheetLayout.filter((s) => s.staffWrites).map((s) => [s.name, s.protect.kind, Boolean(s.protect.openInputs)]),
+  [['条件入力', protectionKind.warningOnly, true]].concat(dayLabels.map((name) => [name, protectionKind.ownerOnly, false])),
+)
+
+check(
+  '担当者が書かないシートは「警告のみ」を全面にかける',
+  sheetLayout.filter((s) => !s.staffWrites).map((s) => [s.name, s.protect.kind, Boolean(s.protect.openInputs)]),
+  [['回答', protectionKind.warningOnly, false], ['検証結果', protectionKind.warningOnly, false], ['指標', protectionKind.warningOnly, false]],
 )
 
 check(

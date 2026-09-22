@@ -5,13 +5,14 @@
 //
 // 見るものは 4 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
-//   ② 保護がかかるのは生成シートの 3 枚だけで、かかり方は「警告のみ」である
+//   ② 8 枚に保護がかかる。割り当ての 4 枚は「持ち主だけ」、ほかの 4 枚は「警告のみ」で、
+//      条件入力だけは区画の入力欄が保護の外にある（→ issue #234）
 //   ③ 2 回走らせても形が変わらない（足りないものだけ足す）
 //   ④ 見出しが構成と違うときは、上書きせずに名指しで止まる（黙って直さない）
 //
 // ここで分かるのは組み立ての手順だけである。
-// 本物の Google スプレッドシートで保護が効くか・コピーでスクリプトが渡るかは分からない
-// （→ src/README.md・issue #136）。
+// 本物の Google スプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
+// コピーした先で「持ち主だけ」が誰に効くかは分からない（→ src/README.md・issue #136・real-device-log.md の項目 21）。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -56,14 +57,27 @@ class FakeRange {
   }
 }
 
+// 本物と同じく、かけた直後は共有された編集者も編集者に入っていて、ドメインにも開いている。
+// 持ち主と走らせている人は外れない（→ Protection.removeEditors）。
+const owner = 'owner@example.com'
+const sharedEditor = 'shared@example.com'
+
 class FakeProtection {
   constructor(sheet) {
     this.sheet = sheet
     this.description = null
     this.warningOnly = false
+    this.editors = [owner, sharedEditor]
+    this.domainEdit = true
+    this.unprotectedRanges = []
   }
   setDescription(description) { this.description = description; return this }
   setWarningOnly(value) { this.warningOnly = value; return this }
+  getEditors() { return [...this.editors] }
+  removeEditors(users) { this.editors = this.editors.filter((user) => user === owner || !users.includes(user)); return this }
+  canDomainEdit() { return this.domainEdit }
+  setDomainEdit(value) { this.domainEdit = value; return this }
+  setUnprotectedRanges(ranges) { this.unprotectedRanges = ranges; return this }
   remove() { this.sheet.protections = this.sheet.protections.filter((p) => p !== this) }
 }
 
@@ -72,13 +86,14 @@ class FakeSheet {
   constructor(name) {
     Object.assign(this, {
       name, cells: new Map(), bold: new Map(), notes: new Map(), protections: [],
-      frozenRows: 0, frozenColumns: 0, maxColumns: 26,
+      frozenRows: 0, frozenColumns: 0, maxRows: 1000, maxColumns: 26,
     })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   setFrozenRows(count) { this.frozenRows = count }
   setFrozenColumns(count) { this.frozenColumns = count }
+  getMaxRows() { return this.maxRows }
   getMaxColumns() { return this.maxColumns }
   insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
   getProtections() { return [...this.protections] }
@@ -114,7 +129,10 @@ for (const name of ['sheet-layout.js', 'build-template.js']) {
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { buildTemplateInto } = context
-const { sheetLayout, protectionNote, sectionRightEdge } = vm.runInContext('({ sheetLayout, protectionNote, sectionRightEdge })', context)
+const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels } = vm.runInContext(
+  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels })',
+  context,
+)
 
 // ---- 検査 -------------------------------------------------------------------
 
@@ -154,15 +172,35 @@ check(
 )
 
 check(
-  '② 保護がかかったのは生成シートの 3 枚だけである',
-  book.getSheets().filter((s) => s.protections.length > 0).map((s) => s.getName()),
-  ['回答', '検証結果', '指標'],
+  '② 8 枚とも保護が 1 つずつかかった',
+  book.getSheets().map((s) => [s.getName(), s.protections.length]),
+  sheetLayout.map((c) => [c.name, 1]),
+)
+
+const protectionOf = (name) => book.getSheetByName(name).protections[0]
+
+check(
+  '② 条件入力・回答・検証結果・指標は「警告のみ」で、説明が付いている',
+  ['条件入力', '回答', '検証結果', '指標'].map((name) => [protectionOf(name).warningOnly, protectionOf(name).description]),
+  [[true, inputProtectionNote], [true, protectionNote], [true, protectionNote], [true, protectionNote]],
 )
 
 check(
-  '② かかり方は「警告のみ」で、説明が付いている',
-  book.getSheets().flatMap((s) => s.protections).map((p) => [p.warningOnly, p.description]),
-  [[true, protectionNote], [true, protectionNote], [true, protectionNote]],
+  '② 割り当ての 4 枚は「持ち主だけ」— 警告ではなく、共有された編集者が外れ、ドメインにも閉じている',
+  dayLabels.map((name) => [protectionOf(name).warningOnly, protectionOf(name).editors, protectionOf(name).domainEdit, protectionOf(name).description]),
+  dayLabels.map(() => [false, [owner], false, gridProtectionNote]),
+)
+
+check(
+  '② 条件入力だけ、区画ごとの入力欄（列名の下から最下行まで・区画の幅）が保護の外にある',
+  book.getSheets().map((s) => [
+    s.getName(),
+    protectionOf(s.getName()).unprotectedRanges.map((r) => [r.row, r.column, r.rowCount, r.columnCount]),
+  ]),
+  sheetLayout.map((c) => [
+    c.name,
+    c.name === '条件入力' ? c.sections.map((section) => [3, section.startColumn, 998, sectionWidth(section)]) : [],
+  ]),
 )
 
 const shapeAfterFirstRun = JSON.stringify(book.getSheets().map((s) => [s.getName(), [...s.cells], s.frozenRows, s.protections.length]))
