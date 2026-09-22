@@ -169,20 +169,64 @@ function buildAssignmentRow(date, slot, role, studentId) {
 }
 
 /**
+ * 役割ごとの背景色（→ issue #213 の「色」の行）。
+ *
+ * 色の名前は記録が持っている ◎ — 前回の配布物は、準備・片付け = グレー ／ 調理 = 黄 ／ 調理責任者 = 橙 ／
+ * 会計 = 水 ／ 呼び込み = 桃 ／ 列整理 = 紫 ／ クリーンパトロール = 緑 である。
+ * 色の値（color）は記録に無いので、スプレッドシートの標準の色から名前に近いものを当てた。
+ * 違反の印（赤い太字 → shell.js の violationMark）が読めるよう、どれも淡い側である。
+ *
+ * ここに無い役割名は塗らない。役割名は条件入力から来るので、年で増えることがある（→ 5-1 の #2）。
+ * 黙って別の色に寄せない。
+ */
+const roleColors = [
+  { roles: ['準備', '片付け'], name: 'グレー', color: '#d9d9d9' },
+  { roles: ['調理'], name: '黄', color: '#ffe599' },
+  { roles: ['調理責任者'], name: '橙', color: '#f9cb9c' },
+  { roles: ['会計'], name: '水', color: '#9fc5e8' },
+  { roles: ['呼び込み'], name: '桃', color: '#d5a6bd' },
+  { roles: ['列整理'], name: '紫', color: '#b4a7d6' },
+  { roles: ['クリーンパトロール'], name: '緑', color: '#b6d7a8' },
+]
+
+/** 役割名 1 つの背景色を引く。表に無い役割名と空のセルは null（塗らない）である。 */
+function roleColorOf(role) {
+  const name = String(role || '').trim()
+  const found = roleColors.filter((one) => one.roles.indexOf(name) !== -1)[0]
+  return found ? found.color : null
+}
+
+/**
+ * マス目のデータの行ぜんぶの背景色を、行と列の並びのまま返す（setBackgrounds にそのまま渡す形）。
+ * 名前のある 2 列は塗らない。width に届かない行は、右を null で埋める。
+ */
+function gridBackgrounds(dataRows, width) {
+  const named = gridNamedColumns()
+  return dataRows.map((row) => {
+    const colors = []
+    for (let column = 0; column < width; column++) {
+      colors.push(column < named.length ? null : roleColorOf(row[column]))
+    }
+    return colors
+  })
+}
+
+/**
  * 違反の行を、1 日ぶんのマス目のセルに当て戻す（→ 6 の #2「違反した所はセルの色に出る」／ issue #155）。
+ * 背景は役割の色で使っているので、違反は文字のほうで出す（→ shell.js の violationMark）。
  * 返すのは { row, column } の配列で、どちらもマス目の中の 0 始まりの位置である（row はデータの行）。
  *
  *   枠 1 つが単位の違反（規則 1・4・5・同じ枠に二重）… その人の行の、その枠の列のセル
  *   その人のその日が単位の違反（規則 3）… その人の行の、名前のある 2 列（学籍番号・氏名）
  *     — 規則 3 が壊れているのは枠 1 つではない（→ count-violations.js の countPrepCleanupBroken）。
- *       準備にも片付けにも入っていない ④ は、塗る枠そのものが無い
+ *       準備にも片付けにも入っていない ④ は、印を付ける枠そのものが無い
  *
- * 未充足は当てない。枠の話であって人の話ではないので、塗る行が無い（→ name-unmet.js）。
+ * 未充足は当てない。枠の話であって人の話ではないので、印を付ける行が無い（→ name-unmet.js）。
  * マス目は名指しを置き換えない — 未充足を名指しするのは検証結果である（→ src/README.md）。
  *
- * 行は学籍番号で引く（→ issue #213）。同じ学籍番号の行が 2 つあれば、どちらも塗る
+ * 行は学籍番号で引く（→ issue #213）。同じ学籍番号の行が 2 つあれば、どちらにも付ける
  * （どちらに書いた役割も同じ人の割り当てとして数えている → fromAssignmentGrid）。
- * どの行にも列にも当たらない違反は塗らない — 検証結果の行が残っているので、黙って消えるのではない。
+ * どの行にも列にも当たらない違反には付けない — 検証結果の行が残っているので、黙って消えるのではない。
  */
 function violationCells(header, dataRows, day, violations) {
   if (!day) return []
@@ -255,6 +299,6 @@ function namesFromAnswers(rows) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow, violationCells, namesFromAnswers,
+    gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
   }
 }

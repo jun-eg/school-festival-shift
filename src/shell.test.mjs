@@ -10,7 +10,7 @@
 //   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
 //   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
 //   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
-//   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、違反した所がセルの色に出る（→ 5 の #8・issue #155）
+//   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、背景に役割の色・違反した所に赤い太字が出る（→ 5 の #8・issue #155）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -63,15 +63,23 @@ class FakeRange {
     }
     return this
   }
-  /** 背景色を変える。値の往復とは別に数える（→ ⑦。1 枚につき消す 1 回・塗る 1 回である）。 */
-  setBackground(color) {
+  /** 書式を消す（背景色・文字の色・太さ）。値の往復とは別に数える（→ ⑦。1 枚につき 4 回までである）。 */
+  clearFormat() {
     roundTrips.formats += 1
     for (let r = this.row; r < this.row + this.rowCount; r++) {
       for (let c = this.column; c < this.column + this.columnCount; c++) {
-        if (color === null) this.sheet.backgrounds.delete(`${r},${c}`)
-        else this.sheet.backgrounds.set(`${r},${c}`, color)
+        ;['backgrounds', 'fontColors', 'fontWeights'].forEach((map) => this.sheet[map].delete(`${r},${c}`))
       }
     }
+    return this
+  }
+  /** 背景色を行列でまとめて置く。null は塗らない。 */
+  setBackgrounds(colors) {
+    roundTrips.formats += 1
+    colors.forEach((row, i) => row.forEach((color, j) => {
+      if (color === null) this.sheet.backgrounds.delete(`${this.row + i},${this.column + j}`)
+      else this.sheet.backgrounds.set(`${this.row + i},${this.column + j}`, color)
+    }))
     return this
   }
   getSheet() { return this.sheet }
@@ -86,21 +94,24 @@ class FakeRange {
 
 class FakeSheet {
   constructor(name, minColumns = 26) {
-    Object.assign(this, { name, cells: new Map(), alignments: new Map(), backgrounds: new Map(), minColumns })
+    Object.assign(this, {
+      name, cells: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), minColumns,
+    })
   }
   getName() { return this.name }
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   getRangeList(a1s) {
     const sheet = this
+    const each = (map, value) => {
+      roundTrips.formats += 1
+      a1s.forEach((a1) => {
+        const { row, column } = fromA1(a1)
+        sheet[map].set(`${row},${column}`, value)
+      })
+    }
     return {
-      setBackground(color) {
-        roundTrips.formats += 1
-        a1s.forEach((a1) => {
-          const { row, column } = fromA1(a1)
-          sheet.backgrounds.set(`${row},${column}`, color)
-        })
-        return this
-      },
+      setFontColor(color) { each('fontColors', color); return this },
+      setFontWeight(weight) { each('fontWeights', weight); return this },
     }
   }
   getLastRow() {
@@ -135,8 +146,8 @@ const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
   sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation,
 } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationBackground } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationBackground })',
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors })',
   context,
 )
 
@@ -480,7 +491,8 @@ function editedBook() {
   cleanupDay.put(1, 3, new Date(1899, 11, 30, 16, 0, 0))
   cleanupDay.put(2, 1, 'EED2349987').put(2, 2, '高木琴音').put(2, 3, '準備')
   // 前の周の印が残っている（数え直した後は消えていなければならない）
-  book.getSheetByName(dayLabels[0]).backgrounds.set('2,3', violationBackground)
+  book.getSheetByName(dayLabels[0]).fontColors.set('2,3', violationMark.fontColor)
+  book.getSheetByName(dayLabels[0]).fontWeights.set('2,3', violationMark.fontWeight)
   return book
 }
 
@@ -500,16 +512,30 @@ check(
   ],
 )
 
+const grayOf = roleColors.filter((one) => one.roles.indexOf('準備') !== -1)[0].color
+
 check(
-  '⑦ 違反した所が、マス目のセルの色に出る（片付け の 2 行目 3 列目 → 6 の #2）',
-  [...recountBook.getSheetByName(dayLabels[3]).backgrounds.entries()],
-  [['2,3', violationBackground]],
+  '⑦ 違反した所が、赤い太字で出る（片付け の 2 行目 3 列目 → 6 の #2）',
+  [
+    [...recountBook.getSheetByName(dayLabels[3]).fontColors.entries()],
+    [...recountBook.getSheetByName(dayLabels[3]).fontWeights.entries()],
+  ],
+  [[['2,3', violationMark.fontColor]], [['2,3', violationMark.fontWeight]]],
 )
 
 check(
-  '⑦ 前の周の色は消えている（違反でなくなったセルに印が残らない）',
-  recountBook.getSheetByName(dayLabels[0]).backgrounds.size,
-  0,
+  '⑦ 背景は役割の色である（準備 はグレー。違反したセルも背景は役割の色のまま → issue #213 の「色」）',
+  [
+    [...recountBook.getSheetByName(dayLabels[3]).backgrounds.entries()],
+    [...recountBook.getSheetByName(dayLabels[0]).backgrounds.entries()],
+  ],
+  [[['2,3', grayOf]], [['2,3', grayOf]]],
+)
+
+check(
+  '⑦ 前の周の印は消えている（違反でなくなったセルに赤い太字が残らない）',
+  [recountBook.getSheetByName(dayLabels[0]).fontColors.size, recountBook.getSheetByName(dayLabels[0]).fontWeights.size],
+  [0, 0],
 )
 
 // 準備 が 11-01 と 11-04 に 1 枠ずつ → 合計 1 時間 ／ 塊 2 つ ／ 準備に入った日 2 日（→ 5-6）
@@ -534,11 +560,12 @@ check(
 // 読むのは run と同じ（構造の検証 8 ＋ 区画 ＋ 回答 1 ＋ マス目）。マス目は中身のある 2 枚だけが 2 回になる。
 // 書くのは検証結果と指標の「消す」「置く」だけで、マス目には 1 度も値を書かない
 // （検証結果は前の行が無いので「消す」が起きない → 置く 1 ＋ 指標の消す・置く 2 ＝ 3）。
-// 色は 1 枚につき「消す」1 回、塗るセルがある枚だけ「塗る」がもう 1 回である。
+// 書式は 1 枚につき「消す」1 回、行がある枚だけ「背景を置く」1 回、違反がある枚だけ「文字の色」「太さ」の 2 回である
+// （行があるのは 準備日 と 片付け の 2 枚、違反があるのは 片付け の 1 枚 → 4 ＋ 2 ＋ 2）。
 check(
-  '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、色は 1 枚につき 2 回までである',
+  '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 4 回までである',
   [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats],
-  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + 1],
+  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + 2 + 2],
 )
 
 const conditionEditBook = editedBook()
@@ -569,13 +596,17 @@ check(
 )
 
 check(
-  '⑦ 生成を押しても、前の周の色は消える（生成は違反を作らない → 5 の #6）',
+  '⑦ 生成を押しても塗り直す — 前の周の赤い太字は消え、背景は書いたマス目の役割の色になる（生成は違反を作らない → 5 の #6）',
   (() => {
     const book = editedBook()
     run(book, {})
-    return dayLabels.map((label) => book.getSheetByName(label).backgrounds.size)
+    return dayLabels.map((label) => {
+      const sheet = book.getSheetByName(label)
+      const filled = [...sheet.cells.entries()].filter(([key, value]) => Number(key.split(',')[0]) > 1 && Number(key.split(',')[1]) > 2 && value !== '')
+      return [sheet.fontColors.size, filled.every(([key]) => sheet.backgrounds.has(key)), sheet.backgrounds.size === filled.length]
+    })
   })(),
-  [0, 0, 0, 0],
+  dayLabels.map(() => [0, true, true]),
 )
 
 check(

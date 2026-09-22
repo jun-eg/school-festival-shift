@@ -3,13 +3,14 @@
 //
 //   使い方: node src/assignment-grid.test.mjs
 //
-// 見るものは 6 つある。
+// 見るものは 7 つある。
 //   ① 従来の形に敷ける — 行が人、列が 30 分枠、セルが役割名 1 つ（記録の配布物 ◎ と同じ形である）
 //   ② 行の並びが入力から決まる（学籍番号の昇順。同じ入力からは同じ並びが出る → 6 の #3）
 //   ③ 敷いて戻すと元の行に戻る（往復しても割り当てが増えも減りもしない）
 //   ④ 当てるのは位置ではなく見出しの時刻である（営業時刻を動かしても、役割が別の枠へ移らない）
 //   ⑤ 載らないものは黙って捨てず、名指しして止まる
 //   ⑥ 違反の行を、塗るセルに当て戻せる（→ 6 の #2「違反した所はセルの色に出る」・issue #155）
+//   ⑦ 背景は役割の色である（記録の配布物 ◎ の 8 役割・7 色 → issue #213）
 //
 // これは契約であって実装ではない。何も書き換えない。
 // 記録の側（前回の確定シフトが本当にこの形に敷けるか）は scripts/前回のシフト表.mjs が見る。
@@ -28,8 +29,8 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays, violationCells, outputColumns } = context
-const { dayLabels, assignmentColumns, checkKind } = vm.runInContext('({ dayLabels, assignmentColumns, checkKind })', context)
+const { toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf } = context
+const { dayLabels, assignmentColumns, checkKind, roleColors } = vm.runInContext('({ dayLabels, assignmentColumns, checkKind, roleColors })', context)
 
 const failed = []
 const passed = []
@@ -273,6 +274,27 @@ check(
     checkRow(checkKind.violation, '2025-11-02', '10:00', 'EED2402549'),
   ]),
   [{ row: 2, column: 2 }, { row: 3, column: 2 }],
+)
+
+// ---- ⑦ 背景は役割の色である -----------------------------------------------
+// 色の名前は記録の配布物 ◎ が持っている（→ issue #213）。値は記録に無いので、ここでは名前と重なりだけを見る。
+
+check(
+  '⑦ 記録の 8 役割に 7 色が付いている（準備と片付けは同じグレー）',
+  roleColors.map((one) => `${one.roles.join('・')}=${one.name}`),
+  ['準備・片付け=グレー', '調理=黄', '調理責任者=橙', '会計=水', '呼び込み=桃', '列整理=紫', 'クリーンパトロール=緑'],
+)
+
+check(
+  '⑦ 色の値は 7 つとも違う（見分けが付く）',
+  new Set(roleColors.map((one) => one.color)).size,
+  roleColors.length,
+)
+
+check(
+  '⑦ 背景の行列は、名前のある 2 列と空のセルと表に無い役割名を塗らず、幅に届かない右を null で埋める',
+  gridBackgrounds([['EED2402549', '高木琴音', '調理', '', ' 準備 ', '委員会の見回り']], 7),
+  [[null, null, roleColorOf('調理'), null, roleColorOf('準備'), null, null]],
 )
 
 // ---- 結果 ------------------------------------------------------------------

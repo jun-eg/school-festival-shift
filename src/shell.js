@@ -57,8 +57,8 @@ function readInputs(spreadsheet) {
 
 /**
  * 入力と、読んだマス目 4 枚をいっしょに返す。
- * マス目も返すのは、違反した所を塗るときに、担当者のシートの何行目が誰かを読み直さずに済ませるためである
- * （→ paintViolations ／ 6 の #2 の実装上の注意）。
+ * マス目も返すのは、色を塗り直すときに、担当者のシートの何行目が誰かを読み直さずに済ませるためである
+ * （→ paintGrids ／ 6 の #2 の実装上の注意）。
  */
 function readInputsAndGrids(spreadsheet) {
   const inputs = {}
@@ -161,7 +161,7 @@ function readSection(sheet, layout, section) {
  *
  * gridsAsTheyAre を渡したときは、マス目を書き戻さない（手直しの後の数え直し → recountSpreadsheet）。
  * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
- * どちらのときも、最後に違反した所をマス目のセルの色で出す（→ paintViolations ／ 6 の #2）。
+ * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
  */
 function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   if ((output.notBuilt || []).length > 0) return
@@ -189,24 +189,27 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
     sheet.getRange(headerRows + 1, 1, rows.length, columnCount).setValues(rows)
   })
 
-  paintViolations(spreadsheet, grids, output['検証結果'], toGrid.days)
+  paintGrids(spreadsheet, grids, output['検証結果'], toGrid.days)
 }
 
 /**
- * 違反した所に塗る色（→ 6 の #2「違反した所はセルの色と検証結果シートに出る」／ issue #155）。
- * マス目の背景色は、この印のためだけに使う — 役割ごとの色は載せない（→ src/README.md の「違反した所は、セルの色で出る」）。
+ * 違反した所の印（→ 6 の #2「違反した所はセルの色と検証結果シートに出る」／ issue #155）。
+ * 文字を赤い太字にする。背景は役割の色に使っている（→ assignment-grid.js の roleColors）ので、
+ * 同じ背景に 2 つの意味を重ねない。
  */
-const violationBackground = '#f4cccc'
+const violationMark = { fontColor: '#cc0000', fontWeight: 'bold' }
 
 /**
- * 違反した所を、マス目のセルの色で出す。
+ * マス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である。
  *
- * 1 枚につき 2 回で済ませる。データの行ぜんぶの色を 1 回で消し、塗るセルを 1 回でまとめて塗る
- * （RangeList。セル単位で往復しない → 6 の #2 の実装上の注意）。
- * 消すのは下の端（getMaxRows）までである — 前の周より行が減っても、空の行に色が残らない。
- * どのセルを塗るかはコアの側が決める（→ assignment-grid.js の violationCells）。
+ * 1 枚につき 4 回までで済ませる（セル単位で往復しない → 6 の #2 の実装上の注意）。
+ *   ① データの行ぜんぶの書式を 1 回で消す（下の端 getMaxRows まで。行が減っても前の色が残らない）
+ *   ② 役割の背景色を、データの行の幅で 1 回で置く
+ *   ③④ 違反したセルを RangeList でまとめて、文字の色と太さを 1 回ずつ
+ * 書式を消すので、担当者が自分で付けた色や太字も消える（→ src/README.md の「違反した所は、セルの色で出る」）。
+ * どの色か・どのセルかはコアの側が決める（→ assignment-grid.js の gridBackgrounds ／ violationCells）。
  */
-function paintViolations(spreadsheet, grids, violations, days) {
+function paintGrids(spreadsheet, grids, violations, days) {
   grids.forEach((one) => {
     const layout = one.layout
     const sheet = findSheet(spreadsheet, layout.name)
@@ -215,12 +218,15 @@ function paintViolations(spreadsheet, grids, violations, days) {
     const maxRows = sheet.getMaxRows()
     if (maxRows <= headerRows) return
 
-    sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).setBackground(null)
+    sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).clearFormat()
+    if (one.grid.rows.length > 0) {
+      sheet.getRange(headerRows + 1, 1, one.grid.rows.length, width).setBackgrounds(gridBackgrounds(one.grid.rows, width))
+    }
     const cells = violationCells(one.grid.header, one.grid.rows, days[layout.grid.dayIndex], violations)
     if (cells.length === 0) return
-    sheet
-      .getRangeList(cells.map((cell) => a1Notation(headerRows + 1 + cell.row, cell.column + 1)))
-      .setBackground(violationBackground)
+    const marked = sheet.getRangeList(cells.map((cell) => a1Notation(headerRows + 1 + cell.row, cell.column + 1)))
+    marked.setFontColor(violationMark.fontColor)
+    marked.setFontWeight(violationMark.fontWeight)
   })
 }
 
@@ -263,7 +269,7 @@ function withNamesFromAnswers(rows, name, nameOf) {
  *
  * 条件入力に行が無い日は、名前のある 2 列だけを残して空にする。黙って別の日に寄せない。
  *
- * 返すのは敷いたマス目である（{ layout, grid } の配列）。違反した所を塗る側が、読み直さずに使う（→ paintViolations）。
+ * 返すのは敷いたマス目である（{ layout, grid } の配列）。色を塗り直す側が、読み直さずに使う（→ paintGrids）。
  */
 function writeGrids(spreadsheet, grids, assignments, context) {
   return grids.map((layout) => {
@@ -329,7 +335,7 @@ function run(spreadsheet, steps) {
 }
 
 /**
- * 手直しの後に数え直す。構造を確かめる → 読む → 数え直す → 検証結果と指標を書き、違反した所を塗る
+ * 手直しの後に数え直す。構造を確かめる → 読む → 数え直す → 検証結果と指標を書き、マス目の色を塗り直す
  * （→ 5 の #8 ／ 6 の #2 ／ issue #155）。
  *
  * run と違うのは 2 つだけである。生成を走らせない（→ core.js の recount）ことと、
@@ -456,7 +462,7 @@ function findSheet(spreadsheet, name) {
 if (typeof module !== 'undefined') {
   module.exports = {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readInputsAndGrids, readSection, readGrid,
-    putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationBackground, paintViolations,
+    putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids,
     a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, recountOnEdit, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
