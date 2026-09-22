@@ -63,8 +63,11 @@ function readInputs(spreadsheet) {
  * forGeneration のときは、マス目から「割り当て」を組まない（空で渡す）。生成が読むのは手直しだけだからである
  * （→ core.js の build ／ 5-3）。組むと、条件入力の営業時刻を動かした後の前の周の列（いまの枠に無い見出し）で、
  * 機械が置いただけのセルのために止まる。手直しの側は止まらずに名指しで返る（→ generate.js の placeFixed）。
+ *
+ * catchMissed のときは、読んだマス目を前に見た控えと比べ、取りこぼした書き換えに印を付けてから入力に積む
+ * （→ markMissedEdits ／ issue #226）。生成と数え直しが渡す。画像の書き出しは渡さない — 1 セルも書き換えない（→ distributionImagesOn）。
  */
-function readInputsAndGrids(spreadsheet, forGeneration) {
+function readInputsAndGrids(spreadsheet, forGeneration, catchMissed) {
   const inputs = {}
   const grids = []
 
@@ -73,7 +76,9 @@ function readInputsAndGrids(spreadsheet, forGeneration) {
     const sheet = findSheet(spreadsheet, name)
     // マス目の 4 枚は、条件入力を読んでからでないと列が何時かが決まらないので、後回しにする。
     if (layout.grid) {
-      grids.push({ layout: layout, grid: readGrid(sheet, layout) })
+      const grid = readGrid(sheet, layout)
+      if (catchMissed) markMissedEdits(sheet, layout, grid)
+      grids.push({ layout: layout, grid: grid })
       inputs[layout.grid.of] = inputs[layout.grid.of] || []
       inputs[layout.grid.fixed] = inputs[layout.grid.fixed] || []
       return
@@ -178,9 +183,11 @@ function readSection(sheet, layout, section) {
  * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
  * 書き戻すときは、手直しの印（メモ）も付け直す（→ writeGrids）。
  * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
+ *
+ * 返すのは塗ったマス目である（{ layout, grid } の配列。1 枚も書かなかったときは空）。控えを置き直す側が使う（→ keepSeenGrids）。
  */
 function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
-  if ((output.notBuilt || []).length > 0) return
+  if ((output.notBuilt || []).length > 0) return []
   const toGrid = context || { days: [], nameOf: null }
   let grids = []
 
@@ -206,6 +213,7 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   })
 
   paintGrids(spreadsheet, grids, output['検証結果'], toGrid.days)
+  return grids
 }
 
 /**
@@ -368,9 +376,10 @@ function runOnActiveSpreadsheet(steps) {
  */
 function run(spreadsheet, steps) {
   checkStructure(spreadsheet)
-  const inputs = readInputsAndGrids(spreadsheet, true).inputs
-  const output = build(inputs, steps)
-  writeOutputs(spreadsheet, output, gridContext(inputs))
+  const read = readInputsAndGrids(spreadsheet, true, true)
+  const output = build(read.inputs, steps)
+  const written = writeOutputs(spreadsheet, output, gridContext(read.inputs))
+  keepSeenGrids(spreadsheet, written.length > 0 ? written : read.grids)
   return output
 }
 
@@ -384,9 +393,10 @@ function run(spreadsheet, steps) {
  */
 function recountSpreadsheet(spreadsheet) {
   checkStructure(spreadsheet)
-  const read = readInputsAndGrids(spreadsheet)
+  const read = readInputsAndGrids(spreadsheet, false, true)
   const output = recount(read.inputs)
   writeOutputs(spreadsheet, output, gridContext(read.inputs), read.grids)
+  keepSeenGrids(spreadsheet, read.grids)
   return output
 }
 
@@ -488,6 +498,82 @@ function markFixedCells(range) {
   }))
   slots.setNotes(after)
   return marked
+}
+
+/**
+ * 取りこぼした書き換えに、手直しの印を付ける（→ assignment-grid.js の missedEdits ／ 5-3 ／ issue #226）。
+ * 返すのは印を付けたセルの数である。
+ *
+ * 本物で間を置かずに 2 セル書き換えると、onEdit が 1 回しか走らず、2 手目のセルに印が付かない（→ real-device-log.md）。
+ * 落ちたイベントは中から拾えないので、次に読んだとき（数え直しでも生成でも）に、前に見た控えと違うセルへ印を付ける。
+ * 読んだ grid.notes も同じに書き換える — 生成は、この後で grid.notes から手直しを組む（→ putGridsIntoInputs）。
+ *
+ * 書くのは印を付ける行の、付けるセルの左端から右端までだけである。範囲ぜんぶを読んだメモで書き戻すと、
+ * 読んでから書くまでのあいだに onEdit が付けた印を消してしまう。
+ */
+function markMissedEdits(sheet, layout, grid) {
+  const missed = missedEdits(readSeenGrid(sheet), grid.header, grid.rows, grid.notes)
+  if (missed.length === 0) return 0
+  const headerRows = headerRowCount(layout)
+  const byRow = {}
+  missed.forEach((cell) => {
+    grid.notes[cell.row][cell.column] = fixedNote
+    byRow[cell.row] = byRow[cell.row] || []
+    byRow[cell.row].push(cell.column)
+  })
+  Object.keys(byRow).forEach((key) => {
+    const row = Number(key)
+    const left = Math.min.apply(null, byRow[key])
+    const right = Math.max.apply(null, byRow[key])
+    sheet.getRange(headerRows + 1 + row, left + 1, 1, right - left + 1).setNotes([grid.notes[row].slice(left, right + 1)])
+  })
+  return missed.length
+}
+
+/**
+ * 前に見たマス目の控えを置く鍵（→ assignment-grid.js の seenGrid）。置き場はマス目のシートの developer metadata である。
+ * 担当者には見えない。**見えなくてよいのは、印そのものではないからである** — 控えが持つのは取りこぼしを見つける手がかりだけで、
+ * どのセルが手直しかは今までどおりセルのメモ（印）が持つ（→ 5-3）。
+ * スコープは増えない（spreadsheets.currentonly の中である → src/README.md の「要求するのは 3 スコープである」）。
+ */
+const seenGridKey = 'seenGrid'
+
+/**
+ * 控えを読む。無い・読めないときは null を返す — 取りこぼしを拾わないだけで、今までどおりに動く。
+ * 読めないことで止めない。控えは生成にも数え直しにも入らない、取りこぼしを見つける手がかりだからである。
+ */
+function readSeenGrid(sheet) {
+  try {
+    const found = sheet.getDeveloperMetadata().filter((one) => one.getKey() === seenGridKey)
+    return found.length > 0 ? JSON.parse(found[0].getValue()) : null
+  } catch (error) {
+    return null
+  }
+}
+
+/**
+ * 控えを置き直す。置けないとき（文字数の上限など）は、前の控えを外す
+ * — 古い控えが残ると、次に読んだとき、機械が置いたセルを取りこぼした書き換えと取り違える。
+ */
+function keepSeenGrid(sheet, seen) {
+  let found = []
+  try {
+    found = sheet.getDeveloperMetadata().filter((one) => one.getKey() === seenGridKey)
+    if (!seen) throw new Error('控えを組めない')
+    const value = JSON.stringify(seen)
+    if (found.length > 0) found[0].setValue(value)
+    else sheet.addDeveloperMetadata(seenGridKey, value)
+    found.slice(1).forEach((one) => one.remove())
+  } catch (error) {
+    found.forEach((one) => {
+      try { one.remove() } catch (ignored) { /* 外せなくても止めない */ }
+    })
+  }
+}
+
+/** 塗ったマス目 4 枚の控えを置き直す（→ run ／ recountSpreadsheet）。 */
+function keepSeenGrids(spreadsheet, grids) {
+  grids.forEach((one) => keepSeenGrid(findSheet(spreadsheet, one.layout.name), seenGrid(one.grid.header, one.grid.rows)))
 }
 
 /**

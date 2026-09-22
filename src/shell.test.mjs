@@ -3,7 +3,7 @@
 //
 //   使い方: node src/shell.test.mjs
 //
-// 見るものは 7 つある。
+// 見るものは 10 ある。
 //   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
 //   ② 読んだ入力が、そのままコアの入口（checkRepresentation）を通る
 //   ③ 見出しの行を読まない。横に並んだ 6 区画を、区画ごとに切って読む（→ src/README.md）
@@ -13,6 +13,7 @@
 //   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、背景に役割の色・違反した所に赤い太字が出る（→ 5 の #8・issue #155）
 //   ⑧ 書き換えたセルに手直しの印（メモ）が付き、生成し直しても残る。残せないものは名指しで返る（→ 5-3・issue #156）
 //   ⑨ 配る画像の中身は、いまのマス目のとおりに組まれ、1 セルも書き換えない（→ 5 の #9・issue #157）
+//   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ 5-3・issue #226）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -30,6 +31,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // 殻 が使うのは getSheetByName / getLastRow / getRange と、範囲の getValues・setValues・clearContent だけである。
 // 走る前の構造の検証（→ verify-structure.js）が、これに getMaxRows / getMaxColumns / getLastColumn を足す。
 // 手直しの印（→ 5-3）が、範囲の getNotes・setNotes・clearNote と、編集された範囲の位置（getRow など）を足す。
+// 取りこぼした書き換えの控え（→ issue #226）が、シートの getDeveloperMetadata・addDeveloperMetadata を足す。
 
 const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0 }
 
@@ -162,6 +164,20 @@ class FakeSheet {
   getMaxRows() { return Math.max(1000, this.getLastRow()) }
   getMaxColumns() { return Math.max(this.minColumns, this.getLastColumn()) }
   put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
+  /** シートに置く見えない記録。鍵と値の組で、値は文字列である。 */
+  getDeveloperMetadata() {
+    const sheet = this
+    return (this.metadata || []).map((entry) => ({
+      getKey() { return entry.key },
+      getValue() { return entry.value },
+      setValue(value) { entry.value = String(value); return this },
+      remove() { sheet.metadata = sheet.metadata.filter((one) => one !== entry) },
+    }))
+  }
+  addDeveloperMetadata(key, value) {
+    this.metadata = (this.metadata || []).concat([{ key, value: String(value) }])
+    return this
+  }
 }
 
 class FakeSpreadsheet {
@@ -780,6 +796,115 @@ check(
   '⑧ 学籍番号を書き換えた行は、役割の入っているセルぜんぶに印が付く（空のセルと名前の列には付かない）',
   notesOf(ownerBook, dayLabels[0]),
   [['2,3', fixedNote]],
+)
+
+// ---- ⑩ 取りこぼした書き換え（→ 5-3 ／ issue #226） ---------------------------
+// 本物で間を置かずに 2 セル書き換えると、onEdit が 1 回しか走らない（→ real-device-log.md）。
+// 2 手目は値だけを置き、イベントを起こさない。次に数え直すか生成するときに、控えと違うセルとして印が付くか。
+
+/** 値だけを置く（onEdit が落ちた 2 手目）。 */
+function editWithoutEvent(book, label, row, column, value) {
+  book.getSheetByName(label).put(row, column, value)
+}
+
+/** 会計 を 11-01 の調理帯に 1 人立て、生成しておく（10:00・10:30 に 会計 が入る → ⑧ の removalBook と同じ）。 */
+function generatedBook() {
+  const book = filledBook()
+  book.getSheetByName('条件入力').put(3, 11, '会計').put(3, 12, 1)
+  run(book, {})
+  return book
+}
+
+const seenBook = generatedBook()
+check(
+  '⑩ 生成すると、マス目 4 枚それぞれに控えが 1 つ置かれる（学籍番号 × 見出しの時刻 → 役割）',
+  dayLabels.map((label) => {
+    const kept = seenBook.getSheetByName(label).getDeveloperMetadata().filter((one) => one.getKey() === 'seenGrid')
+    return kept.length === 1 && JSON.parse(kept[0].getValue()).rows !== undefined
+  }),
+  [true, true, true, true],
+)
+
+const burstBook = generatedBook()
+editWithoutEvent(burstBook, dayLabels[0], 2, 8, '') // 2 手目 — 10:30 の 会計 を空に。onEdit が落ちた
+const burstSaid = edit(burstBook, dayLabels[0], 2, 7, '') // 1 手目 — 10:00 の 会計 を空に。onEdit はこれ 1 回だけ
+check(
+  '⑩ onEdit が 1 回しか走らなくても、続けて書き換えた 2 セルとも印が付く',
+  [notesOf(burstBook, dayLabels[0]), burstSaid.text.startsWith('数え直した')],
+  [[['2,7', fixedNote], ['2,8', fixedNote]], true],
+)
+
+run(burstBook, {})
+check(
+  '⑩ そのあと生成し直しても、2 手目は戻らない（空のまま、印も残る）',
+  [burstBook.getSheetByName(dayLabels[0]).getRange(2, 7, 1, 2).getValues()[0], notesOf(burstBook, dayLabels[0])],
+  [['', ''], [['2,7', fixedNote], ['2,8', fixedNote]]],
+)
+
+const lastDroppedBook = generatedBook()
+edit(lastDroppedBook, dayLabels[0], 2, 7, '')
+editWithoutEvent(lastDroppedBook, dayLabels[0], 2, 8, '') // 数え直しが終わった後に書き換えた。onEdit が落ちた
+check(
+  '⑩ 最後の 1 手の onEdit が落ちても、次の「生成」がその書き換えを手直しとして読み、戻さない',
+  [
+    readInputs(lastDroppedBook)['手直し'].length,
+    run(lastDroppedBook, {}) && lastDroppedBook.getSheetByName(dayLabels[0]).getRange(2, 7, 1, 2).getValues()[0],
+    notesOf(lastDroppedBook, dayLabels[0]),
+  ],
+  [1, ['', ''], [['2,7', fixedNote], ['2,8', fixedNote]]],
+)
+
+const ownerBurstBook = generatedBook()
+editWithoutEvent(ownerBurstBook, dayLabels[0], 2, 1, 'ZZZ9999999')
+edit(ownerBurstBook, dayLabels[1], 1, 1, '学籍番号') // 別のシートの見出し — 数え直しは走るが印は付かない
+check(
+  '⑩ 学籍番号を書き換えた行の onEdit が落ちても、役割の入っているセルぜんぶに印が付く（控えに無い学籍番号の行）',
+  (() => {
+    const row = ownerBurstBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 50).getValues()[0]
+    const filled = row.map((value, index) => [`2,${index + 1}`, value]).filter(([key, value]) => Number(key.split(',')[1]) > 2 && value !== '')
+    return [filled.length > 3, JSON.stringify(notesOf(ownerBurstBook, dayLabels[0])) === JSON.stringify(filled.map(([key]) => [key, fixedNote]).sort())]
+  })(),
+  [true, true],
+)
+
+const noSeenBook = filledBook()
+editWithoutEvent(noSeenBook, dayLabels[0], 2, 4, '準備')
+run(noSeenBook, {})
+check(
+  '⑩ 控えが無ければ（テンプレートのまま・消された）、今までどおりに動く — 黙って全部を手直しにしない',
+  [notesOf(noSeenBook, dayLabels[0]), noSeenBook.getSheetByName(dayLabels[0]).getRange(2, 4, 1, 1).getValues()[0][0]],
+  [[], ''],
+)
+
+const machineBook = generatedBook()
+run(machineBook, {})
+check(
+  '⑩ 生成し直しただけでは印は付かない（スクリプトの書き戻しは控えを置き直すので、差にならない）',
+  notesOf(machineBook, dayLabels[0]),
+  [],
+)
+
+const imageSeenBook = generatedBook()
+editWithoutEvent(imageSeenBook, dayLabels[0], 2, 7, '')
+const imageSeenBefore = JSON.stringify(imageSeenBook.getSheetByName(dayLabels[0]).metadata)
+distributionImagesOn(imageSeenBook)
+check(
+  '⑩ 画像の書き出しは取りこぼしを拾わない（1 セルも書き換えない。控えも置き直さない）',
+  [notesOf(imageSeenBook, dayLabels[0]), JSON.stringify(imageSeenBook.getSheetByName(dayLabels[0]).metadata) === imageSeenBefore],
+  [[], true],
+)
+
+const brokenSeenBook = generatedBook()
+brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value = '{壊れた'
+editWithoutEvent(brokenSeenBook, dayLabels[0], 2, 8, '')
+check(
+  '⑩ 控えが読めなくても止まらない（取りこぼしを拾わないだけで、数え直しは走り、控えは置き直される）',
+  [
+    edit(brokenSeenBook, dayLabels[0], 2, 7, '').text.startsWith('数え直した'),
+    notesOf(brokenSeenBook, dayLabels[0]),
+    JSON.parse(brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value).rows !== undefined,
+  ],
+  [true, [['2,7', fixedNote]], true],
 )
 
 // ---- ⑨ 配る画像の中身（→ 5 の #9 ／ issue #157） -----------------------------

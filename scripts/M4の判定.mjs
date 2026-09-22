@@ -105,6 +105,17 @@ class 偽のシート {
   getMaxColumns() { return this.maxColumns }
   getLastRow() { return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[0])), 0) }
   getLastColumn() { return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[1])), 0) }
+  // 取りこぼした書き換えの控えを置く見えない記録（→ src/shell.js の keepSeenGrid ／ issue #226）。
+  getDeveloperMetadata() {
+    const シート = this
+    return (this.metadata ?? []).map((一つ) => ({
+      getKey() { return 一つ.key },
+      getValue() { return 一つ.value },
+      setValue(値) { 一つ.value = String(値); return this },
+      remove() { シート.metadata = シート.metadata.filter((他) => 他 !== 一つ) },
+    }))
+  }
+  addDeveloperMetadata(key, value) { this.metadata = [...(this.metadata ?? []), { key, value: String(value) }]; return this }
 }
 
 // ---- 担当者に向いた口を見張る ------------------------------------------------
