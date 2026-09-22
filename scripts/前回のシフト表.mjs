@@ -4,12 +4,16 @@
 //   使い方: node scripts/前回のシフト表.mjs
 //   宣言:   scripts/前回のシフト表の宣言.json（決めも期待値もあちらが持つ。このファイルに書かない）
 //
-// 見るのは 1 つである — 記録が、この形にそのまま載るか。
-// 前回の配布物 ◎ は行が人・列が 30 分枠・セルが役割名 1 つで、1 日 1 枚である。
-// 同じ形が記録（data/ の 4 本）から出るなら、敷き方が記録の側と食い違っていない。
+// 見るのは 2 つである。
+//   ① 記録が、この形にそのまま載るか。
+//      前回の配布物 ◎ は行が人・列が 30 分枠・セルが役割名 1 つで、1 日 1 枚である。
+//      同じ形が記録（data/ の 4 本）から出るなら、敷き方が記録の側と食い違っていない。
+//   ② 敷いたマス目を配る画像にしたとき、粒度が落ちないか（M4「前回の配布物と同じ粒度」→ 5 の #9 ／ issue #157）。
+//      画像の（名前・時刻・役割）が、マス目の（人・枠・役割）と 1 つも違わなければ、差分は 0 である。
 //
 // 敷くのは src/assignment-grid.js の toAssignmentGrid である。ここで敷き方を書き直さない
 // （書き直した形で一致しても、答えにならない）。枠の刻み方も src/input-types.js のままである。
+// 画像の中身を組むのも src/distribution-image.js の distributionTable のままである（canvas に塗る手前まで）。
 //
 // 記録は 1 文字も書き換えない。読むだけである。合格の線を 1 つでも外したら終了コード 1 で落ちる。
 
@@ -28,10 +32,10 @@ const 宣言 = JSON.parse(読む('scripts/前回のシフト表の宣言.json'))
 // ---- 実装を読む ------------------------------------------------------------
 
 const 文脈 = vm.createContext({})
-for (const 名 of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js']) {
+for (const 名 of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js', 'distribution-image.js']) {
   vm.runInContext(読む(path.join('src', 名)), 文脈, { filename: 名 })
 }
-const { toDays, toAssignmentGrid } = 文脈
+const { toDays, toAssignmentGrid, distributionTable } = 文脈
 const { dayLabels, assignmentColumns } = vm.runInContext('({ dayLabels, assignmentColumns })', 文脈)
 
 const 分にする = (時刻) => Number(時刻.split(':')[0]) * 60 + Number(時刻.split(':')[1])
@@ -102,8 +106,28 @@ const 敷いた = 日ごと.map((一日, i) => {
     氏名の種類: new Set(マス目.rows.map((一行) => 一行[1])).size,
     役割: [...new Set(その日の行.map((一行) => 一行[3]))].sort(),
     セル: マス目.rows.reduce((数, 一行) => 数 + 一行.slice(2).filter((セル) => セル !== '').length, 0),
+    マス目の三つ組: マス目の三つ組(マス目),
+    画像の三つ組: 画像の三つ組(distributionTable(マス目.header, マス目.rows, 一日, dayLabels[i])),
   }
 })
+
+/** マス目の埋まったセルを（氏名・時刻・役割）にする。 */
+function マス目の三つ組(マス目) {
+  const 組 = []
+  マス目.rows.forEach((一行) => 一行.slice(2).forEach((役割, j) => {
+    if (役割 !== '') 組.push(`${一行[1]} ${マス目.header[2 + j]} ${役割}`)
+  }))
+  return 組.sort()
+}
+
+/** 配る画像の表を（名前・時刻・役割）にする。 */
+function 画像の三つ組(表) {
+  const 組 = []
+  表.rows.forEach((一行) => 一行.cells.forEach((セル, j) => {
+    if (セル.role !== '') 組.push(`${一行.name} ${表.times[j]} ${セル.role}`)
+  }))
+  return 組.sort()
+}
 
 // ---- 突き合わせる -----------------------------------------------------------
 
@@ -129,6 +153,14 @@ function 見る(題, 実測, 期待) {
   )
 })
 
+敷いた.forEach((一日) => {
+  見る(
+    `${一日.ラベル}（${一日.日}）を配る画像にしても、（人・枠・役割）の差分が 0 である（M4 → 5 の #9）`,
+    一日.画像の三つ組,
+    一日.マス目の三つ組,
+  )
+})
+
 見る('区間が 1 本も枠から落ちていない（重なる枠を取る → 宣言の決め）', 枠に落ちなかった区間, [])
 見る('1 セルに 2 役割になるセルの数が宣言のとおりである', 重なり.length, 宣言.期待値['1セルに2役割になるセル'])
 見る(
@@ -147,7 +179,8 @@ console.log('敷いた形（1 日 1 枚。行が人、列が 30 分枠、セル�
     `  ${一日.ラベル}（${一日.日}）　行 ${String(一日.行).padStart(2)} 人 ／ 列 ${String(一日.枠).padStart(2)} 枠`
       + ` ／ 埋まったセル ${String(一日.セル).padStart(3)}`
       + ` ／ 氏名の種類 ${一日.氏名の種類}`
-      + ` ／ 役割 ${一日.役割.join('・')}`,
+      + ` ／ 役割 ${一日.役割.join('・')}`
+      + ` ／ 画像に描いたセル ${一日.画像の三つ組.length}`,
   )
 })
 

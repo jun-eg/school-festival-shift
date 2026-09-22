@@ -5,11 +5,11 @@
  * 操作 3・7・9 と同じ名前である。担当者に新しい操作を 1 つも増やさない。
  * 手直しの画面は作らない（→ 6 の #2）— 手直しはスプレッドシートそのもので行う。
  * 手直しの後の数え直しは、メニューにも出さない。マス目のセルを書き換えれば走る（→ onEdit ／ issue #155）。
- * 開くのは、名簿の画像を選ぶダイアログ 1 枚だけである（→ 2 の一覧 3・build-form.js）。
+ * 開くダイアログは 2 枚で、どちらも入力と出力の受け渡しである
+ * — 名簿の画像を選ぶ（→ 2 の一覧 3・build-form.js）と、画像の書き出し（→ 2 の一覧 9・export-images.html）。
  *
- * 中身はそれぞれの issue が入れる。「フォームを作る」（→ build-form.js）と
- * 「生成」（→ shell.js ／ core.js）は入っている。
- * まだ入っていないものは、押したら「まだ作っていない」と名指しで言う（黙って走らない）。
+ * 3 つとも中身が入っている。「フォームを作る」は build-form.js、「生成」は shell.js ／ core.js、
+ * 「画像を書き出す」は distribution-image.js ／ export-images.html である。
  *
  * label は担当者に見える表示名、functionName は Apps Script が名前で呼ぶ関数である。
  * 表示名は日本語のまま、呼ぶ名前は英字である（→ src/README.md の「名前の線」）。
@@ -20,7 +20,7 @@ const menuName = 'シフト'
 const menuItems = [
   { label: 'フォームを作る', functionName: 'createForm' },
   { label: '生成', functionName: 'runGeneration' },
-  { label: '画像を書き出す', functionName: 'exportImages', issue: 157 },
+  { label: '画像を書き出す', functionName: 'exportImages' },
 ]
 
 function onOpen() {
@@ -80,16 +80,21 @@ function runGeneration() {
   )
 }
 
+/**
+ * 配る画像を書き出すダイアログを開く（→ 2 の一覧 9 ／ 5 の #9・#10 ／ 6 の #5 ／ issue #157）。
+ *
+ * 中身はダイアログが開いてから取りに来る（→ exportImagesFromDialog）。ここで組んで埋め込まないのは、
+ * 止まったときの名指しをダイアログの中に出すためである — 開く前に投げると、担当者には何も出ない。
+ * canvas に塗って PNG にするのはダイアログである。外から読み込むファイルは 0 個である（→ 6 の #5）。
+ */
 function exportImages() {
-  notBuiltYet('画像を書き出す')
+  const dialog = HtmlService.createHtmlOutputFromFile('export-images')
+    .setWidth(960)
+    .setHeight(640)
+  SpreadsheetApp.getUi().showModalDialog(dialog, '画像を書き出す')
 }
 
-/** 名指しで止まる。黙って走らない（→ 2 の「止まる箇所」#8）。 */
-function notBuiltYet(label) {
-  const pressed = menuItems.filter((item) => item.label === label)[0]
-  SpreadsheetApp.getActive().toast(
-    `「${label}」はまだ作っていない（issue #${pressed.issue}）`,
-    menuName,
-    5,
-  )
+/** 画面から呼ばれる入口（export-images.html の google.script.run）。返すのは日ごとの描く中身である。 */
+function exportImagesFromDialog() {
+  return distributionImagesOn(SpreadsheetApp.getActive())
 }

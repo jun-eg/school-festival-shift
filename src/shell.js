@@ -391,6 +391,20 @@ function recountSpreadsheet(spreadsheet) {
 }
 
 /**
+ * 配る画像の中身を組む（→ 5 の #9 ／ 2 の一覧 9 ／ issue #157）。構造を確かめる → 読む → 組む、で、何も書かない。
+ *
+ * 読むのはマス目の 4 枚そのものである — 担当者が手直しした後のセルを、そのまま描く（→ 5-3）。
+ * 生成も数え直しも走らせない。描くのは、いまシートに見えているとおりである。
+ * 読む口は生成・数え直しと同じ 1 本で、同じ名指しで止まる（見出しがいまの枠に無い・学籍番号が空 → assignment-grid.js）。
+ * 返すのはダイアログに渡す値だけである（→ export-images.html）。
+ */
+function distributionImagesOn(spreadsheet) {
+  checkStructure(spreadsheet)
+  const read = readInputsAndGrids(spreadsheet)
+  return distributionImages(read.grids, gridContext(read.inputs).days)
+}
+
+/**
  * セルが書き換えられたときに呼ばれる口（→ menu.js の onEdit）。返すのは担当者に見せる一言である。
  *
  * 数え直すのは、マス目の 4 枚のどれかが書き換えられたときだけである（→ 2 の一覧 8）。
@@ -555,7 +569,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readInputsAndGrids, readSection, readGrid,
     putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids,
-    a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, recountOnEdit, markFixedCells, gridContext,
+    a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, distributionImagesOn, recountOnEdit, markFixedCells, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }
