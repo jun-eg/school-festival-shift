@@ -290,7 +290,7 @@ check(
 )
 
 check(
-  '① 正規表現が 3 箇所に入り、希望時間の 4 設問は同じ 1 本である',
+  '① 正規表現が 2 箇所に入り（友達欄には入らない → issue #200）、希望時間の 4 設問は同じ 1 本である',
   form.items.filter((item) => item.validation).map((item) => [item.title, item.validation.pattern]),
   lastYearItems.filter((item) => item.pattern).map((item) => [item.title, item.pattern]),
 )
@@ -307,9 +307,9 @@ check(
 )
 
 check(
-  '① 短文回答には、記録に無いエラーメッセージを付けていない（→ 4-3）',
-  form.items.filter((item) => item.kind === 'text' && item.validation).map((item) => item.validation.helpText),
-  [undefined, undefined],
+  '① 短文回答には、記録に無いエラーメッセージを付けていない（→ 4-3。検証が付くのは学籍番号だけ → issue #200）',
+  form.items.filter((item) => item.kind === 'text' && item.validation).map((item) => [item.title, item.validation.helpText]),
+  [['学籍番号', undefined]],
 )
 
 check(

@@ -18,7 +18,7 @@
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
-/** 見出しの左側 — 名前のある 2 列である（→ sheet-layout.js の gridSheet）。 */
+/** 見出しの左側 — 名前のある 3 列である（→ sheet-layout.js の gridSheet）。 */
 function gridNamedColumns() {
   return gridLayouts(assignmentName)[0].sections[0].columns
 }
@@ -38,8 +38,8 @@ function gridSlotKey(start, end) {
 /**
  * 1 日ぶんのマス目に敷く。返すのは { header, rows } である。
  *
- *   header … 学籍番号 / 氏名 / その日の枠の開始時刻（枠の数だけ）
- *   rows   … 1 人 1 行。学籍番号 / 氏名 / 枠ごとの役割名（入っていない枠は空）
+ *   header … 学籍番号 / 氏名 / 一緒に組みたいお友達 / その日の枠の開始時刻（枠の数だけ）
+ *   rows   … 1 人 1 行。学籍番号 / 氏名 / 友達欄 / 枠ごとの役割名（入っていない枠は空）
  *
  * 行の並びは学籍番号の昇順である。入力から決まるので、同じ入力からは同じ並びが出る（→ 6 の #3）。
  * 生成の出てきた順に並べない — 順が変わると、担当者が書き換えたセルが別の行へ移ったように見えて、
@@ -48,11 +48,14 @@ function gridSlotKey(start, end) {
  * 氏名は回答から引く（nameOf）。生成は氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、
  * ここで足している。見出しに出すためだけの列である（→ input-types.js の columnsOutsideWish）。
  *
+ * 友達欄も回答から引く（friendsOf）。担当者が余裕のあるときに手で寄せるための列で、生成は読まない
+ * （→ 5-2 ／ issue #200）。氏名と同じく、表示のためだけに足している。
+ *
  * alsoStudentIds は、その日に 1 枠も置いていなくても行を残す人である（→ 5-3 ／ issue #156）。
  * 「この人をここに置かない」という手直し（空のセルに付いた印）と、残せなかった手直しの名指しは、
  * 置いた枠が 1 つも無い人にも付く。行が無いと、印を載せるセルが無くなり、手直しが黙って消える。
  */
-function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds) {
+function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
   const named = gridNamedColumns()
   const header = named.concat((day ? day.slots : []).map((slot) => slot.start))
   if (!day) return { header: header, rows: [] }
@@ -100,9 +103,12 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds) {
     order.push(id)
   })
 
+  const shown = { '学籍番号': (studentId) => studentId, '氏名': nameOf, '一緒に組みたいお友達': friendsOf }
   const rows = order
     .sort()
-    .map((studentId) => [studentId, nameOf ? (nameOf(studentId) || '') : ''].concat(people[studentId]))
+    .map((studentId) => named
+      .map((column) => (shown[column] ? (shown[column](studentId) || '') : ''))
+      .concat(people[studentId]))
 
   return { header: header, rows: rows }
 }
@@ -114,7 +120,7 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds) {
  * 列に当てるのは位置ではなく、見出しに書いてある時刻そのものである。
  * 位置で当てると、条件入力の営業時刻を動かしたときに、前の周の役割が別の枠へ黙って移る。
  *
- * 氏名は読まない。表示のための列で、生成が見ると 5 の #1（7 種類の外を参照しない）が破れる。
+ * 氏名も友達欄も読まない。表示のための列で、生成が見ると 5 の #1（7 種類の外を参照しない）が破れる。
  * 戻す行の氏名は空である（生成が置くときと同じ → generate.js の generationNotAimed）。
  */
 function fromAssignmentGrid(header, dataRows, day, label) {
@@ -429,7 +435,7 @@ function roleColorOf(role) {
 
 /**
  * マス目のデータの行ぜんぶの背景色を、行と列の並びのまま返す（setBackgrounds にそのまま渡す形）。
- * 名前のある 2 列は塗らない。width に届かない行は、右を null で埋める。
+ * 名前のある 3 列は塗らない。width に届かない行は、右を null で埋める。
  */
 function gridBackgrounds(dataRows, width) {
   const named = gridNamedColumns()
@@ -448,7 +454,7 @@ function gridBackgrounds(dataRows, width) {
  * 返すのは { row, column } の配列で、どちらもマス目の中の 0 始まりの位置である（row はデータの行）。
  *
  *   枠 1 つが単位の違反（規則 1・4・5・同じ枠に二重）… その人の行の、その枠の列のセル
- *   その人のその日が単位の違反（規則 3）… その人の行の、名前のある 2 列（学籍番号・氏名）
+ *   その人のその日が単位の違反（規則 3）… その人の行の、学籍番号と氏名の 2 列（友達欄には付けない — 誰の違反かを指す列ではない）
  *     — 規則 3 が壊れているのは枠 1 つではない（→ count-violations.js の countPrepCleanupBroken）。
  *       準備にも片付けにも入っていない ④ は、印を付ける枠そのものが無い
  *
@@ -478,6 +484,7 @@ function violationCells(header, dataRows, day, violations) {
     if (time !== '') columnOf[time] = column
   }
 
+  const whoColumns = ['学籍番号', '氏名'].map((name) => named.indexOf(name))
   const cells = []
   const seen = {}
   function mark(row, column) {
@@ -494,7 +501,7 @@ function violationCells(header, dataRows, day, violations) {
     const start = at(violation, '開始')
     rows.forEach((row) => {
       if (start === '') {
-        for (let column = 0; column < named.length; column++) mark(row, column)
+        whoColumns.forEach((column) => mark(row, column))
         return
       }
       if (columnOf[start] !== undefined) mark(row, columnOf[start])
@@ -512,19 +519,36 @@ function violationCells(header, dataRows, day, violations) {
  * 畳み込みそのものはここでしない — ここが返すのは表示の対応であって、型 #6 ではない。
  */
 function namesFromAnswers(rows) {
+  return latestAnswerOf(rows, '氏名')
+}
+
+/**
+ * 回答の行から (学籍番号 → 友達欄) を作る（→ issue #200）。氏名と同じく、見出しに出すためだけの対応である。
+ *
+ * 友達欄は自由記述である（「太郎君」「同期」「先輩」も書ける → form-definition.js）。
+ * 担当者が読んで手で寄せるための列なので、書かれたとおりに出す — 学籍番号に解決しない・分けない。
+ * 採るのは氏名と同じく後から来た行である。出し直しで友達欄を消した人は、空のまま出る
+ * （空の行を飛ばすと、消した友達欄が前の回答から戻ってくる）。
+ */
+function friendsFromAnswers(rows) {
+  return latestAnswerOf(rows, '一緒に組みたいお友達', true)
+}
+
+/** 回答の 1 列を、学籍番号ごとに後から来た行で引く。keepBlank でなければ、空の値は前の行を上書きしない。 */
+function latestAnswerOf(rows, columnName, keepBlank) {
   const columns = answerSection().columns
   const studentIdColumn = columns.indexOf('学籍番号')
-  const nameColumn = columns.indexOf('氏名')
-  const names = {}
+  const valueColumn = columns.indexOf(columnName)
+  const values = {}
 
   rows.forEach((row) => {
     const studentId = String(row[studentIdColumn] || '').trim().toUpperCase()
-    const name = String(row[nameColumn] || '').trim()
-    if (studentId === '' || name === '') return
-    names[studentId] = name
+    const value = String(row[valueColumn] || '').trim()
+    if (studentId === '' || (value === '' && !keepBlank)) return
+    values[studentId] = value
   })
 
-  return function (studentId) { return names[String(studentId).toUpperCase()] || '' }
+  return function (studentId) { return values[String(studentId).toUpperCase()] || '' }
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
@@ -532,5 +556,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow,
     fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
+    friendsFromAnswers,
   }
 }

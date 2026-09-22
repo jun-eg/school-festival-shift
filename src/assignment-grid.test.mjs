@@ -12,6 +12,7 @@
 //   ⑥ 違反の行を、塗るセルに当て戻せる（→ 6 の #2「違反した所はセルの色に出る」・issue #155）
 //   ⑦ 背景は役割の色である（記録の配布物 ◎ の 8 役割・7 色 → issue #213）
 //   ⑧ 手直しの印（メモ）が付いたセルだけを手直しとして読み、書き戻すときに印を付け直す（→ 5-3・issue #156）
+//   ⑨ 友達欄は回答に書かれたとおりに並ぶが、戻すときには読まない（担当者が手で寄せるための列 → 5-2・issue #200）
 //
 // これは契約であって実装ではない。何も書き換えない。
 // 記録の側（前回の確定シフトが本当にこの形に敷けるか）は scripts/前回のシフト表.mjs が見る。
@@ -31,7 +32,7 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const {
-  toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf,
+  toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, friendsFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf,
   fixedFromAssignmentGrid, gridNotes, isFixedNote, conflictNote,
 } = context
 const { dayLabels, assignmentColumns, checkKind, roleColors, fixedNote } = vm.runInContext(
@@ -77,24 +78,30 @@ const assignments = [
   row('2025-11-03', '10:00', '10:30', '調理', 'EED2402549'),
 ]
 
-const nameOf = namesFromAnswers([
-  ['2025-10-01 10:00:00', 'eed2402549', '高木琴音', '3年生', 'はい', '', '', '', '', ''],
+// 友達欄は自由記述である（→ issue #200）。学籍番号でなくても、書かれたとおりに出る。
+const answers = [
+  ['2025-10-01 10:00:00', 'eed2402549', '高木琴音', '3年生', 'はい', '太郎君、同期', '', '', '', ''],
   ['2025-10-01 11:00:00', 'ECK2626643', '森田咲良', '2年生', 'いいえ', '', '', '', '', ''],
-])
+]
+const nameOf = namesFromAnswers(answers)
+const friendsOf = friendsFromAnswers(answers)
+
+// 名前のある列（学籍番号・氏名・友達欄）の数。時刻の列はこの右から始まる。
+const named = 3
 
 // ---- ① 従来の形に敷ける -----------------------------------------------------
 
-const grid = toAssignmentGrid(assignments, day, nameOf)
+const grid = toAssignmentGrid(assignments, day, nameOf, [], friendsOf)
 
 check(
-  '① 見出しは 学籍番号 / 氏名 ＋ その日の枠の開始時刻である（24 枠 → 26 列）',
+  '① 見出しは 学籍番号 / 氏名 / 一緒に組みたいお友達 ＋ その日の枠の開始時刻である（24 枠 → 27 列）',
   [grid.header.slice(0, 5), grid.header.length, day.slots.length],
-  [['学籍番号', '氏名', '08:00', '08:30', '09:00'], 26, 24],
+  [['学籍番号', '氏名', '一緒に組みたいお友達', '08:00', '08:30'], 27, 24],
 )
 
 check(
   '① 1 人 1 行で、セルに入るのは役割名 1 つである（配布物 ◎ と同じ形 → issue #213）',
-  grid.rows.map((one) => [one[0], one[1], one.slice(2).filter((cell) => cell !== '')]),
+  grid.rows.map((one) => [one[0], one[1], one.slice(named).filter((cell) => cell !== '')]),
   [
     ['ECK2626643', '森田咲良', ['呼び込み']],
     ['EED2402549', '高木琴音', ['調理', '調理']],
@@ -103,14 +110,14 @@ check(
 )
 
 check(
-  '① 役割は、その枠の列に落ちる（10:00-10:30 は 5 つ目の枠 ＝ 7 列目）',
-  [grid.rows[1][6], grid.rows[1][7], grid.rows[2][2]],
+  '① 役割は、その枠の列に落ちる（10:00-10:30 は 5 つ目の枠 ＝ 8 列目）',
+  [grid.rows[1][named + 4], grid.rows[1][named + 5], grid.rows[2][named]],
   ['調理', '調理', '準備'],
 )
 
 check(
   '① 別の日の行は、この日のマス目に落ちない（1 日 1 枚である）',
-  grid.rows.map((one) => one.slice(2).filter((cell) => cell !== '').length).reduce((a, b) => a + b, 0),
+  grid.rows.map((one) => one.slice(named).filter((cell) => cell !== '').length).reduce((a, b) => a + b, 0),
   4,
 )
 
@@ -130,7 +137,7 @@ check(
 
 check(
   '② 割り当ての順を入れ替えても、同じマス目が出る（決定的である → 6 の #3）',
-  JSON.stringify(toAssignmentGrid(assignments.slice().reverse(), day, nameOf)),
+  JSON.stringify(toAssignmentGrid(assignments.slice().reverse(), day, nameOf, [], friendsOf)),
   JSON.stringify(grid),
 )
 
@@ -158,20 +165,59 @@ check(
 
 check(
   '③ 条件入力にその日の行が無くても、マス目が空なら止まらない',
-  fromAssignmentGrid(['学籍番号', '氏名'], [], undefined, dayLabels[3]),
+  fromAssignmentGrid(['学籍番号', '氏名', '一緒に組みたいお友達'], [], undefined, dayLabels[3]),
   [],
 )
 
 // ---- ④ 当てるのは見出しの時刻である -----------------------------------------
 
 // 見出しを 1 列ずらしても、時刻で当てるので役割は同じ枠に戻る（位置で当てていない）
-const shiftedHeader = ['学籍番号', '氏名'].concat(day.slots.map((slot) => slot.start))
-const shiftedRows = [['EED2402549', '高木琴音'].concat(day.slots.map((slot) => (slot.start === '13:00' ? '会計' : '')))]
+const shiftedHeader = ['学籍番号', '氏名', '一緒に組みたいお友達'].concat(day.slots.map((slot) => slot.start))
+const shiftedRows = [['EED2402549', '高木琴音', ''].concat(day.slots.map((slot) => (slot.start === '13:00' ? '会計' : '')))]
 
 check(
   '④ 当てるのは見出しに書いてある時刻である（列の位置ではない）',
   fromAssignmentGrid(shiftedHeader, shiftedRows, day, dayLabels[1]),
   [row('2025-11-02', '13:00', '13:30', '会計', 'EED2402549')],
+)
+
+// ---- ⑨ 友達欄 ---------------------------------------------------------------
+
+check(
+  '⑨ 友達欄は回答に書かれたとおりに並ぶ（学籍番号に解決しない・分けない。書いていない人は空 → issue #200）',
+  grid.rows.map((one) => [one[0], one[2]]),
+  [['ECK2626643', ''], ['EED2402549', '太郎君、同期'], ['LTS2390333', '']],
+)
+
+check(
+  '⑨ 友達欄を渡さなければ、列は空のまま残る（列の数は変わらない）',
+  toAssignmentGrid(assignments, day, nameOf).rows.map((one) => [one.length, one[2]]),
+  [[27, ''], [27, ''], [27, '']],
+)
+
+check(
+  '⑨ 出し直しでは後から来た行を採る。友達欄を消して出し直した人は空になる（前の回答から戻さない）',
+  (() => {
+    const resubmitted = friendsFromAnswers([
+      ['2025-10-01 10:00:00', 'EED2402549', '高木琴音', '3年生', 'はい', '先輩', '', '', '', ''],
+      ['2025-10-02 10:00:00', 'EED2402549', '高木琴音', '3年生', 'はい', '', '', '', '', ''],
+      ['2025-10-01 11:00:00', 'ECK2626643', '森田咲良', '2年生', 'いいえ', '同期の女', '', '', '', ''],
+      ['2025-10-02 11:00:00', 'eck2626643', '森田咲良', '2年生', 'いいえ', '同期の女の子', '', '', '', ''],
+    ])
+    return [resubmitted('EED2402549'), resubmitted('ECK2626643')]
+  })(),
+  ['', '同期の女の子'],
+)
+
+check(
+  '⑨ 戻すときは友達欄を読まない（担当者が書き換えても、割り当ての行は変わらない → 5-2）',
+  fromAssignmentGrid(
+    grid.header,
+    grid.rows.map((one) => one.map((cell, column) => (column === 2 ? '調理' : cell))),
+    day,
+    dayLabels[1],
+  ).slice().sort(),
+  backAgain.slice().sort(),
 )
 
 // ---- ⑤ 載らないものは名指しして止まる ---------------------------------------
@@ -197,7 +243,7 @@ check(
   '⑤ 学籍番号が空の行に役割が入っていれば、誰の行かが決まらないので止まる',
   whyItStopped(() => fromAssignmentGrid(
     grid.header,
-    [['', ''].concat(day.slots.map((slot) => (slot.start === '10:00' ? '調理' : '')))],
+    [['', '', ''].concat(day.slots.map((slot) => (slot.start === '10:00' ? '調理' : '')))],
     day,
     dayLabels[1],
   ))?.includes('学籍番号が空である'),
@@ -208,7 +254,7 @@ check(
   '⑤ 学籍番号が 10 桁英数字でなければ名指しする（→ 4-1 の #1）',
   whyItStopped(() => fromAssignmentGrid(
     grid.header,
-    [['あ', ''].concat(day.slots.map((slot) => (slot.start === '10:00' ? '調理' : '')))],
+    [['あ', '', ''].concat(day.slots.map((slot) => (slot.start === '10:00' ? '調理' : '')))],
     day,
     dayLabels[1],
   ))?.includes('形式と違う'),
@@ -219,8 +265,8 @@ check(
 check(
   '⑤ 見出しの時刻がいまの枠に無ければ、黙って別の枠へ移さずに名指しする（→ 5-3）',
   whyItStopped(() => fromAssignmentGrid(
-    ['学籍番号', '氏名', '07:00'],
-    [['EED2402549', '高木琴音', '調理']],
+    ['学籍番号', '氏名', '一緒に組みたいお友達', '07:00'],
+    [['EED2402549', '高木琴音', '', '調理']],
     day,
     dayLabels[1],
   ))?.includes('いまの 2025-11-02 の枠に無い'),
@@ -230,8 +276,8 @@ check(
 check(
   '⑤ 条件入力にその日の行が無いのにマス目に中身があれば、名指しして止まる',
   whyItStopped(() => fromAssignmentGrid(
-    ['学籍番号', '氏名', '08:00'],
-    [['EED2402549', '高木琴音', '準備']],
+    ['学籍番号', '氏名', '一緒に組みたいお友達', '08:00'],
+    [['EED2402549', '高木琴音', '', '準備']],
     undefined,
     dayLabels[3],
   ))?.includes('その日の行が無い'),
@@ -247,20 +293,20 @@ function checkRow(kind, date, start, studentId) {
   return outputColumns('検証結果').map((name) => values[name])
 }
 
-const paintedHeader = ['学籍番号', '氏名', '10:00', '10:30', '11:00']
+const paintedHeader = ['学籍番号', '氏名', '一緒に組みたいお友達', '10:00', '10:30', '11:00']
 const paintedRows = [
-  ['ECK2626643', '森田咲良', '呼び込み', '', ''],
-  ['', '', '', '', ''],
-  ['eed2402549', '高木琴音', '調理', '調理', ''],
+  ['ECK2626643', '森田咲良', '', '呼び込み', '', ''],
+  ['', '', '', '', '', ''],
+  ['eed2402549', '高木琴音', '太郎君', '調理', '調理', ''],
 ]
 
 check(
-  '⑥ 枠 1 つの違反はその枠のセルに、その人のその日の違反（規則 3）は名前のある 2 列に当たる',
+  '⑥ 枠 1 つの違反はその枠のセルに、その人のその日の違反（規則 3）は学籍番号と氏名の 2 列に当たる（友達欄には当てない）',
   violationCells(paintedHeader, paintedRows, day, [
     checkRow(checkKind.violation, '2025-11-02', '10:30', 'EED2402549'),
     checkRow(checkKind.violation, '2025-11-02', '', 'ECK2626643'),
   ]),
-  [{ row: 2, column: 3 }, { row: 0, column: 0 }, { row: 0, column: 1 }],
+  [{ row: 2, column: 4 }, { row: 0, column: 0 }, { row: 0, column: 1 }],
 )
 
 check(
@@ -276,11 +322,11 @@ check(
 
 check(
   '⑥ 同じセルに違反が 2 つあっても 1 回だけ塗る。同じ学籍番号の行が 2 つあれば両方に当たる',
-  violationCells(paintedHeader, paintedRows.concat([['EED2402549', '', '', '', '']]), day, [
+  violationCells(paintedHeader, paintedRows.concat([['EED2402549', '', '', '', '', '']]), day, [
     checkRow(checkKind.violation, '2025-11-02', '10:00', 'EED2402549'),
     checkRow(checkKind.violation, '2025-11-02', '10:00', 'EED2402549'),
   ]),
-  [{ row: 2, column: 2 }, { row: 3, column: 2 }],
+  [{ row: 2, column: 3 }, { row: 3, column: 3 }],
 )
 
 // ---- ⑦ 背景は役割の色である -----------------------------------------------
@@ -299,9 +345,9 @@ check(
 )
 
 check(
-  '⑦ 背景の行列は、名前のある 2 列と空のセルと表に無い役割名を塗らず、幅に届かない右を null で埋める',
-  gridBackgrounds([['EED2402549', '高木琴音', '調理', '', ' 準備 ', '委員会の見回り']], 7),
-  [[null, null, roleColorOf('調理'), null, roleColorOf('準備'), null, null]],
+  '⑦ 背景の行列は、名前のある 3 列と空のセルと表に無い役割名を塗らず、幅に届かない右を null で埋める',
+  gridBackgrounds([['EED2402549', '高木琴音', '調理', '調理', '', ' 準備 ', '委員会の見回り']], 8),
+  [[null, null, null, roleColorOf('調理'), null, roleColorOf('準備'), null, null]],
 )
 
 // ---- ⑧ 手直しの印 -----------------------------------------------------------
@@ -334,13 +380,13 @@ check(
 
 check(
   '⑧ 見出しがいまの枠に無い印は、止まらずにそのまま乗る（名指しは生成の側 → generate.js の placeFixed）',
-  fixedFromAssignmentGrid(['学籍番号', '氏名', '07:00'], [['EED2402549', '', '会計']], [['', '', fixedNote]], day, dayLabels[2]),
+  fixedFromAssignmentGrid(['学籍番号', '氏名', '一緒に組みたいお友達', '07:00'], [['EED2402549', '', '', '会計']], [['', '', '', fixedNote]], day, dayLabels[2]),
   [['2025-11-02', '07:00', '会計', 'EED2402549']],
 )
 
 check(
   '⑧ 誰の行か決まらない印は、fromAssignmentGrid と同じに名指しして止まる',
-  whyItStopped(() => fixedFromAssignmentGrid(grid.header, [['', '', '調理']], [['', '', fixedNote]], day, dayLabels[2]))
+  whyItStopped(() => fixedFromAssignmentGrid(grid.header, [['', '', '', '調理']], [['', '', '', fixedNote]], day, dayLabels[2]))
     ?.includes('学籍番号が空である'),
   true,
 )

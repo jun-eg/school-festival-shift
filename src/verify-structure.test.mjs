@@ -166,7 +166,7 @@ check('① 構成どおりに並んでいれば、崩れは 0 箇所である', 
 // 担当者が書く行を足しても、見出しだけを見ているので崩れない
 const bookWithMoreRows = emptyTemplate()
 bookWithMoreRows.getSheetByName('条件入力').put(3, 1, '2025-11-01').put(4, 1, '2025-11-02')
-bookWithMoreRows.getSheetByName('準備日').put(2, 1, 'EED2349987').put(1, 3, '08:00')
+bookWithMoreRows.getSheetByName('準備日').put(2, 1, 'EED2349987').put(1, 4, '08:00')
 check('① 担当者がデータの行を書き足しても崩れない（見るのは見出しの行だけである）', namedLines(bookWithMoreRows), [])
 
 // ---- ② シートを消す／列を挿す／見出しを書き換える ---------------------------
@@ -194,17 +194,17 @@ check(
   ],
 )
 
-// マス目の 4 枚は、名前のある 2 列だけを名前で照らす。右は時刻の列で、名前を持たない
+// マス目の 4 枚は、名前のある 3 列だけを名前で照らす。右は時刻の列で、名前を持たない
 // （何時の枠かは毎回の入力で変わる → sheet-layout.js の slotColumns）。
 const gridWithInsertedColumn = emptyTemplate()
-gridWithInsertedColumn.getSheetByName('学祭1日目').put(1, 3, '08:00').put(1, 4, '08:30').insertColumn(2)
+gridWithInsertedColumn.getSheetByName('学祭1日目').put(1, 4, '08:00').put(1, 5, '08:30').insertColumn(2)
 
 check(
-  '② マス目の 4 枚は、名前のある 2 列だけを照らす（時刻の列は名前を持たないので出てこない）',
+  '② マス目の 4 枚は、名前のある 3 列だけを照らす（時刻の列は名前を持たないので出てこない）',
   namedLines(gridWithInsertedColumn),
   [
-    '「学祭1日目」の 1 行目 1 列目から 2 列 が構成と違う。'
-      + 'いま: 学籍番号 / （空） ／ 構成: 学籍番号 / 氏名',
+    '「学祭1日目」の 1 行目 1 列目から 3 列 が構成と違う。'
+      + 'いま: 学籍番号 / （空） / 氏名 ／ 構成: 学籍番号 / 氏名 / 一緒に組みたいお友達',
   ],
 )
 
@@ -279,7 +279,7 @@ check(
   ],
 )
 
-// マス目の 4 枚は 50 列を取る（→ sheet-layout.js の maxSlotsPerDay）。
+// マス目の 4 枚は 51 列を取る（→ sheet-layout.js の maxSlotsPerDay）。
 // 既定の 26 列のままコピーされたものは、読む前にここで名指しになる
 const gridNotWidened = emptyTemplate()
 gridNotWidened.getSheetByName('片付け').cutColumnsTo(26)
@@ -287,7 +287,7 @@ gridNotWidened.getSheetByName('片付け').cutColumnsTo(26)
 check(
   '③ マス目の 4 枚が広げられていなければ、読む前に列数を名指しする',
   namedLines(gridNotWidened),
-  ['シート「片付け」の列が 26 列しかない（構成は 50 列である）'],
+  ['シート「片付け」の列が 26 列しかない（構成は 51 列である）'],
 )
 
 // 条件入力は 2 行目までが見出しである。行が 1 行しか残っていなければ、列名の行そのものが無い
