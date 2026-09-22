@@ -6,7 +6,7 @@
 // 見るものは 6 つある。
 //   ① 前回の日付と営業時刻を入れたとき、4-1 の表と 1 行ずつ突き合わせて差分が 0
 //      （設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。→ 仕様 #2 の判定）
-//   ② 正規表現が 3 箇所で、希望時間の 4 設問は同じ 1 本である（→ 4-2）
+//   ② 正規表現が 2 箇所で、希望時間の 4 設問は同じ 1 本である（→ 4-2。友達欄は自由記述 → issue #200）
 //   ③ エラーメッセージの句点の揺れ ◎ を揃えずに写している（→ 4-3）
 //   ④ 説明文が、記録にある例 3 つと営業時間を持っている（→ 4-2）
 //   ⑤ 入る側から数え直すと 6 項目である（→ 5 の #3）。締切は定義に無い（→ 4-1）
@@ -99,7 +99,7 @@ const tableInRequirements = [
   { number: 3, title: '学年', kind: 'ラジオボタン', required: true, detail: '1年生／2年生／3年生／4年生' },
   { number: 4, title: '調理担当ですか？', kind: 'ラジオボタン', required: true, detail: 'はい／いいえ' },
   { number: null, title: '調理名簿', kind: '画像アイテム', required: false, detail: '委員会から来た名簿の画像' },
-  { number: 5, title: '一緒に組みたいお友達', kind: '短文回答', required: false, detail: '^(?:[A-Za-z0-9]{10})(?:,[A-Za-z0-9]{10})*$' },
+  { number: 5, title: '一緒に組みたいお友達', kind: '短文回答', required: false, detail: '—' },
   { number: 6, title: '11月1日(準備日)', kind: '長文回答', required: true, detail: '→ 4-2 の正規表現' },
   { number: 7, title: '11月2日(学祭1日目)', kind: '長文回答', required: true, detail: '→ 4-2 の正規表現' },
   { number: 8, title: '11月3日(学祭2日目)', kind: '長文回答', required: true, detail: '→ 4-2 の正規表現' },
@@ -150,15 +150,23 @@ check(
   ['学籍番号', '氏名', '学年', '調理担当ですか？', '調理名簿', '一緒に組みたいお友達'],
 )
 
-// ---- ② 正規表現は 3 箇所で、希望時間は 1 本である（→ 4-2） ------------------
+// ---- ② 正規表現は 2 箇所で、希望時間は 1 本である（→ 4-2） ------------------
 
 const itemsWithPattern = lastYearItems.filter((item) => item.pattern)
 const wishTimeItems = lastYearItems.filter((item) => item.kind === formItemKind.paragraph)
 
 check(
-  '② 正規表現を持つのは 3 箇所である（学籍番号・友達欄・希望時間）',
+  '② 正規表現を持つのは 2 箇所である（学籍番号・希望時間。友達欄は自由記述である → issue #200）',
   itemsWithPattern.map((item) => item.title),
-  ['学籍番号', '一緒に組みたいお友達', '11月1日(準備日)', '11月2日(学祭1日目)', '11月3日(学祭2日目)', '11月4日(片付け)'],
+  ['学籍番号', '11月1日(準備日)', '11月2日(学祭1日目)', '11月3日(学祭2日目)', '11月4日(片付け)'],
+)
+
+check(
+  '② 友達欄は、学籍番号でない書き方も任意のまま通る（記録で弾かれる形だった答え ◎ → ADR 入る側-0012 ／ issue #200）',
+  lastYearItems
+    .filter((item) => item.title === '一緒に組みたいお友達')
+    .map((item) => [item.required, item.pattern === undefined]),
+  [[false, true]],
 )
 
 check(

@@ -64,7 +64,7 @@ check(
 check(
   '割り当ての行の形は、シートの列ではなく別に持つ（マス目に載るため → #213）',
   [outputColumns(assignmentName), gridLayouts(assignmentName)[0].sections[0].columns],
-  [['日', '開始', '終了', '役割', '学籍番号', '氏名'], ['学籍番号', '氏名']],
+  [['日', '開始', '終了', '役割', '学籍番号', '氏名'], ['学籍番号', '氏名', '一緒に組みたいお友達']],
 )
 
 check(
@@ -140,11 +140,17 @@ check(
 )
 
 check(
-  '友達欄は割り当ての材料にしないので、回答シートの外に出てこない（→ 5-2）',
+  '友達欄は割り当ての材料にしないので、回答とマス目の 4 枚（担当者が手で寄せるときに読む → #200）の外に出てこない（→ 5-2）',
   sheetLayout
-    .filter((s) => s.name !== '回答')
+    .filter((s) => s.name !== '回答' && !dayLabels.includes(s.name))
     .flatMap((s) => s.sections.flatMap((k) => k.columns))
     .filter((name) => name.includes('お友達')),
+  [],
+)
+
+check(
+  '友達欄は割り当ての行の形に無い（マス目に出すのは表示のためだけである → 5-2・#200）',
+  outputColumns(assignmentName).filter((name) => name.includes('お友達')),
   [],
 )
 
@@ -192,7 +198,7 @@ check(
     sheetLayout.filter((s) => s.sections.some((k) => k.slotColumns)).map((s) => s.name),
     sectionWidth(gridLayouts(assignmentName)[0].sections[0]),
   ],
-  [dayLabels, 2 + maxSlotsPerDay],
+  [dayLabels, 3 + maxSlotsPerDay],
 )
 
 check(

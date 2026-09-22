@@ -53,7 +53,7 @@ function buildTemplateInto(spreadsheet) {
 /**
  * 構成が要る列数まで、シートを広げる。
  *
- * 新しいシートは 26 列しかないが、マス目の 4 枚は 50 列を取る（→ sheet-layout.js の maxSlotsPerDay）。
+ * 新しいシートは 26 列しかないが、マス目の 4 枚は 51 列を取る（名前のある 3 列 ＋ 時刻の列 → sheet-layout.js の maxSlotsPerDay）。
  * 足りないまま置くと、走る前の検証が「列が足りない」で止まる（→ verify-structure.js）。
  * 減らさない — 余分な列があること自体は、構造の崩れではない。
  */

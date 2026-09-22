@@ -123,7 +123,7 @@ function putGridsIntoInputs(inputs, grids, forGeneration) {
  * マス目のシート 1 枚を、見出しの行とデータの行に分けて読む。
  *
  * 見出しの行も読むのが、区画を読むのと違うところである — 何時の枠かは見出しに書いてある。
- * 読む幅は区画の幅（名前のある 2 列 ＋ 時刻の 48 列 → sheet-layout.js の maxSlotsPerDay）で、
+ * 読む幅は区画の幅（名前のある 3 列 ＋ 時刻の 48 列 → sheet-layout.js の maxSlotsPerDay）で、
  * 列がそれだけあることは走る前に確かめてある（→ verify-structure.js の checkColumnCount）。
  *
  * セルのメモも同じ範囲で読む。手直しの印はメモである（→ assignment-grid.js の fixedNote ／ 5-3）。
@@ -293,7 +293,7 @@ function withNamesFromAnswers(rows, name, nameOf) {
  * 前の周の列が残ると、次に読むときに「いまの枠に無い見出し」として名指しになる
  * （→ assignment-grid.js の fromAssignmentGrid）。
  *
- * 条件入力に行が無い日は、名前のある 2 列だけを残して空にする。黙って別の日に寄せない。
+ * 条件入力に行が無い日は、名前のある 3 列だけを残して空にする。黙って別の日に寄せない。
  *
  * 手直しの印（メモ）も書き直す（→ assignment-grid.js の gridNotes ／ 5-3）。行の並びは学籍番号の順なので、
  * 人が増えれば行がずれる — メモを残したままにすると、印が別の人のセルに移る。だから一度ぜんぶ消してから付け直す。
@@ -320,7 +320,7 @@ function writeGrids(spreadsheet, grids, assignments, context, checks) {
         .filter((row) => at(row, '役割') !== '' || day.slots.some((slot) => slot.start === at(row, '開始')))
         .map((row) => at(row, '学籍番号'))
       : []
-    const grid = toAssignmentGrid(assignments, day, context.nameOf, fixedToday)
+    const grid = toAssignmentGrid(assignments, day, context.nameOf, fixedToday, context.friendsOf)
 
     if (grid.header.length > width) {
       throw new Error(
@@ -460,7 +460,7 @@ function recountOnEdit(event) {
  * 担当者が書き換えたセルに、手直しの印（メモ）を付ける（→ assignment-grid.js の fixedNote ／ 5-3 ／ issue #156）。
  * 返すのは印を付けたセルの数である。
  *
- * 付けるのは時刻の列のデータの行だけである — 見出しの行と、名前のある 2 列（学籍番号・氏名）には付けない。
+ * 付けるのは時刻の列のデータの行だけである — 見出しの行と、名前のある 3 列（学籍番号・氏名・友達欄）には付けない。
  * 空にしたセルにも付ける。「この人をこの枠に置かない」という手直しである。
  * 貼り付けで何セルもまとめて書き換えたときは、その範囲ぜんぶに付く（書き込みは 1 回で済ませる → 6 の #2）。
  *
@@ -579,17 +579,19 @@ function keepSeenGrids(spreadsheet, grids) {
 }
 
 /**
- * マス目を敷くのに要る 3 つ — その日の枠と、学籍番号から引く氏名と、担当者の手直しである。
+ * マス目を敷くのに要る 4 つ — その日の枠と、学籍番号から引く氏名・友達欄と、担当者の手直しである。
  *
  * どちらも入力から出る。build を通った後に組んでいるので、枠の刻み直しはここでは起きない
  * （崩れていればコアの入口がすでに名指しして止まっている → input-types.js）。
  * 氏名は回答から引く。生成は氏名を 1 度も見ない（→ 5 の #1・assignment-grid.js の namesFromAnswers）。
+ * 友達欄も回答から引く。担当者が手で寄せるときに読む列で、生成は見ない（→ 5-2・friendsFromAnswers ／ issue #200）。
  * 手直しは、書き戻すときに印を付け直すのに使う（→ writeGrids）。
  */
 function gridContext(inputs) {
   return {
     days: toDays(inputs['日ごとの営業時刻'], '日ごとの営業時刻'),
     nameOf: namesFromAnswers(inputs['回答']),
+    friendsOf: friendsFromAnswers(inputs['回答']),
     fixed: inputs[fixedName] || [],
   }
 }
