@@ -216,17 +216,21 @@ function toNeeds(rows, source) {
   return needs
 }
 
-/** 型 #3（調理責任者の学年条件）— 学年の集合（→ 5-1 の #3）。同じ学年が 2 行あっても 1 つである。 */
+/**
+ * 型 #3（調理責任者の学年条件）— 学年の集合（→ 5-1 の #3）。同じ学年が 2 行あっても 1 つである。
+ * セルには数字だけを書き（`3`）、型ではフォームの選択肢の形（`3年生`）で持つ（→ #237）。
+ */
 function toCookLeaderGrades(rows, source) {
   const section = conditionSection(source)
   const columns = section.columns
   const chosen = []
 
   eachFilledRow(source, section, rows, (row, rowIndex) => {
-    const grade = readText(source, columns, row, rowIndex, '学年')
+    const number = readText(source, columns, row, rowIndex, '学年')
+    const grade = `${number}年生`
     if (grades.indexOf(grade) === -1) {
       throw new Error(
-        `${whereIs(source, rowIndex)}の「${grade}」が学年でない（${grades.join(' / ')} のどれか）`,
+        `${whereIs(source, rowIndex)}の「${number}」が学年の数字でない（${grades.map((g) => g.replace('年生', '')).join(' / ')} のどれか）`,
       )
     }
     if (chosen.indexOf(grade) === -1) chosen.push(grade)
