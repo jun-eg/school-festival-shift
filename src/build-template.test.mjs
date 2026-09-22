@@ -3,12 +3,13 @@
 //
 //   使い方: node src/build-template.test.mjs
 //
-// 見るものは 4 つある。
+// 見るものは 5 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
 //   ② 8 枚に保護がかかる。割り当ての 4 枚は「持ち主だけ」、ほかの 4 枚は「警告のみ」で、
 //      条件入力だけは区画の入力欄が保護の外にある（→ issue #234）
 //   ③ 2 回走らせても形が変わらない（足りないものだけ足す）
 //   ④ 見出しが構成と違うときは、上書きせずに名指しで止まる（黙って直さない）
+//   ⑤ 条件入力の区画ごとに、列名の下へ初期値が置かれる。入力欄に中身がある区画には置かない（→ issue #240）
 //
 // ここで分かるのは組み立ての手順だけである。
 // 本物の Google スプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
@@ -233,6 +234,42 @@ check(
   '④ 止まったとき、書き換えられたセルを上書きしていない',
   brokenBook.getSheetByName('指標').getRange(1, 3, 1, 1).getValues()[0],
   ['合計時間（時）'],
+)
+
+const conditionLayout = sheetLayout[0]
+const inputRowsOf = (target, section, rowCount) => target
+  .getSheetByName('条件入力')
+  .getRange(3, section.startColumn, rowCount, sectionWidth(section))
+  .getValues()
+
+check(
+  '⑤ 条件入力の 6 区画とも、列名の下（3 行目から）に初期値がそのまま置かれた',
+  conditionLayout.sections.map((section) => [section.heading, inputRowsOf(book, section, section.initialRows.length)]),
+  conditionLayout.sections.map((section) => [section.heading, section.initialRows]),
+)
+check(
+  '⑤ 初期値の下の行は空のままである',
+  conditionLayout.sections.map((section) => inputRowsOf(book, section, section.initialRows.length + 1).slice(-1)[0].every((cell) => cell === '')),
+  conditionLayout.sections.map(() => true),
+)
+
+const writtenBook = new FakeSpreadsheet(['シート1', '条件入力'])
+writtenBook.getSheetByName('条件入力').getRange(4, 1, 1, 1).setValues([['2026-10-30']])
+const writtenLog = buildTemplateInto(writtenBook)
+const [daySection, ...otherSections] = conditionLayout.sections
+
+check(
+  '⑤ 入力欄に中身がある区画には初期値を置かず、書いてあった値をそのまま残す',
+  inputRowsOf(writtenBook, daySection, daySection.initialRows.length),
+  daySection.initialRows.map((row, i) => row.map((_, j) => (i === 1 && j === 0 ? '2026-10-30' : ''))),
+)
+check(
+  '⑤ ほかの区画には初期値が置かれ、置いた区画だけが記録に出る',
+  [
+    otherSections.every((section) => JSON.stringify(inputRowsOf(writtenBook, section, section.initialRows.length)) === JSON.stringify(section.initialRows)),
+    writtenLog.filter((line) => line.includes('初期値')).length,
+  ],
+  [true, otherSections.length],
 )
 
 // ---- 結果 -------------------------------------------------------------------
