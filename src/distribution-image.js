@@ -1,28 +1,19 @@
 /**
- * 配る画像の中身を組む（docs/tech-requirements.md 5 の #9・#10 ／ 6 の #5 ／ issue #157）。
+ * 配る画像の中身を組む（docs/tech-requirements.md 5 の #9・#10 ／ issue #157）。
  *
- * 形は前回の配布物 ◎ と同じである（→ issue #213 の「従来のレイアウト」）。
- *   ・1 日 1 枚の 4 枚。表題に日が入る（前回は `11月1日シフト表` 〜 `11月4日シフト表`）
- *   ・行が人、見出しは名前の 1 列だけ。学籍番号は載せない（前回の配布物に無い ◎ — 氏名だけが外へ出るのは Before と同じ → 2）
- *   ・列が 30 分枠、セルが役割名 1 つで、役割ごとに背景色が付く（→ assignment-grid.js の roleColors）
+ * 形は前回の配布物と同じ（→ issue #213）。1 日 1 枚、行が人（見出しは名前の 1 列。学籍番号は載せない）、
+ * 列が 30 分枠、セルが役割名で、役割ごとに背景色が付く。
+ * 描く元は手直し後のマス目そのもので、落とすのは学籍番号の列と、その日に 1 枠も入っていない行だけである。
  *
- * 描く元は割り当てのマス目 4 枚そのものである — 担当者が手直しした後のセルを、そのまま描く（→ 5-3）。
- * 形がマス目と同じなので、ここは並べ替えない。落とすのは学籍番号の列と、その日に 1 枠も入っていない行だけである
- * （前回の配布物の行は「その日に 1 枠でも入っている人」である ◎ → issue #213 の ② ／ ADR tech-requirements-0010）。
+ * 描く位置までここで決め（手元の検査で形まで見るため）、export-images.html は canvas に塗るだけである。
+ * 文字の幅は canvas で測らず見積もる。字体は端末に依存するので、塗る側は fillText の maxWidth で収める。
  *
- * 描く位置まで、ここで決める。ダイアログ（export-images.html）は、返った図形を canvas に塗るだけである。
- * 位置を決める側をコアに置くのは、手元の検査で形まで見るためである（→ distribution-image.test.mjs）。
- * 文字の幅は canvas で測らず、全角 1 字 ＝ 1 文字ぶん・半角 1 字 ＝ 半分で見積もる。
- * 字体は端末に依存してよい（→ 2 の「止まる箇所」#7）ので、塗る側は見積もった幅に収めて描く（fillText の maxWidth）。
- *
- * コアの側である。配列を受けて値を返し、SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
+ * コアの側である。SpreadsheetApp を掴まない。
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
-
 /**
- * 描く寸法（px）。canvas には、これを imageScale 倍して塗る（スマホで拡大して読まれる ◎ — 入る側 ACTION 6）。
- * セルの幅は役割名で決めない — 決めると、長い役割名が 1 つある日だけ表が横に伸びる。
- * 収まらない役割名は、塗る側が字を詰める（→ export-images.html の fillText）。
+ * 描く寸法（px）。canvas には imageScale 倍して塗る（スマホで拡大して読まれるため）。
+ * セルの幅は役割名で決めない（長い役割名がある日だけ表が伸びないように）。収まらない字は塗る側が詰める。
  */
 const imageMetrics = {
   padding: 16,
@@ -53,24 +44,21 @@ function estimateTextWidth(text, size) {
   return Math.ceil(width)
 }
 
-/** `2025-11-01` を `11月1日` にする。前回の表題の書き方である ◎（→ issue #213）。 */
+/** `2025-11-01` を `11月1日` にする（前回の表題の書き方）。 */
 function monthDayOf(date) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date))
-  if (!match) throw new Error(`日付「${date}」が YYYY-MM-DD でない（→ 条件入力の「日ごとの営業時刻」）`)
+  if (!match) throw new Error(`日付「${date}」が YYYY-MM-DD でない`)
   return `${Number(match[2])}月${Number(match[3])}日`
 }
 
 /**
- * マス目 1 枚から、配る 1 枚の表を組む。返すのは { fileName, title, times, rows } である。
+ * マス目 1 枚から、配る 1 枚の表 { fileName, title, times, rows } を組む。
  *
- *   times … 見出しの時刻（見出しが空の右側の列は落とす — 48 列のうち、その日に刻んだ枠だけが時刻を持つ）
- *   rows  … 1 人 1 行。{ name, cells: [{ role, color }] }（cells は times と同じ数・同じ並び）
+ *   times … 見出しの時刻（見出しが空の右側の列は落とす）
+ *   rows  … 1 人 1 行。{ name, cells: [{ role, color }] }（cells は times と同じ並び）
  *
- * header と dataRows はシートから読んだとおりである（→ shell.js の readGrid）。day は条件入力のその日の行で、
- * 表題の日付にだけ使う（label は `準備日` などのシート名 → sheet-layout.js の dayLabels）。
- *
- * 黙って捨てない。氏名の無い人に役割が入っていたら、名指しして止まる — 名前の列が空の行は、配っても誰の行か読めない。
- * 氏名は生成のたびに回答から入る（→ assignment-grid.js の namesFromAnswers）ので、空なのは回答に無い学籍番号である。
+ * header と dataRows は shell.js の readGrid が読んだとおり。day は表題の日付にだけ使い、label はシート名である。
+ * 氏名の無い人に役割が入っていたら、誰の行か読めないので名指しして止まる。
  */
 function distributionTable(header, dataRows, day, label) {
   const named = gridNamedColumns()
@@ -91,8 +79,7 @@ function distributionTable(header, dataRows, day, label) {
     if (name === '') {
       throw new Error(
         `シート「${label}」の ${rowIndex + 2} 行目（学籍番号「${String(row[studentIdColumn] || '')}」）に役割が入っているが、氏名が空である。`
-          + '配る画像には氏名しか載らないので、誰の行か読めない。回答にその学籍番号があるかを見て、メニューの「生成」を押す'
-          + '（氏名は生成のたびに回答から入る）',
+          + '回答にその学籍番号があるかを見て、メニューの「生成」を押す',
       )
     }
     const blank = times.map((time, index) => (time === '' && roles[index] !== '' ? index : -1)).filter((index) => index !== -1)
@@ -185,11 +172,9 @@ function distributionDrawing(table) {
 }
 
 /**
- * マス目 4 枚から、配る画像の中身を日の順に組む（→ 2 の一覧 9）。grids は殻が読んだ { layout, grid } の配列である。
- * 返すのは 1 枚ごとに { label, fileName, title, times, rows, drawing } で、1 人も入っていない日は rows が空のまま返る
- * — 描くかどうかは塗る側が言う（黙って落とさない）。
- *
- * 4 枚とも 1 人も入っていなければ、描くものが無いので止まる。生成の前に押したときである。
+ * マス目 4 枚から、配る画像の中身を日の順に組む。grids は殻が読んだ { layout, grid } の配列である。
+ * 1 枚ごとに { label, fileName, title, times, rows, drawing } を返す。1 人も入っていない日も rows を空にして返す。
+ * 4 枚とも空なら（生成の前に押したとき）止まる。
  */
 function distributionImages(grids, days) {
   const images = grids
@@ -201,7 +186,7 @@ function distributionImages(grids, days) {
       if (!day) {
         if (one.grid.rows.length === 0) return { label: label, fileName: '', title: '', times: [], rows: [], drawing: null }
         throw new Error(
-          `シート「${label}」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。表題の日付が決まらない（→ 4-1）`,
+          `シート「${label}」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い`,
         )
       }
       const table = distributionTable(one.grid.header, one.grid.rows, day, label)
@@ -212,7 +197,7 @@ function distributionImages(grids, days) {
     })
 
   if (images.every((image) => image.rows.length === 0)) {
-    throw new Error('割り当ての 4 枚に、役割の入ったセルが 1 つも無い。先にメニューの「生成」を押す（→ 2 の一覧 7）')
+    throw new Error('割り当ての 4 枚に、役割の入ったセルが 1 つも無い。先にメニューの「生成」を押す')
   }
   return images
 }

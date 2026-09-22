@@ -3,19 +3,16 @@
 //
 //   使い方: node src/generate.test.mjs
 //
-// 見るものは 6 つある（issue #151 の受け入れ条件 4 つと、その適用の順序 → 5-5）。
-//   ① 違反 0 の案が 1 つ出る（数える側に食わせて 0 件 → 5-4・count-violations.js）
-//   ② 人数が足りない枠が全部名指しで出る（置いた数 ＋ あと何人 ＝ 需要 → 5-4・name-unmet.js）
-//   ③ 同じ入力からは同じ案が出る（決定的である → 6 の #3 の理由 ③）
-//   ④ 外部のソルバーを読んでいない（→ 6 の #3）
+// 見るものは 7 つある（issue #151 の受け入れ条件 4 つと、適用の順序 → 5-5）。
+//   ① 違反 0 の案が 1 つ出る（数える側に食わせて 0 件）
+//   ② 人数が足りない枠が全部名指しで出る（置いた数 ＋ あと何人 ＝ 需要）
+//   ③ 同じ入力からは同じ案が出る
+//   ④ 外部のソルバーを読んでいない
 //   ⑤ 5-5 の適用の順序どおりに置く（きつい順 ／ 入れ替え 1 手 ／ 帯の中 ／ 氏名は空）
 //   ⑥ 決まらない入力で止まり、コアの段として繋がっている
-//   ⑦ 担当者の手直し（固定）を先に置き、再実行で残す。置けない固定は名指しで返し、違反は作らない（→ 5-3・issue #156）
+//   ⑦ 手直し（固定）を先に置き、再実行で残す。置けない固定は名指しで返す（→ issue #156）
 //
-// 規則を決めたのは上流である（→ docs/tech-requirements.md 3）。方式は 6 の #3、適用の順序は 5-5 が持つ。
-// 扱いが動いたら、ここと src/generate.js の generationOrder ／ generationNotAimed が一緒に動く。
-//
-// これは契約であって実装ではない。何も書き換えない。
+// 扱いが動いたら、ここと generate.js の generationOrder ／ generationNotAimed が一緒に動く。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -26,7 +23,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
 
 // ---- 読み込む ---------------------------------------------------------------
-// SpreadsheetApp を文脈に置いていない。置かなくても通ることが、この検査そのものである。
+// SpreadsheetApp を文脈に置かずに通ることも、この検査のうちである。
 
 const coreFiles = ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js']
 
@@ -38,7 +35,7 @@ function load(files) {
   return context
 }
 
-// shell.js を読むのは、モックの CSV を回答シートに貼ったときの表現に揃えるためである（→ ①）。
+// shell.js は、モックの CSV を回答シートに貼ったときの表現に揃えるために読む（→ ①）。
 const context = load(coreFiles.concat(['shell.js']))
 const {
   generate, expand, takeIn, countViolations, nameUnmet, nameFixedConflicts, builtInSteps, sheetColumns, formatDateTime,
@@ -141,11 +138,8 @@ function demandRoles(plan) {
 
 /**
  * その枠のその役割に要る人数。効く行が複数あれば最大である（→ 5-4）。
- * 未充足の側（name-unmet.js）と同じ読み方を、この検査の側でもう一度書いてある
- * — 生成と未充足が同じ関数を読んでいるので、突き合わせる相手を別に持たないと確かめたことにならない。
- *
- * 時間帯を空けた行が効くのは、その日の 調理開始〜調理終了 の帯である（→ 5-1 の #2・issue #210）。
- * 「全枠」ではない — 営業していない帯に店の役割の需要を立てない。
+ * 生成と未充足が同じ関数を読むので、突き合わせる相手としてここにもう一度書いてある。
+ * 時間帯を空けた行が効くのは、その日の 調理開始〜調理終了 の帯である（→ issue #210）。
  */
 function requiredFor(plan, day, slot, role) {
   let required = 0
@@ -211,9 +205,8 @@ for (let i = 0; i < 10; i++) {
 }
 
 /**
- * 準備・片付けの需要は、時間帯を明示して置く（→ 5-1 の #2・issue #210）。
- * 空欄で書くと、その日の 調理開始〜調理終了 の帯に立つ — この 2 つは調理帯の外にある帯なので、
- * 意図した所に立たない。plainDay では 準備が 08:00-10:00、片付けが 18:00-20:00 である。
+ * 準備・片付けの需要は時間帯を明示して置く。空欄だと調理帯に立ってしまう（→ issue #210）。
+ * plainDay では 準備が 08:00-10:00、片付けが 18:00-20:00 である。
  */
 const prepCleanupNeeds = [['', '08:00', '10:00', '準備', 2], ['', '18:00', '20:00', '片付け', 2]]
 
@@ -309,9 +302,7 @@ check(
   demandTotal(shortPlan),
 )
 
-// 枠の側から埋める役割は、需要を超えない。準備・片付けはそうではない — 規則 3 が要るのは「入っていること」
-// なので、帯の需要が尽きても帯の頭に 1 枠置く（→ 5-5 の「準備・片付けをどこに置くか」・placeInBand）。
-// その 2 つをここで数えると、規則 3 を満たしたことが超過として出る。
+// 準備・片付けは除く。規則 3 のために帯の需要が尽きても 1 枠置くので、超過に見える（→ placeInBand）。
 check(
   '② 必要人数を超えて置いていない（需要のある枠と役割ごとに見る。準備・片付けは規則 3 が置くので除く → 5-5）',
   overPlaced(plainPlan).filter((one) => [ruleRoles.prep, ruleRoles.cleanup].indexOf(one.split(' ')[2]) === -1),
@@ -644,7 +635,7 @@ check(
   [[false, false, false, false], true, 0],
 )
 
-// 規則 3 と固定 — 準備・片付けの手直しは、店の割り当てが出そろってから向きを見る（→ releaseMisfitBandFixes）。
+// 規則 3 と固定 — 準備・片付けの手直しは、店の割り当てが出そろってから向きを見る（→ releaseFixesBreakingRule3）。
 //   EED2000300 … 午前の店の時間を希望していない（8:00-9:00 と 14:00-15:00 と 18:00-19:00）。
 //                午後だけの店の固定（14:00 会計）＋ 準備の固定 → 生成が午前を足せないので ③ のまま。準備を外して名指しする
 //   EED2000003 … 1 日じゅう希望している。午後だけの店の固定 ＋ 準備の固定 → 生成が午前に店の枠を足せば ④ で満たす
@@ -799,15 +790,9 @@ const mockWishes = takeIn(
   readCsv(fs.readFileSync(path.join(dataDir, '前回の希望データ-モック.csv'), 'utf8')).slice(1).map(asSheetRow),
 )
 
-// 前回の 5 時刻は、入力の行としては記録に無い。設問の説明文の営業時間 ◎ から 1 日を 1 本の帯として刻む
-// （→ 7 の「前回の 5 時刻の置き方」の M1 ①・フォームの側・expand.test.mjs と同じ置き方である）。
-// M2 の判定は別の置き方である（確定シフトの行から算出する → scripts/前回の5時刻.mjs）。
-// ここが見るのは記録と同じ大きさ（36 人・88 枠）で違反 0 が出ることだけで、帯の内訳は見ない
-// （規則 3 の ①〜⑤ そのものは、上の plainDay の側が 1 つずつ見ている）。
-//
-// だから需要は時間帯を明示して置く（→ 下の fiveRolesWholeDay・issue #210）。1 本の帯として刻んだ日は
-// 調理帯が 0 枠なので、時間帯を空けた行はどの枠にも立たない（→ 5-1 の #2）。
-// 帯の内訳を見ないこの置き方で、内訳に依る書き方（空欄）を使わない。
+// 前回の 5 時刻は記録に無いので、設問の営業時間 ◎ から 1 日を 1 本の帯として刻む（→ expand.test.mjs と同じ）。
+// 見るのは記録と同じ大きさ（36 人・88 枠）で違反 0 が出ることだけで、帯の内訳は見ない。
+// 1 本の帯の日は調理帯が 0 枠なので、需要は時間帯を明示して置く（→ fiveRolesWholeDay・issue #210）。
 const lastYearDayRows = [
   ['2025-11-01', '08:00', '08:00', '08:00', '08:00', '21:00'],
   ['2025-11-02', '08:00', '08:00', '08:00', '08:00', '20:00'],
@@ -819,8 +804,7 @@ const lastYearDayRows = [
 const lastYearDays = toDays(lastYearDayRows, '日ごとの営業時刻')
 const expandable = mockWishes.filter((wish) => whyItStopped(() => expand([wish], lastYearDays)) === null)
 
-// 5 役割を、4 日の全枠に効かせる。どの日も 08:00 に始まり、いちばん遅い日でも 21:00 に終わる（→ 上の 4 行）
-// ので、08:00-21:00 の 1 行が全 88 枠に重なる。数えるのは規模（88 枠 × 8 人 ＝ のべ 704）である。
+// 08:00-21:00 の 1 行で、5 役割を 4 日の全 88 枠に効かせる（88 枠 × 8 人 ＝ のべ 704）。
 const fiveRolesWholeDay = fiveRoles.map((need) => ['', '08:00', '21:00', need[3], need[4]])
 const mockPlan = planOf(lastYearDayRows, fiveRolesWholeDay, expandable)
 
@@ -847,9 +831,8 @@ check(
   JSON.stringify(mockPlan.rows),
 )
 
-// 前回のモックの大きさで、手直しを積んで通し直す（→ 5 の #11「動かしたセルが 1 つも戻っていない」・issue #156）。
-// 案の 7 行に 1 行を手直しにする — 店の役割（調理の外）は別の役割に書き換え、それ以外は書いてあるとおりに固定する。
-// 11 行に 1 行（7 の倍数を除く）は、セルを空にする（その人をその枠に置かない）。
+// 前回のモックの大きさで、手直しを積んで通し直す（→ 5 の #11）。
+// 7 行に 1 行を手直しにする（店の役割は別の役割に書き換え、ほかはそのまま固定）。11 行に 1 行はセルを空にする。
 const mockFixes = []
 mockPlan.rows.forEach((row, index) => {
   const at = [columnOf(row, '日'), columnOf(row, '開始')]
@@ -874,9 +857,8 @@ check(
   [true, 0, 0],
 )
 
-// このモックの置き方は準備の帯が 0 枠である（1 日 1 本の帯 → 上の lastYearDayRows）。午前だけの店の手直しは、
-// 生成が同じ人の午後の枠を足せたときだけ満たせる（④ → 片付け）。足せなかった日の手直しだけが名指しで返る
-// （外すのは、残りで規則 3 を満たせる最小の側である → generate.js の releaseFixesBreakingRule3）。
+// このモックは準備の帯が 0 枠なので、午前だけの店の手直しは、生成が午後を足せたときだけ満たせる（④）。
+// 足せなかった日の手直しだけが名指しで返る（→ releaseFixesBreakingRule3）。
 check(
   '⑦ 前回のモックで名指しされるのは、規則 3 を満たせない日の手直しだけで、名指しは手直しの 1 割に満たない',
   [

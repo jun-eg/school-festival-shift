@@ -1,37 +1,15 @@
 /**
- * 走る前の構造の検証 — シートの有無・見出し・列数を照らす
- * （docs/tech-requirements.md 2 の「止まる箇所」#8 ／ issue #138）。
+ * 走る前の構造の検証 — シートの有無・見出し・列数を照らす（docs/tech-requirements.md 2 の「止まる箇所」#8）。
+ * シートの保護（build-template.js）は持ち主を締め出せず、「警告のみ」は押し切れるので、こちらでも止める。
  *
- * #8 の予防は 2 つあり、これはそのもう片方である。
- * 片方（生成シートに保護をかける）は build-template.js が持つが、
- * かかり方は「警告のみ」で、押し切れば書ける（→ src/README.md「保護は『警告のみ』である」）。
+ * 崩れていたら、崩れている箇所を全部名指しして止まる。セルは 1 つも書き換えない（読むだけ）。
+ * 見るのは見出しの行だけである（データの行は担当者が増減させるのが仕様）。
+ * 「回答」の後ろ 4 列（希望時間）は列名が毎年変わるので、位置だけを当てる。
  *
- * 壊れうるのは行の削除・列の挿入・生成シートの上書きで、
- * 担当者から見ると「触っていい操作」と見分けが付かない
- * — 手直しの画面がスプレッドシートそのもの（→ 6 の #2）で、
- * セルを書き換えることが仕様だからである（→ 5-3）。
- *
- * 崩れていたら、崩れている箇所を全部名指しして止まる。
- *   黙って直さない — セルを 1 つも書き換えない。読むだけである
- *   黙って走らない — 読む前に止まるので、生成は 1 行も動かない
- * 「満たせない枠は黙って埋めない」（→ 5 の #6）と同じ扱いである。
- *
- * 直し方はここが決めない。テンプレートをもう 1 回コピーして条件を入れ直す
- * （→ 6 の #1 の理由 ⑤・src/README.md の「テンプレートの作り方」）。
- *
- * 見るのは見出しの行だけである。データの行は見ない — 条件入力と割り当ては担当者が書く所で、
- * 行が増えたり減ったりするのが仕様である（→ 5-1・5-3）。
- * 列数は見出しの行で見る（区画の右端より右や、区画のあいだに中身があれば名指しする）。
- *
- * 名前で突き合わせるのは、構成が名前を持っている列だけである。
- * 「回答」の後ろ 4 列（希望時間 4 設問）は列名が毎年変わる（→ 4-1・sheet-layout.js）ので、
- * 当てるのは位置だけである — 何と書いてあるかは見ない。
- *
- * スプレッドシートは引数で受ける。SpreadsheetApp を名指しするのは shell.js の 1 行だけである。
- * 他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
+ * スプレッドシートは引数で受ける。他のファイルの値をこのファイルの最上位で使わない（→ core.js の同じ注意）。
  */
 
-/** 崩れの種類。文にするときの形が種類ごとに違う（→ breakageToText）。 */
+/** 崩れの種類（→ breakageToText）。 */
 const breakageKind = {
   missingSheet: 'シートが無い',
   tooFewColumns: '列が足りない',
@@ -41,10 +19,7 @@ const breakageKind = {
 
 /**
  * 崩れている箇所を全部名指しして返す（崩れていなければ空の配列）。
- *
- * 最初の 1 件で切り上げない。担当者が直すのはスプレッドシートの上なので、
- * 1 箇所ずつ走らせ直させるより、いま崩れている所を一度に出したほうが手数が少ない。
- * 読むのはシートごとに 1 回である。セル単位で往復しない（→ 6 の #2 の実装上の注意）。
+ * 最初の 1 件で切り上げない — 一度に出したほうが直す手数が少ない。読むのはシートごとに 1 回である。
  */
 function nameBreakages(spreadsheet) {
   const breakages = []
@@ -64,23 +39,19 @@ function nameBreakages(spreadsheet) {
   return breakages
 }
 
-/**
- * 走る前に構造を確かめる。崩れていれば、崩れている箇所を全部名指しして止まる。
- * 崩れていなければ空の配列を返す（分岐させるためではなく、0 箇所であることを見せるためである）。
- */
+/** 走る前に構造を確かめる。崩れていれば全部名指しして止まり、崩れていなければ空の配列を返す。 */
 function checkStructure(spreadsheet) {
   const breakages = nameBreakages(spreadsheet)
   if (breakages.length === 0) return breakages
 
   throw new Error(
-    `シートの構造が ${breakages.length} 箇所崩れているので、生成を走らせない。`
-      + '中身を見てから決める（黙って直さない）。'
-      + '戻せないときは、テンプレートをもう 1 回コピーして条件を入れ直す（→ src/README.md）。\n'
+    `シートの構造が ${breakages.length} 箇所崩れているので、生成を走らせない（黙って直さない）。`
+      + '戻せないときは、テンプレートをもう 1 回コピーして条件を入れ直す。\n'
       + breakages.map(breakageToText).join('\n'),
   )
 }
 
-/** 崩れ 1 つを、場所を名指しした 1 行にする。担当者が読むのはこの行である。 */
+/** 崩れ 1 つを、場所を名指しした 1 行にする。 */
 function breakageToText(breakage) {
   if (breakage.kind === breakageKind.missingSheet) {
     return `シート「${breakage.sheet}」が無い`
@@ -97,11 +68,7 @@ function breakageToText(breakage) {
     + `いま: ${breakage.actual.map(showBlank).join(' / ')} ／ 構成: ${breakage.expected.join(' / ')}`
 }
 
-/**
- * シートの列が、構成の要る数だけあるかを見る。
- * 列をまとめて消されると、読む前にここで名指しになる
- * （読む範囲をシートの外に取ると、名指しの代わりに範囲外の例外が出てしまう）。
- */
+/** シートの列が構成の要る数だけあるかを見る（列をまとめて消されたとき、範囲外の例外より先に名指しする）。 */
 function checkColumnCount(sheet, layout, breakages) {
   const rightEdge = sectionRightEdge(layout)
   if (sheet.getMaxColumns() >= rightEdge) return
@@ -117,9 +84,8 @@ function checkColumnCount(sheet, layout, breakages) {
 }
 
 /**
- * 見出しの行だけを 1 回で読む。区画の右端より右も、中身があるところまで読む（挿された列を見るため）。
- * 読む範囲をシートの外に出さない — 出すと、名指しの代わりに範囲外の例外が出てしまう。
- * 消された側は空として突き合わせるので、名指しは checkSections から出る。
+ * 見出しの行だけを 1 回で読む。挿された列を見るため、区画の右端より右も中身があるところまで読む。
+ * 読む範囲はシートの外に出さない（出すと範囲外の例外になる）。
  */
 function readHeaderRows(sheet, layout) {
   const rowCount = Math.min(headerRowCount(layout), sheet.getMaxRows())
@@ -133,11 +99,7 @@ function readHeaderRows(sheet, layout) {
     .map((row) => row.map((cell) => String(normalizeValue(cell))))
 }
 
-/**
- * 区画ごとに、見出しのセルと列名の並びを突き合わせる。並びは 1 件にまとめて名指しする。
- * 突き合わせるのは section.columns — 構成が名前を持っている列だけである。
- * 「回答」の後ろ 4 列は、位置が取ってあるだけで名前を持たない（→ 上の注意）ので、ここに来ない。
- */
+/** 区画ごとに、見出しのセルと列名の並び（section.columns）を突き合わせ、違えば 1 件にまとめて名指しする。 */
 function checkSections(layout, headerRows, breakages) {
   const columnNameRow = headerRowCount(layout)
 
@@ -166,12 +128,7 @@ function checkRange(layout, headerRows, row, startColumn, expectedNames, breakag
   })
 }
 
-/**
- * 見出しの行のうち、どの区画にも入らない列に中身があれば名指しする。
- *
- * 見るのは区画のあいだ（条件入力は 6 区画が横に並ぶ）と、区画の右端より右である。
- * 列を 1 つ挿すと、右へずれた見出しがここに落ちてくる。
- */
+/** 見出しの行のうち、どの区画にも入らない列（区画のあいだ・右端より右）に中身があれば名指しする。 */
 function checkUnknownColumns(layout, headerRows, breakages) {
   // 名前が input-types.js の conditionSection と別なのは、.gs が 1 つのグローバルを共有するからである
   const usedColumns = {}
@@ -194,13 +151,13 @@ function checkUnknownColumns(layout, headerRows, breakages) {
   })
 }
 
-/** 読んだ見出しの行から 1 セル取る。読んだ範囲の外は空として扱う（列を消された側である）。 */
+/** 読んだ見出しの行から 1 セル取る。読んだ範囲の外は空として扱う。 */
 function cellAt(headerRows, row, column) {
   const rowValues = headerRows[row - 1] || []
   return column <= rowValues.length ? rowValues[column - 1] : ''
 }
 
-/** 空のセルは、文の中で見えないと場所が読めない。 */
+/** 空のセルを文の中で見えるようにする。 */
 function showBlank(value) {
   return value === '' ? '（空）' : value
 }

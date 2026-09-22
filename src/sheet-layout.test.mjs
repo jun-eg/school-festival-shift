@@ -1,17 +1,14 @@
 #!/usr/bin/env node
-// シート構成の検査 — src/sheet-layout.js の定義が、決めた形どおりかを突き合わせる。
+// シート構成（src/sheet-layout.js）の検査。
 //
 //   使い方: node src/sheet-layout.test.mjs
 //
 // 見るものは 2 つある。
-//   ① docs/tech-requirements.md と issue #135 が決めた形（5 枚・担当者が書く側・保護する側・列）
-//   ② 回答シートの並びが、data/前回の希望データ-モック.csv の見出しと当たるか
-//      — 回答シートの列はフォームの設問（4-1）の転記だが、後ろ 4 列の列名は毎年変わる（設問の題だからである）。
-//        構成が名前で持つのは前の 6 列だけなので、名前で突き合わせるのもそこまでで、
-//        後ろ 4 列は数と位置だけを見る
+//   ① 決めた形（シートの枚数・担当者が書く側・保護する側・列 → issue #135）
+//   ② 回答シートの並びが data/前回の希望データ-モック.csv の見出しと当たるか
+//      （列名が毎年変わる後ろ 4 列は、数と位置だけを見る）
 //
-// これは契約であって実装ではない。何も書き換えない。
-// 実際の Google スプレッドシートの上での挙動（保護・コピー）はここでは分からない（→ src/README.md）。
+// 実機での挙動（保護・コピー）はここでは分からない。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -24,10 +21,10 @@ const require = createRequire(import.meta.url)
 
 const {
   sheetLayout, checkKind, sectionWidth,
-  dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts,
+  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts,
 } = require('./sheet-layout.js')
 
-/** 名前でシート 1 枚の区画を引く。並びの番号で当てない（並びが動くと検査が別の枚を見てしまう）。 */
+/** 名前でシート 1 枚の区画を引く（並びの番号だと、並びが動いたとき別の枚を見る）。 */
 function sheetSectionOf(name) {
   return sheetLayout.filter((layout) => layout.name === name)[0].sections[0]
 }
@@ -74,15 +71,21 @@ check(
 )
 
 check(
-  '保護をかけるのは生成シートの 3 枚だけである（割り当ては外れる）',
+  '8 枚とも保護をかける（→ issue #234）',
   sheetLayout.filter((s) => s.protect).map((s) => s.name),
-  ['回答', '検証結果', '指標'],
+  sheetLayout.map((s) => s.name),
 )
 
 check(
-  '担当者が書くシートに保護をかけていない',
-  sheetLayout.filter((s) => s.staffWrites && s.protect).map((s) => s.name),
-  [],
+  '担当者が書くシートに「警告のみ」を全面にはかけない — 割り当ては持ち主だけ、条件入力は入力欄を外す',
+  sheetLayout.filter((s) => s.staffWrites).map((s) => [s.name, s.protect.kind, Boolean(s.protect.openInputs)]),
+  [['条件入力', protectionKind.warningOnly, true]].concat(dayLabels.map((name) => [name, protectionKind.ownerOnly, false])),
+)
+
+check(
+  '担当者が書かないシートは「警告のみ」を全面にかける',
+  sheetLayout.filter((s) => !s.staffWrites).map((s) => [s.name, s.protect.kind, Boolean(s.protect.openInputs)]),
+  [['回答', protectionKind.warningOnly, false], ['検証結果', protectionKind.warningOnly, false], ['指標', protectionKind.warningOnly, false]],
 )
 
 check(
