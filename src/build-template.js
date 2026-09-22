@@ -13,7 +13,7 @@ function buildTemplate() {
 }
 
 /**
- * sheetLayout どおりにシートを作り、見出しを置き、生成シートに保護をかける。
+ * sheetLayout どおりにシートを作り、見出しを置き、8 枚に保護をかける。
  * 何度走らせても同じ形になる（足りないものだけ足す）。
  * 名前をコアの build と重ねない（Apps Script は .gs で 1 つのグローバルを共有する）。
  */
@@ -37,9 +37,11 @@ function buildTemplateInto(spreadsheet) {
 
   removeDefaultSheet(spreadsheet, log)
   spreadsheet.setActiveSheet(spreadsheet.getSheetByName(sheetLayout[0].name))
+  const countOf = (kind) => sheetLayout.filter((c) => c.protect && c.protect.kind === kind).length
   log.push(
     `${sheetLayout.length} 枚のうち保護したのは ${sheetLayout.filter((c) => c.protect).length} 枚である`
-    + `（割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚）`,
+    + `（${protectionKind.warningOnly} ${countOf(protectionKind.warningOnly)} 枚 ／ ${protectionKind.ownerOnly} ${countOf(protectionKind.ownerOnly)} 枚。`
+    + `割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚）`,
   )
   return log
 }
@@ -97,7 +99,11 @@ function replaceValues(sheet, row, startColumn, values, sheetName, log) {
   )
 }
 
-/** 生成シートに「警告のみ」の保護をかける（持ち主の担当者を締め出せる保護は無いため）。 */
+/**
+ * シートに保護をかける。かけ方は構成が持つ 2 つのどちらか（→ sheet-layout.js の protectionKind）。
+ * 持ち主を締め出せる保護は無いので、誰も手で書かないシートは「警告のみ」にする（→ src/README.md）。
+ * 「持ち主だけ」は編集者を全部外す（持ち主と、走らせている人は外れない）。
+ */
 function applyProtection(sheet, layout, log) {
   sheet
     .getProtections(SpreadsheetApp.ProtectionType.SHEET)
@@ -105,8 +111,29 @@ function applyProtection(sheet, layout, log) {
 
   if (!layout.protect) return
 
-  sheet.protect().setDescription(protectionNote).setWarningOnly(true)
-  log.push(`シート「${layout.name}」に保護をかけた（警告のみ）`)
+  const protection = sheet.protect().setDescription(layout.protect.note)
+  if (layout.protect.kind === protectionKind.ownerOnly) {
+    protection.removeEditors(protection.getEditors())
+    if (protection.canDomainEdit()) protection.setDomainEdit(false)
+  } else {
+    protection.setWarningOnly(true)
+  }
+  if (layout.protect.openInputs) protection.setUnprotectedRanges(inputRanges(sheet, layout))
+  log.push(
+    `シート「${layout.name}」に保護をかけた（${layout.protect.kind}`
+    + `${layout.protect.openInputs ? `。区画 ${layout.sections.length} つの入力欄は外した` : ''}）`,
+  )
+}
+
+/**
+ * 保護の外に出す入力欄 — 区画ごとに、列名の行の下からシートの最下行まで、区画の幅だけである。
+ * 見出し・列名・区画のあいだの列・右端より右は保護の内に残る（→ verify-structure.js が見る所である）。
+ * 最下行より下に行を足すと、足した行は保護の内になる（警告が出るだけで、書ける）。
+ */
+function inputRanges(sheet, layout) {
+  const firstInputRow = (layout.hasSectionHeadings ? 2 : 1) + 1
+  const rowCount = sheet.getMaxRows() - firstInputRow + 1
+  return layout.sections.map((section) => sheet.getRange(firstInputRow, section.startColumn, rowCount, sectionWidth(section)))
 }
 
 /** 新しいスプレッドシートに最初からある空のシートを消す。中身があれば残して名指しする。 */

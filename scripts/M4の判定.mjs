@@ -73,6 +73,12 @@ class 偽の保護 {
   constructor(シート) { Object.assign(this, { シート, description: null, warningOnly: false }) }
   setDescription(文) { this.description = 文; return this }
   setWarningOnly(値) { this.warningOnly = 値; return this }
+  // 割り当ての 4 枚は「持ち主だけ」、条件入力は入力欄を外す（→ src/build-template.js の applyProtection ／ issue #234）。
+  // この手は保護の中身を見ないので、受けて捨てる。
+  getEditors() { return [] }
+  removeEditors() { return this }
+  canDomainEdit() { return false }
+  setUnprotectedRanges() { return this }
   remove() { this.シート.protections = this.シート.protections.filter((p) => p !== this) }
 }
 
