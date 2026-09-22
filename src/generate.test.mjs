@@ -467,10 +467,10 @@ check(
 )
 
 check(
-  '⑤ 踏む段は 3 つで、目的にしないものは 3 つ名前で置いてある（⑥・固定・氏名 → 5-5）',
+  '⑤ 踏む段は 4 つで、目的にしないものは 3 つ名前で置いてある（⑥・固定・氏名 → 5-5）',
   [generationOrder.map((step) => step.key), generationNotAimed.map((one) => one.what)],
   [
-    ['fill', 'swap', 'prepCleanup'],
+    ['fill', 'swap', 'prepCleanup', 'prepCleanupDemand'],
     ['規則 3 の ⑥（複数日で偏らせない）', '5-3 の固定（担当者が割り当てシートに入れた手直し）', '割り当ての 氏名'],
   ],
 )

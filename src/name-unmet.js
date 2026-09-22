@@ -35,7 +35,8 @@ const unmetSources = [
   {
     key: 'roleNeeds',
     label: '必要人数',
-    what: '(日・時間帯・役割名・人数) の行。時間帯を空けた行は、その日の 調理開始〜調理終了 の帯に効く（→ 5-1 の #2）',
+    what: '(日・時間帯・役割名・人数) の行。時間帯を空けた行は、その役割の帯に効く'
+      + '（準備 → 準備帯 ／ 片付け → 片付け帯 ／ それ以外 → 調理帯。→ 5-1 の #2）',
   },
   {
     key: 'committeeNeeds',
@@ -100,22 +101,37 @@ function allNeeds(conditions) {
 }
 
 /**
+ * 時間帯を空けた行が効く帯（→ 5-1 の #2）。**役割の側で決まる。**
+ *
+ *   `準備`   … その日の `準備開始`〜`調理開始`
+ *   `片付け` … その日の `片付け開始`〜`片付け終了`
+ *   それ以外 … その日の `調理開始`〜`調理終了`（店を開けている帯）
+ *
+ * 帯の実体は count-violations.js が 1 つだけ持つ（→ prepCleanupBands）。ここで書き直さない。
+ * 「全枠」ではない — 営業していない帯にまで店の役割の需要が立つ（準備日の朝に `呼び込み` が要ることになる）。
+ * 役割ごとに帯が決まるので、**担当者は日も時間帯も書かずに 1 行ずつ書ける**
+ * （日ごとの 5 時刻を 2 か所に書かせない → 5-1 の #1）。
+ */
+function blankBandFor(day, role) {
+  const band = prepCleanupBands().filter((one) => one.role === role)[0]
+  if (band) return { from: day[band.from], to: day[band.to] }
+  return { from: day.cookStart, to: day.cookEnd }
+}
+
+/**
  * 需要 1 行が、その枠に効くか。日を受けるのであって、日付の文字列ではない（→ 空けた時間帯の読み）。
  *
  * 日の欄が空なら、日では絞らない（→ 5-1 の #2）。
- * 時間帯の欄が空なら、**その日の `調理開始`〜`調理終了` の帯**である（→ 5-1 の #2・5-4）。
- * 「全枠」ではない — 営業していない帯にまで店の役割の需要が立つ（準備日の朝に `呼び込み` が要ることになる）。
- * 帯の側で決まるので、準備日・片付け日は**調理帯が 0 枠なので需要が立たない**
- * （日ごとに書き分けなくてよい → ADR tech-requirements/0008）。
+ * 時間帯の欄が空なら、**その役割の帯**である（→ blankBandFor・ADR tech-requirements/0008・0009）。
+ * 帯の側で決まるので、**準備日・片付け日は店の 5 役割の需要が立たず、`準備` の需要は立つ。**
  *
  * 時間帯が決まったあとの切り方は 1 つである — **重なる枠すべて**に効く（→ 5-4）。
  * 端が触れているだけの枠は重なっていない。**空けた行と書いた行で、切り方を変えていない。**
  */
 function needCovers(need, day, slot) {
   if (need.date !== '' && need.date !== day.date) return false
-  const from = need.start === '' ? day.cookStart : need.start
-  const to = need.start === '' ? day.cookEnd : need.end
-  return toMinutes(from) < toMinutes(slot.end) && toMinutes(slot.start) < toMinutes(to)
+  const span = need.start === '' ? blankBandFor(day, need.role) : { from: need.start, to: need.end }
+  return toMinutes(span.from) < toMinutes(slot.end) && toMinutes(slot.start) < toMinutes(span.to)
 }
 
 /**
@@ -234,7 +250,7 @@ function unmetRow(date, slot, role, required, have) {
 if (typeof module !== 'undefined') {
   module.exports = {
     unmetSources,
-    nameUnmet, allNeeds, needCovers, requiredAt, placedPeople, roleSlotKey, rolesInOrder,
+    nameUnmet, allNeeds, blankBandFor, needCovers, requiredAt, placedPeople, roleSlotKey, rolesInOrder,
     checkEveryNeedLands, describeNeed, sectionOf, unmetRow,
   }
 }

@@ -33,6 +33,31 @@ const ruleRoles = {
 const cookRoles = [ruleRoles.cook, ruleRoles.cookLeader]
 
 /**
+ * 規則 3 が名指しする 2 つの役割名と、その帯（→ 3 の役割名の表・5-5）。
+ *
+ * 帯の実体をここに置くのは、**数える側（name-unmet.js）と組む側（generate.js）の両方が読む**からである。
+ * 2 か所に持つと、片方が古くなる（→ src/README.md）。
+ */
+function prepCleanupBands() {
+  return [
+    { role: ruleRoles.prep, from: 'prepStart', to: 'cookStart' },
+    { role: ruleRoles.cleanup, from: 'cleanupStart', to: 'cleanupEnd' },
+  ]
+}
+
+/** 規則 3 が置く 2 つの役割名（→ 3 の役割名の表）。 */
+function prepCleanupRoles() {
+  return prepCleanupBands().map((band) => band.role)
+}
+
+/** その枠が、その役割の帯の中にあるか。 */
+function isInBand(day, slot, role) {
+  const band = prepCleanupBands().filter((one) => one.role === role)[0]
+  if (!band) throw new Error(`準備・片付けの帯に「${role}」が無い（prepCleanupBands と食い違っている）`)
+  return toMinutes(slot.start) >= toMinutes(day[band.from]) && toMinutes(slot.end) <= toMinutes(day[band.to])
+}
+
+/**
  * 数える違反 5 つ（→ 5-4 の「違反」の行）。
  * label は検証結果の「内容」の頭に出る名前で、what はその 1 行が何を見ているかである。
  */
@@ -233,8 +258,13 @@ function prepCleanupDetail(day, boundary) {
     if (day.cleanup && !day.prep) return null
     return `③ その日の割り当てが午後だけなので、${ruleRoles.cleanup} に入れて ${ruleRoles.prep} には入れない。${where}。${now}`
   }
-  if (!day.prep && !day.cleanup) return null
-  return `⑤ その日の割り当てが午前にも午後にも無いので、${ruleRoles.prep} にも ${ruleRoles.cleanup} にも入れない。${where}。${now}`
+  // ⑤「どちらも無い → 入れない」は、当たらなくなった（→ ADR tech-requirements/0009）。
+  // ①〜④ が見ているのは「店の役割に就いた人に 準備・片付け を乗せるか」で、
+  // 午前・午後は店の役割の行からしか立たない（準備・片付けの行そのものは見ない → ①）。
+  // 準備・片付けが需要になった（→ 5-1 の #2・5-5 の 4 段目）ので、
+  // 店の役割に就いていない日に 準備 だけ置かれている人は、置かれたことそのものが仕事である。
+  // 記録もその形である — `2025-11-01` は `準備` 25 人・店の役割 0 行である（→ data/前回の確定シフト.md）。
+  return null
 }
 
 /**
@@ -362,6 +392,7 @@ function cookAnswerText(canCook) {
 if (typeof module !== 'undefined') {
   module.exports = {
     ruleRoles, cookRoles, violationRules, violationsNotCounted,
+    prepCleanupBands, prepCleanupRoles, isInBand,
     countViolations, cookLeaderGradeBroken, cookAnswerBroken, countPrepCleanupBroken, prepCleanupDetail,
     readAssignments, checkOnSlot, wishesByStudentId, wishedSlots, slotKey, violationRow, labelOf, cookAnswerText,
   }
