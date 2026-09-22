@@ -1,7 +1,7 @@
 /**
- * 入力の型 — docs/tech-requirements.md 5-1 の 6 種類（issue #140 ／ 8 の 4）。
+ * 入力の型 — docs/tech-requirements.md 5-1 の 7 種類（issue #140 ／ 8 の 4）。
  *
- * 殻が読んだ行の配列を、6 種類の型に直す。ここが通った先には、6 種類の外の値が 1 つも無い
+ * 殻が読んだ行の配列を、7 種類の型に直す。ここが通った先には、7 種類の外の値が 1 つも無い
  * （→ 5 の #1）。友達欄が割り当ての材料にならない（→ 5-2）のも、氏名が型に入らないのも、
  * 「型に無いものは型に無い」というだけのことである。
  *
@@ -31,6 +31,18 @@ const cookAnswers = { はい: true, いいえ: false }
 /** 準備・片付けのルールの区画に書く項目（→ 5-1 の #5・規則 3）。いまは境目 1 つだけである。 */
 const prepCleanupItems = { noonBoundary: '午前と午後の境目' }
 
+/** 置き方のルールの区画に書く項目（→ 5-1 の #7・5-5）。いまはまとまりの長さ 1 つだけである。 */
+const placementItems = { minRun: '連続して入る最小の長さ' }
+
+/**
+ * 「連続して入る最小の長さ」の既定（→ 5-1 の #7）。**担当者が書けば、その値で走る。**
+ *
+ * 定数ではない。**書かなかった年に何分で走るか**であって、**書いた年はこの値を見ない**
+ * （定数にすると、来年 2 時間にしたい年にコードを直すことになる → 5 の #12）。
+ * 前年の値を既定にしているのでもない（→ 5-1 の #1）— **年に依らない 1 時間**である。
+ */
+const defaultMinRun = '1:00'
+
 /** 学籍番号の形式。フォームの正規表現の転記である（→ 4-1 の #1）。識別キーはこれである ◎。 */
 const studentIdPattern = /^[A-Za-z0-9]{10}$/
 
@@ -52,12 +64,12 @@ const wishColumns = { studentId: '学籍番号', grade: '学年', canCook: '調�
 const columnsOutsideWish = ['タイムスタンプ', '氏名', '一緒に組みたいお友達']
 
 /**
- * 6 種類の型（→ 5-1）。並びは 5-1 の表の #1〜#6 と同じである。
+ * 7 種類の型（→ 5-1）。並びは 5-1 の表の #1〜#7 と同じである。
  *
  *   key    … コアが条件を持つときのキー（→ core.js の takeConditions）
  *   source … その型に直す行がどこから来るか。区画の見出し、またはシートの名前である
  *   build  … 行の配列をその型に直す関数
- *   fields … その型のどこかに現れてよい名前の全部。ここに無い名前が型に出たら、それは 6 種類の外である
+ *   fields … その型のどこかに現れてよい名前の全部。ここに無い名前が型に出たら、それは 7 種類の外である
  *
  * 型 #6 だけ、build を呼ぶのが core.js の build の入口ではない — 規則 2 の畳み込み（取り込む ／ #146）を
  * 通ってから 1 人 1 件になるので、呼ぶのはその段である。
@@ -114,6 +126,14 @@ const inputTypes = [
     source: '回答',
     fields: ['studentId', 'grade', 'canCook', 'answers'],
   },
+  {
+    number: 7,
+    name: '置き方のルール',
+    key: 'placementRule',
+    build: toPlacementRule,
+    source: '置き方のルール',
+    fields: ['minRun'],
+  },
 ]
 
 /**
@@ -125,7 +145,7 @@ function toType(type, rows) {
 }
 
 /**
- * 条件入力の 5 区画（型 #1〜#5）。build の入口で行から直すのはここまでである
+ * 条件入力の 6 区画（型 #1〜#5 と #7）。build の入口で行から直すのはここまでである
  * （→ core.js の takeConditions）。型 #6 は規則 2 の畳み込みを通ってからなので、ここに入らない。
  */
 function conditionTypes() {
@@ -277,6 +297,67 @@ function toPrepCleanupRule(rows, source) {
   })
 
   return rule
+}
+
+/**
+ * 型 #7（置き方のルール）— 生成が置くときのまとまりの長さ（→ 5-1 の #7・5-5）。
+ *
+ * 規則ではない。3 に規則を足していない（→ 5-4 と同じ理由）— 動かすのは
+ * 「**置くときに、何枠ぶんをひとまとまりにするか**」だけで、枠の刻み（30 分）も希望の受け方も動かない。
+ *
+ * 書かれていなければ既定（1 時間）で走る（→ defaultMinRun）。ここで止まらない。
+ * 止まるのは値が枠の刻みに乗らないときだけである — 乗らない値は、置けない長さだからである。
+ */
+function toPlacementRule(rows, source) {
+  const section = conditionSection(source)
+  const columns = section.columns
+  const rule = { minRun: toRunMinutes(defaultMinRun) }
+  let written = false
+
+  eachFilledRow(source, section, rows, (row, rowIndex) => {
+    const item = readText(source, columns, row, rowIndex, '項目')
+    if (item !== placementItems.minRun) {
+      throw new Error(
+        `${whereIs(source, rowIndex)}の項目「${item}」は決めていない。`
+          + `いま書けるのは ${placementItems.minRun} だけである（→ 5-1 の #7）`,
+      )
+    }
+    if (written) {
+      throw new Error(`${whereIs(source, rowIndex)}の「${item}」が、すでに上の行にある`)
+    }
+    rule.minRun = readRunLength(source, columns, row, rowIndex, '値')
+    written = true
+  })
+
+  return rule
+}
+
+/**
+ * 長さのセル。時刻ではないので HH:MM を要求しない（`1:00` と書ける）。分で返す。
+ *
+ * 枠の刻み（30 分）の倍数でなければ名指しして止まる — 倍数でない長さは枠に乗らないので、
+ * 黙って切り上げても切り捨てても、担当者が書いた値では走らないことになる（→ 5 の #6 と同じ扱い）。
+ */
+function readRunLength(source, columns, row, rowIndex, columnName) {
+  const cell = cellOf(source, columns, row, rowIndex, columnName)
+  const text = typeof cell.value === 'number' ? String(cell.value) : cell.value
+  if (!/^\d{1,2}:[0-5]\d$/.test(text)) {
+    throw new Error(`${cell.where}が 時:分 でない。いま: ${showBlankValue(text)}（${defaultMinRun} のように書く）`)
+  }
+  const minutes = toRunMinutes(text)
+  if (minutes < slotMinutes || minutes % slotMinutes !== 0) {
+    throw new Error(
+      `${cell.where}の「${text}」が ${slotMinutes} 分の倍数でない。`
+        + `枠の刻みが ${slotMinutes} 分なので、倍数でない長さは枠に乗らない（→ 規則 1 の ①・5-1 の #7）`,
+    )
+  }
+  return minutes
+}
+
+/** `1:00` のような長さを分にする。時刻の toMinutes とは別である — 桁を揃えていない文字列が来る。 */
+function toRunMinutes(text) {
+  const part = text.split(':')
+  return Number(part[0]) * 60 + Number(part[1])
 }
 
 /**
@@ -504,9 +585,10 @@ function showBlankValue(value) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    slotMinutes, grades, cookAnswers, prepCleanupItems, studentIdPattern,
+    slotMinutes, grades, cookAnswers, prepCleanupItems, placementItems, defaultMinRun, studentIdPattern,
     wishColumns, columnsOutsideWish, inputTypes,
-    toType, conditionTypes, toDays, cutSlots, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish,
+    toType, conditionTypes, toDays, cutSlots, toNeeds, toCookLeaderGrades, toPrepCleanupRule,
+    toPlacementRule, readRunLength, toRunMinutes, toWishes, toWish,
     dayAnswerColumns, answerSection, conditionSection, eachFilledRow, whereIs, readStudentId,
   }
 }

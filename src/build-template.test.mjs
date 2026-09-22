@@ -114,7 +114,7 @@ for (const name of ['sheet-layout.js', 'build-template.js']) {
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { buildTemplateInto } = context
-const { sheetLayout, protectionNote } = vm.runInContext('({ sheetLayout, protectionNote })', context)
+const { sheetLayout, protectionNote, sectionRightEdge } = vm.runInContext('({ sheetLayout, protectionNote, sectionRightEdge })', context)
 
 // ---- 検査 -------------------------------------------------------------------
 
@@ -138,7 +138,7 @@ check(
 check(
   '① 条件入力の 1 行目は区画の見出しで、2 行目が列名である',
   [
-    book.getSheetByName('条件入力').getRange(1, 1, 1, 22).getValues()[0].filter((v) => v !== ''),
+    book.getSheetByName('条件入力').getRange(1, 1, 1, sectionRightEdge(sheetLayout[0])).getValues()[0].filter((v) => v !== ''),
     book.getSheetByName('条件入力').getRange(2, 1, 1, 5).getValues()[0],
   ],
   [

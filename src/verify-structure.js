@@ -169,7 +169,7 @@ function checkRange(layout, headerRows, row, startColumn, expectedNames, breakag
 /**
  * 見出しの行のうち、どの区画にも入らない列に中身があれば名指しする。
  *
- * 見るのは区画のあいだ（条件入力は 5 区画が横に並ぶ）と、区画の右端より右である。
+ * 見るのは区画のあいだ（条件入力は 6 区画が横に並ぶ）と、区画の右端より右である。
  * 列を 1 つ挿すと、右へずれた見出しがここに落ちてくる。
  */
 function checkUnknownColumns(layout, headerRows, breakages) {

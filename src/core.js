@@ -100,7 +100,7 @@ function inputNames() {
 }
 
 /**
- * 条件入力の 5 区画の名前（→ 5-1 の #1〜#5）。殻が読む単位であり、入力の名前の一部である。
+ * 条件入力の 6 区画の名前（→ 5-1 の #1〜#5 と #7）。殻が読む単位であり、入力の名前の一部である。
  * 段に渡るのはこの名前ではなく、ここから直した型のほうである（→ takeConditions）。
  */
 function conditionNames() {
@@ -159,7 +159,7 @@ function build(inputs, steps) {
 }
 
 /**
- * 入力から条件入力の 5 区画を取り出し、5-1 の型に直す（→ input-types.js の conditionTypes）。
+ * 入力から条件入力の 6 区画を取り出し、5-1 の型に直す（→ input-types.js の conditionTypes）。
  * キーは型の側の名前である — 段が掴むのは型であって、区画の見出しではない。
  */
 function takeConditions(inputs) {

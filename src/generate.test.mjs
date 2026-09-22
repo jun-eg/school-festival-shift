@@ -41,11 +41,11 @@ function load(files) {
 const context = load(coreFiles.concat(['shell.js']))
 const {
   generate, expand, takeIn, countViolations, nameUnmet, builtInSteps, sheetColumns, formatDateTime,
-  toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule,
-  demandUnits, fillTightestFirst, swapWithinSlot, placedCount,
+  toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toPlacementRule,
+  demandUnits, fillTightestFirst, swapWithinSlot, placedCount, minRunSlotsToPlaceBy,
 } = context
-const { generationOrder, generationNotAimed, coreSteps, ruleRoles, checkKind } = vm.runInContext(
-  '({ generationOrder, generationNotAimed, coreSteps, ruleRoles, checkKind })',
+const { generationOrder, generationNotAimed, runExceptions, coreSteps, ruleRoles, checkKind } = vm.runInContext(
+  '({ generationOrder, generationNotAimed, runExceptions, coreSteps, ruleRoles, checkKind })',
   context,
 )
 
@@ -96,6 +96,8 @@ function conditionsOf(dayRows, needRows, more) {
     cookLeaderGrades: toCookLeaderGrades(one.grades || [['3年生'], ['4年生']], '調理責任者の学年'),
     committeeNeeds: toNeeds(one.committee || [], '委員会の指定枠'),
     prepCleanupRule: toPrepCleanupRule(one.boundary === null ? [] : [['午前と午後の境目', one.boundary || '12:00']], '準備・片付けのルール'),
+    // 置き方のルール（型 #7）。空で置くと既定の 1 時間である（→ 5-1 の #7）。
+    placementRule: toPlacementRule(one.minRun ? [['連続して入る最小の長さ', one.minRun]] : [], '置き方のルール'),
   }
 }
 
@@ -430,9 +432,32 @@ const evenWishes = [
 const evenPlan = planOf([plainDay], [['', '', '', '会計', 1]], evenWishes)
 
 check(
-  '⑤ 枠の中で採るのは、置いた数が少ない人から（同数なら候補の順 → 5-5）',
-  placedAs(evenPlan, '会計').slice(0, 4).map((one) => one[2]),
-  ['EED2000500', 'EED2000501', 'EED2000502', 'EED2000500'],
+  '⑤ 枠の中で採るのは、その日にまだ置いた枠が少ない人から（同数なら候補の順 → 5-5）',
+  placedAs(evenPlan, '会計').slice(0, 6).map((one) => one[2]),
+  [
+    'EED2000500', 'EED2000500',
+    'EED2000501', 'EED2000501',
+    'EED2000502', 'EED2000502',
+  ],
+)
+
+// まとまりの長さは条件入力から来る（→ 5-1 の #7）。ここが動けば塊の長さが動く。
+check(
+  '⑤ 「連続して入る最小の長さ」を 2 時間にすると、塊が 4 枠になる（→ 5-1 の #7・5-5）',
+  placedAs(planOf([plainDay], [['', '', '', '会計', 1]], evenWishes, { minRun: '2:00' }), '会計')
+    .slice(0, 8).map((one) => one[2]),
+  [
+    'EED2000500', 'EED2000500', 'EED2000500', 'EED2000500',
+    'EED2000501', 'EED2000501', 'EED2000501', 'EED2000501',
+  ],
+)
+
+check(
+  '⑤ まとまりの長さは、分から枠の数になる（30 分の刻みは動かない → 規則 1 の ①）',
+  ['0:30', '1:00', '1:30', '2:00'].map((written) => minRunSlotsToPlaceBy({
+    placementRule: toPlacementRule([['連続して入る最小の長さ', written]], '置き方のルール'),
+  })),
+  [1, 2, 3, 4],
 )
 
 check(
@@ -467,12 +492,24 @@ check(
 )
 
 check(
-  '⑤ 踏む段は 4 つで、目的にしないものは 3 つ名前で置いてある（⑥・固定・氏名 → 5-5）',
+  '⑤ 踏む段は 4 つで、目的にしないものは 4 つ名前で置いてある（⑥・1 日の上限・固定・氏名 → 5-5）',
   [generationOrder.map((step) => step.key), generationNotAimed.map((one) => one.what)],
   [
     ['fill', 'swap', 'prepCleanup', 'prepCleanupDemand'],
-    ['規則 3 の ⑥（複数日で偏らせない）', '5-3 の固定（担当者が割り当てシートに入れた手直し）', '割り当ての 氏名'],
+    [
+      '規則 3 の ⑥（複数日で偏らせない）',
+      '1 日の上限（例: 中央の 1.5 倍まで）',
+      '5-3 の固定（担当者が割り当てシートに入れた手直し）',
+      '割り当ての 氏名',
+    ],
   ],
+)
+
+// まとまりで置けない端は、名前で持ってある（→ runExceptions・issue #215 の ②）。
+check(
+  '⑤ まとまりで置けない端が 5 つ名前で置いてある（隠さない → 5-5・count-violations.js の同じ置き方）',
+  runExceptions.map((one) => one.what),
+  ['希望の切れ目', '帯の切れ目', '需要の切れ目', '規則 3 の端', 'そこしか置けないとき'],
 )
 
 // ---- ⑥ 決まらない入力で止まり、段として繋がっている -------------------------

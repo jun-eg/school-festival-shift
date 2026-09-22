@@ -94,7 +94,7 @@ const violationsNotCounted = [
  *
  * 受け取るもの（どれも配列か、配列を持つ型である）
  *   assignments … 割り当ての行（生成する段の出力 → #151）
- *   conditions  … 条件入力の 5 区画を直した型（→ core.js の takeConditions・input-types.js）
+ *   conditions  … 条件入力の 6 区画を直した型（→ core.js の takeConditions・input-types.js）
  *   wishes      … 希望（型 #6。取り込む段の出力 → #146）
  *   candidates  … その人がその日に入れる候補の枠（展開する段の出力 → #149。形は wishedSlots）
  *
@@ -270,7 +270,7 @@ function prepCleanupDetail(day, boundary) {
 /**
  * 割り当ての行を、数えられる形にする。
  *
- * 型にしない。割り当ては 5-1 の 6 種類に入らない — 生成の出力であり、5-3 の固定である。
+ * 型にしない。割り当ては 5-1 の 7 種類に入らない — 生成の出力であり、5-3 の固定である。
  * 読むのは、数えるのに要る 6 列だけである（読み方は input-types.js の読み手を借りる）。
  *
  * その日の 30 分枠に無い時間帯の行は、数えずに名指しして止まる。

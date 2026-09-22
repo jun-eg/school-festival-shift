@@ -50,7 +50,7 @@ const unmetSources = [
  *
  * 受け取るもの
  *   assignments … 割り当ての行（生成する段の出力 → #151）
- *   conditions  … 条件入力の 5 区画を直した型（→ core.js の takeConditions・input-types.js）
+ *   conditions  … 条件入力の 6 区画を直した型（→ core.js の takeConditions・input-types.js）
  *
  * 希望も候補も受け取らない。**足りているかどうかは、置いてある人数と要る人数だけで決まる。**
  * 誰を置けたかは生成の側の話である（→ 5 の #6）。
