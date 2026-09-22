@@ -30,13 +30,14 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
 
+// ラベル 4 つの値は sheet-layout.js が持つ（割り当ての 4 枚の名前と同じ 1 か所である → issue #213）
 const context = vm.createContext({})
-vm.runInContext(fs.readFileSync(path.join(here, 'form-definition.js'), 'utf8'), context, {
-  filename: 'form-definition.js',
-})
-const { formItemsFor, wishTimeDescription, entrantItemNames } = context
-const { formItems, formItemKind, wishTimePattern, wishTimeLabels, wishTimeExamples } = vm.runInContext(
-  '({ formItems, formItemKind, wishTimePattern, wishTimeLabels, wishTimeExamples })',
+for (const name of ['sheet-layout.js', 'form-definition.js']) {
+  vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
+}
+const { formItemsFor, wishTimeDescription, entrantItemNames, wishTimeLabels } = context
+const { formItems, formItemKind, wishTimePattern, wishTimeExamples, dayLabels } = vm.runInContext(
+  '({ formItems, formItemKind, wishTimePattern, wishTimeExamples, dayLabels })',
   context,
 )
 
@@ -348,8 +349,23 @@ check(
 
 check(
   '⑦ ラベル 4 つは定義側の固定である ◎（学祭は例年この 4 日 → 4-1）',
-  wishTimeLabels,
+  wishTimeLabels(),
   ['準備日', '学祭1日目', '学祭2日目', '片付け'],
+)
+
+check(
+  '⑦ ラベルの値は 1 か所である — 割り当ての 4 枚の名前と同じものを見ている（→ issue #213）',
+  wishTimeLabels(),
+  dayLabels,
+)
+
+check(
+  '⑦ 表の側はラベルを持たない。何日目かだけを持ち、ラベルは組むときに付く（→ formItemsFor）',
+  [
+    formItems.filter((item) => item.dayIndex !== undefined).map((item) => item.dayIndex),
+    formItems.filter((item) => item.label !== undefined).length,
+  ],
+  [[0, 1, 2, 3], 0],
 )
 
 /** 止まることを見る。止まらなければ null が返る。 */

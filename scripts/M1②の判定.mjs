@@ -77,7 +77,7 @@ class 偽のシート {
   // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
   constructor(name) {
     Object.assign(this, {
-      name, id: 次のシート番号++, cells: new Map(), protections: [], frozenRows: 0, formUrl: null,
+      name, id: 次のシート番号++, cells: new Map(), protections: [], frozenRows: 0, frozenColumns: 0, formUrl: null,
       maxRows: 1000, maxColumns: 26,
     })
   }
@@ -86,6 +86,8 @@ class 偽のシート {
   getSheetId() { return this.id }
   getRange(行, 列, 行数 = 1, 列数 = 1) { return new 偽の範囲(this, 行, 列, 行数, 列数) }
   setFrozenRows(数) { this.frozenRows = 数 }
+  setFrozenColumns(数) { this.frozenColumns = 数 }
+  insertColumnsAfter(後ろ, 数) { this.maxColumns = Math.max(this.maxColumns, 後ろ + 数) }
   getProtections() { return [...this.protections] }
   protect() { const p = new 偽の保護(this); this.protections.push(p); return p }
   getFormUrl() { return this.formUrl }

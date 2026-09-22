@@ -44,6 +44,7 @@
       "src/generate.js",
       "src/count-violations.js",
       "src/name-unmet.js",
+      "src/assignment-grid.js",
       "src/shell.js",
       "src/verify-structure.js",
       "src/build-template.js",

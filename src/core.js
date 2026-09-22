@@ -69,7 +69,11 @@ function builtInSteps() {
   }
 }
 
-/** コアが返すシート。生成が書く 3 枚である（→ 5 の #6・#7・5-4）。 */
+/**
+ * コアが返す束。生成が書く 3 つである（→ 5 の #6・#7・5-4）。
+ * 「割り当て」だけはシート 1 枚に対応しない — 日ごとの 4 枚にマス目で載る（→ sheet-layout.js の dayLabels）。
+ * どのシートのどこに敷くかは殻が決める（→ shell.js の writeOutputs）。
+ */
 const outputNames = ['割り当て', '検証結果', '指標']
 
 /** コアが読まないシート。生成しか書かないので、入力にならない（→ 5-4・5 の #7）。 */
@@ -85,6 +89,11 @@ function inputNames() {
   const names = []
   sheetLayout.forEach((layout) => {
     if (sheetsNotRead.indexOf(layout.name) !== -1) return
+    // マス目の 4 枚は、まとまって 1 つの入力になる（→ sheet-layout.js の grid）。
+    if (layout.grid) {
+      if (names.indexOf(layout.grid.of) === -1) names.push(layout.grid.of)
+      return
+    }
     layout.sections.forEach((section) => names.push(layout.hasSectionHeadings ? section.heading : layout.name))
   })
   return names
@@ -227,16 +236,20 @@ function checkOutput(output) {
   })
 }
 
-/** シート 1 枚の区画を引く。割り当て・検証結果・指標はどれも区画を 1 つしか持たない。 */
+/**
+ * 区画を 1 つ引く。検証結果・指標はどれもシート 1 枚に区画を 1 つしか持たない。
+ * 「割り当て」はシートに対応しないので、行の形から組む（→ sheet-layout.js の assignmentSection）。
+ */
 function sheetSection(name) {
+  if (name === assignmentName) return assignmentSection()
   const layout = sheetLayout.filter((c) => c.name === name)[0]
   if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
   return layout.sections[0]
 }
 
-/** シート 1 枚の列名を引く。 */
+/** 生成が返す行の列名を引く（→ sheet-layout.js の outputColumns）。 */
 function sheetColumns(name) {
-  return sheetSection(name).columns
+  return outputColumns(name)
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。

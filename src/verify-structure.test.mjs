@@ -119,7 +119,7 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { nameBreakages, checkStructure, breakageToText } = context
+const { nameBreakages, checkStructure, breakageToText, sectionRightEdge } = context
 const { sheetLayout } = vm.runInContext('({ sheetLayout })', context)
 
 const failed = []
@@ -139,10 +139,12 @@ function whyItStopped(work) {
   }
 }
 
-/** sheetLayout どおりに見出しを置いた、空の 5 枚を作る。 */
+/** sheetLayout どおりに見出しを置いた、空の 8 枚を作る（テンプレートを組んだ直後の形である）。 */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
     const sheet = new FakeSheet(layout.name)
+    // マス目の 4 枚は既定の 26 列に収まらない。テンプレートも同じだけ広げる（→ build-template.js の widenTo）
+    sheet.maxColumns = Math.max(sheet.maxColumns, sectionRightEdge(layout))
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
@@ -164,7 +166,7 @@ check('① 構成どおりに並んでいれば、崩れは 0 箇所である', 
 // 担当者が書く行を足しても、見出しだけを見ているので崩れない
 const bookWithMoreRows = emptyTemplate()
 bookWithMoreRows.getSheetByName('条件入力').put(3, 1, '2025-11-01').put(4, 1, '2025-11-02')
-bookWithMoreRows.getSheetByName('割り当て').put(2, 1, '2025-11-01')
+bookWithMoreRows.getSheetByName('準備日').put(2, 1, 'EED2349987').put(1, 3, '08:00')
 check('① 担当者がデータの行を書き足しても崩れない（見るのは見出しの行だけである）', namedLines(bookWithMoreRows), [])
 
 // ---- ② シートを消す／列を挿す／見出しを書き換える ---------------------------
@@ -179,15 +181,30 @@ check(
 )
 
 const bookWithInsertedColumn = emptyTemplate()
-bookWithInsertedColumn.getSheetByName('割り当て').insertColumn(2)
+bookWithInsertedColumn.getSheetByName('指標').insertColumn(2)
 
 check(
   '② 列を 1 つ挿すと、ずれた列名と、右へ押し出された見出しを名指しする',
   namedLines(bookWithInsertedColumn),
   [
-    '「割り当て」の 1 行目 1 列目から 6 列 が構成と違う。'
-      + 'いま: 日 / （空） / 開始 / 終了 / 役割 / 学籍番号 ／ 構成: 日 / 開始 / 終了 / 役割 / 学籍番号 / 氏名',
-    '「割り当て」の 1 行目 7 列目 に、構成に無い「氏名」がある',
+    '「指標」の 1 行目 1 列目から 5 列 が構成と違う。'
+      + 'いま: 学籍番号 / （空） / 氏名 / 合計時間 / シフト回数'
+      + ' ／ 構成: 学籍番号 / 氏名 / 合計時間 / シフト回数 / 準備回数',
+    '「指標」の 1 行目 6 列目 に、構成に無い「準備回数」がある',
+  ],
+)
+
+// マス目の 4 枚は、名前のある 2 列だけを名前で照らす。右は時刻の列で、名前を持たない
+// （何時の枠かは毎回の入力で変わる → sheet-layout.js の slotColumns）。
+const gridWithInsertedColumn = emptyTemplate()
+gridWithInsertedColumn.getSheetByName('学祭1日目').put(1, 3, '08:00').put(1, 4, '08:30').insertColumn(2)
+
+check(
+  '② マス目の 4 枚は、名前のある 2 列だけを照らす（時刻の列は名前を持たないので出てこない）',
+  namedLines(gridWithInsertedColumn),
+  [
+    '「学祭1日目」の 1 行目 1 列目から 2 列 が構成と違う。'
+      + 'いま: 学籍番号 / （空） ／ 構成: 学籍番号 / 氏名',
   ],
 )
 
@@ -249,16 +266,28 @@ check(
 // 列をまとめて消されると、構成の要る列数そのものが無くなる。
 // 読む範囲をシートの外に取れば範囲外の例外になるので、読む前に名指しする
 const bookWithCutColumns = emptyTemplate()
-bookWithCutColumns.getSheetByName('割り当て').cutColumnsTo(4)
+bookWithCutColumns.getSheetByName('指標').cutColumnsTo(3)
 
 check(
   '③ 列をまとめて消されても、範囲外で落ちずに列数を名指しする',
   namedLines(bookWithCutColumns),
   [
-    'シート「割り当て」の列が 4 列しかない（構成は 6 列である）',
-    '「割り当て」の 1 行目 1 列目から 6 列 が構成と違う。'
-      + 'いま: 日 / 開始 / 終了 / 役割 / （空） / （空） ／ 構成: 日 / 開始 / 終了 / 役割 / 学籍番号 / 氏名',
+    'シート「指標」の列が 3 列しかない（構成は 5 列である）',
+    '「指標」の 1 行目 1 列目から 5 列 が構成と違う。'
+      + 'いま: 学籍番号 / 氏名 / 合計時間 / （空） / （空）'
+      + ' ／ 構成: 学籍番号 / 氏名 / 合計時間 / シフト回数 / 準備回数',
   ],
+)
+
+// マス目の 4 枚は 50 列を取る（→ sheet-layout.js の maxSlotsPerDay）。
+// 既定の 26 列のままコピーされたものは、読む前にここで名指しになる
+const gridNotWidened = emptyTemplate()
+gridNotWidened.getSheetByName('片付け').cutColumnsTo(26)
+
+check(
+  '③ マス目の 4 枚が広げられていなければ、読む前に列数を名指しする',
+  namedLines(gridNotWidened),
+  ['シート「片付け」の列が 26 列しかない（構成は 50 列である）'],
 )
 
 // 条件入力は 2 行目までが見出しである。行が 1 行しか残っていなければ、列名の行そのものが無い
@@ -277,7 +306,7 @@ check(
 
 const bookLeftBroken = emptyTemplate()
 bookLeftBroken.getSheetByName('検証結果').put(1, 1, '区分')
-bookLeftBroken.getSheetByName('割り当て').insertColumn(2)
+bookLeftBroken.getSheetByName('指標').insertColumn(2)
 const snapshotBeforeChecking = bookLeftBroken.snapshot()
 nameBreakages(bookLeftBroken)
 
@@ -292,7 +321,7 @@ check(
 roundTrips.reads = 0
 nameBreakages(emptyTemplate())
 
-check('⑤ 読むのはシートごとに 1 回である（5 枚で 5 回）', roundTrips.reads, sheetLayout.length)
+check('⑤ 読むのはシートごとに 1 回である（8 枚で 8 回）', roundTrips.reads, sheetLayout.length)
 
 roundTrips.reads = 0
 nameBreakages(bookMissingASheet)

@@ -1,9 +1,13 @@
 /**
- * シート 5 枚の構成。
+ * シート 8 枚の構成。
  *
  * docs/tech-requirements.md 2「実行形態と前提」の「何で動かすか」が決めた
  * 「条件の入力・回答・割り当て・検証結果が同じ 1 ファイルの中のシートとして並ぶ」の実体である。
  * 列の中身は 5-1「入力の型」と 5-4「『違反』と『未充足』は別に数える」から降ろした。
+ *
+ * 割り当ては 1 枚ではなく、日ごとの 4 枚である（→ dayLabels ／ issue #213）。
+ * 4 枚は従来のシフト表の形である ◎ — 行が人、列が 30 分枠、セルが役割名 1 つ。
+ * 1 枚に縦積みにしない。配る単位も読む単位も日である ◎（設問も日ごと 4 つ → 4-1）。
  *
  * ここは値を持たない定義だけである。SpreadsheetApp を 1 度も掴まない（→ 6 の #8）。
  * 入力の初期値も持たない — テンプレートが空であること自体が
@@ -12,6 +16,71 @@
 
 /** 生成シートの保護にかける説明文。保護の強さについては src/README.md を読む。 */
 const protectionNote = 'スクリプトが書くシートである（手で書き換えない）'
+
+/**
+ * 日ごとの 4 枚の名前 ＝ 希望時間 4 設問のラベル ◎（→ 4-1）。定義はここ 1 か所である。
+ * フォームの側もここを見る（→ form-definition.js の wishTimeLabels）。
+ * 同じ値を 2 か所に書かせない — 食い違ったときに、どちらが正かが決まらない。
+ *
+ * 上から順に、条件入力の「日ごとの営業時刻」の 4 行と 1 対 1 で当てる。
+ * 学祭は例年この 4 日である ◎（2026-09-21 → docs/interviews/02-作る側.md）。
+ */
+const dayLabels = ['準備日', '学祭1日目', '学祭2日目', '片付け']
+
+/** 割り当てという名前。シートの名前ではなく、コアが受け渡す束の名前である（→ assignmentColumns）。 */
+const assignmentName = '割り当て'
+
+/**
+ * 割り当ての 1 件の形。これはシートの列ではない — 割り当てが載るのは日ごとの 4 枚のマス目である。
+ * コアが受け渡すのはこの形の行で、マス目に敷く／マス目から戻すのは assignment-grid.js が持つ。
+ */
+const assignmentColumns = ['日', '開始', '終了', '役割', '学籍番号', '氏名']
+
+/**
+ * マス目のシートが取る、時刻の列の数。1 日は 30 分枠が最大 48 である（24 時間 ÷ 30 分）。
+ * 実際に使うのはその日の枠の数だけで、右の残りは空のまま置く
+ * — 枠の数は条件入力の「日ごとの営業時刻」から出る（→ 規則 1 の ①）ので、
+ * テンプレートを作る時点では決まっていない（→ build-template.js）。
+ */
+const maxSlotsPerDay = 48
+
+/**
+ * 割り当ての 1 日ぶんのシート。4 枚とも同じ形で、違うのは名前と、何日目かだけである。
+ *
+ * 従来のシフト表の形である ◎ — 行が人、列がその日の 30 分枠、セルが役割名 1 つ。
+ * 1 セル 1 役割にしてあるのは、担当者が書き換えるのが「セルを 1 つ」だからである（→ 5 の #8）。
+ *
+ * 関数にしてあるのは、4 枚を同じ場所で決めるためである。呼ぶのは同じファイルの中だけで、
+ * 関数の宣言は巻き上がるので、sheetLayout より下に書いてあっても通る。
+ */
+function gridSheet(dayIndex) {
+  return {
+    name: dayLabels[dayIndex],
+    staffWrites: true,
+    protect: false,
+    hasSectionHeadings: false,
+    frozenRows: 1,
+    // 学籍番号と氏名を固定しておかないと、右へ送ったときに誰の行かが読めなくなる。
+    frozenColumns: 2,
+    // この 4 枚がまとまって「割り当て」1 つになる。dayIndex は
+    // 条件入力の「日ごとの営業時刻」の何行目と当てるかである（→ dayLabels）。
+    grid: { of: assignmentName, dayIndex: dayIndex },
+    sections: [
+      {
+        heading: null,
+        startColumn: 1,
+        note: '生成の結果（→ issue #213）。行が人、列がその日の 30 分枠、セルが役割名 1 つである。'
+          + '担当者がセルを書き換えるのが仕様である（→ 5-3）ので、保護をかけない。'
+          + '時刻の見出しは生成のたびに書き直す — 枠は条件入力の「日ごとの営業時刻」から刻む（→ 規則 1 の ①）',
+        columns: ['学籍番号', '氏名'],
+        // 右は時刻の列である。名前を持たない — 何時の枠かは毎回の入力で変わる。
+        // 当てるのは位置ではなく、見出しに書いてある時刻そのものである
+        // （→ assignment-grid.js の fromAssignmentGrid）。
+        slotColumns: maxSlotsPerDay,
+      },
+    ],
+  }
+}
 
 const sheetLayout = [
   {
@@ -88,21 +157,11 @@ const sheetLayout = [
       },
     ],
   },
-  {
-    name: '割り当て',
-    staffWrites: true,
-    protect: false,
-    hasSectionHeadings: false,
-    frozenRows: 1,
-    sections: [
-      {
-        heading: null,
-        startColumn: 1,
-        note: '生成の結果。担当者がセルを書き換えるのが仕様である（→ 5-3）ので、保護をかけない',
-        columns: ['日', '開始', '終了', '役割', '学籍番号', '氏名'],
-      },
-    ],
-  },
+  // 割り当ての 4 枚。同じ形なので、ラベルの位置から組む（→ dayLabels ／ gridSheet ／ issue #213）。
+  gridSheet(0),
+  gridSheet(1),
+  gridSheet(2),
+  gridSheet(3),
   {
     name: '検証結果',
     staffWrites: false,
@@ -144,16 +203,55 @@ const checkKind = { violation: '違反', unmet: '未充足' }
  * （→ shell.js の readSection ／ verify-structure.js の sectionRightEdge ／ input-types.js の checkRowWidth）。
  */
 function sectionWidth(section) {
-  return section.columns.length + (section.yearlyColumns || 0)
+  return section.columns.length + (section.yearlyColumns || 0) + (section.slotColumns || 0)
 }
 
 /** 列数が構成と違うことを名指しする文。名前のある列は名前で、そうでない列は数で出す。 */
 function sectionColumnsText(section) {
   return section.columns.join(' / ')
     + (section.yearlyColumns ? ` ＋ 毎年名前が変わる ${section.yearlyColumns} 列` : '')
+    + (section.slotColumns ? ` ＋ 時刻の ${section.slotColumns} 列` : '')
+}
+
+/**
+ * 区画の右端の列。そのシートが要る列数である（名前を持たない列も数に入る → sectionWidth）。
+ * テンプレートを広げる側（→ build-template.js の widenTo）と、
+ * 走る前に列数を照らす側（→ verify-structure.js の checkColumnCount）が、同じここを見る。
+ */
+function sectionRightEdge(layout) {
+  return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + sectionWidth(section) - 1), 0)
+}
+
+/**
+ * 生成が返す行の形。シート 1 枚にそのまま載るものはその列名で、
+ * 日ごとの 4 枚にマス目で載る「割り当て」だけは行の形のほうである（→ assignmentColumns）。
+ */
+function outputColumns(name) {
+  if (name === assignmentName) return assignmentColumns
+  const layout = sheetLayout.filter((c) => c.name === name)[0]
+  if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
+  return layout.sections[0].columns
+}
+
+/**
+ * 割り当ての「区画」— シート 1 枚に対応しないので、行の形から組む（→ assignmentColumns）。
+ * 読む側（→ count-violations.js の readAssignments）が、他のシートと同じ手で列を引けるようにしてある。
+ */
+function assignmentSection() {
+  return { heading: null, startColumn: 1, columns: assignmentColumns }
+}
+
+/** マス目のシート 4 枚を、dayIndex の順に引く（→ grid）。 */
+function gridLayouts(of) {
+  return sheetLayout
+    .filter((layout) => layout.grid && layout.grid.of === of)
+    .sort((a, b) => a.grid.dayIndex - b.grid.dayIndex)
 }
 
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
-  module.exports = { sheetLayout, checkKind, protectionNote, sectionWidth, sectionColumnsText }
+  module.exports = {
+    sheetLayout, checkKind, protectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
+    dayLabels, assignmentName, assignmentColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
+  }
 }
