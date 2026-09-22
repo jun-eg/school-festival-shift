@@ -12,6 +12,7 @@
 //   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
 //   ⑦ マス目のセルを書き換えると、生成を走らせずに数え直し、背景に役割の色・違反した所に赤い太字が出る（→ 5 の #8・issue #155）
 //   ⑧ 書き換えたセルに手直しの印（メモ）が付き、生成し直しても残る。残せないものは名指しで返る（→ 5-3・issue #156）
+//   ⑨ 配る画像の中身は、いまのマス目のとおりに組まれ、1 セルも書き換えない（→ 5 の #9・issue #157）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -171,12 +172,12 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({})
-for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'shell.js', 'verify-structure.js']) {
+for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'distribution-image.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
-  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote,
+  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote, distributionImagesOn,
 } = context
 const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote } = vm.runInContext(
   '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote })',
@@ -779,6 +780,38 @@ check(
   '⑧ 学籍番号を書き換えた行は、役割の入っているセルぜんぶに印が付く（空のセルと名前の列には付かない）',
   notesOf(ownerBook, dayLabels[0]),
   [['2,3', fixedNote]],
+)
+
+// ---- ⑨ 配る画像の中身（→ 5 の #9 ／ issue #157） -----------------------------
+// 描くのは、いまシートに見えているとおりである。生成も数え直しも走らせず、何も書かない。
+
+const imageBook = filledBook()
+const everyNote = (book) => JSON.stringify(book.sheets.map((sheet) => notesOf(book, sheet.name)))
+const imageBookBefore = bookSnapshot(imageBook)
+const imageNotesBefore = everyNote(imageBook)
+roundTrips.writes = 0
+roundTrips.formats = 0
+const exported = distributionImagesOn(imageBook)
+
+check(
+  '⑨ マス目の 1 セルが、そのまま配る画像の 1 セルになる（名前は氏名だけで、学籍番号は載らない）',
+  exported.map((image) => [image.label, image.fileName, image.times, image.rows]),
+  [
+    ['準備日', '11月1日シフト表.png', ['08:00', '08:30', '09:00'], [{ name: '高木琴音', cells: [{ role: '準備', color: grayOf }, { role: '', color: null }, { role: '', color: null }] }]],
+    ['学祭1日目', '11月2日シフト表.png', [], []],
+    ['学祭2日目', '11月3日シフト表.png', [], []],
+    ['片付け', '11月4日シフト表.png', [], []],
+  ],
+)
+check('⑨ 描かない日は図形を持たない（塗る側が「描いていない」と言う）', exported.map((image) => image.drawing === null), [false, true, true, true])
+check('⑨ 1 セルも書き換えない（値も書式もメモも）', [bookSnapshot(imageBook) === imageBookBefore, everyNote(imageBook) === imageNotesBefore, roundTrips.writes, roundTrips.formats], [true, true, 0, 0])
+
+const brokenImageBook = filledBook()
+brokenImageBook.getSheetByName('検証結果').put(1, 1, '区分')
+check(
+  '⑨ 構造が崩れていれば、描かずに名指しで止まる（生成と同じ検証を先に通す）',
+  whyItStopped(() => distributionImagesOn(brokenImageBook))?.includes('「検証結果」の 1 行目 1 列目'),
+  true,
 )
 
 // ---- シートが無いとき -------------------------------------------------------

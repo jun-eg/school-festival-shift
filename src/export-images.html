@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <!--
+      「画像を書き出す」で出る画面（docs/tech-requirements.md 2 の一覧 9 ／ 5 の #9・#10 ／ 6 の #5 ／ issue #157）。
+      担当者がやるのは、保存を押して LINE ノートに貼ることだけである。
+      外から読み込むファイルは 0 個である（→ 6 の #5）。描画のライブラリも字体も読まない — 字体は端末に依存してよい（→ 2 の「止まる箇所」#7）。
+
+      ここは塗るだけである。何をどこに描くかは distribution-image.js（コア）が決めて、図形の一覧で渡してくる。
+      位置をここで決めないのは、手元の検査で形まで見るためである（→ distribution-image.test.mjs）。
+    -->
+    <style>
+      body {
+        font-family: sans-serif;
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 16px;
+        color: #202124;
+      }
+      p { margin: 0 0 12px; }
+      .note { color: #5f6368; }
+      .stopped { color: #b3261e; white-space: pre-wrap; }
+      button { font-size: 13px; padding: 6px 16px; }
+      section { margin: 0 0 24px; }
+      h2 { font-size: 14px; margin: 0 0 4px; }
+      img { display: block; max-width: 100%; border: 1px solid #dadce0; margin: 4px 0; }
+    </style>
+  </head>
+  <body>
+    <p id="state" class="note">割り当ての 4 枚を読んでいる…</p>
+    <p><button id="saveAll" hidden></button></p>
+    <div id="images"></div>
+
+    <script>
+      var state = document.getElementById('state')
+      var saveAll = document.getElementById('saveAll')
+      var list = document.getElementById('images')
+      var links = []
+
+      function say(text, stopped) {
+        state.textContent = text
+        state.className = stopped ? 'stopped' : 'note'
+      }
+
+      // 図形の一覧を canvas に塗る。寸法は px で来るので、scale 倍して画素を増やす（→ distribution-image.js の imageScale）。
+      function paint(drawing) {
+        var canvas = document.createElement('canvas')
+        canvas.width = drawing.width * drawing.scale
+        canvas.height = drawing.height * drawing.scale
+        var ctx = canvas.getContext('2d')
+        ctx.scale(drawing.scale, drawing.scale)
+
+        drawing.boxes.forEach(function (box) {
+          ctx.fillStyle = box.fill
+          ctx.fillRect(box.x, box.y, box.w, box.h)
+        })
+
+        ctx.strokeStyle = drawing.colors.line
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        drawing.lines.forEach(function (line) {
+          ctx.moveTo(line.x1, line.y1)
+          ctx.lineTo(line.x2, line.y2)
+        })
+        ctx.stroke()
+
+        ctx.fillStyle = drawing.colors.text
+        ctx.textBaseline = 'middle'
+        drawing.texts.forEach(function (text) {
+          ctx.font = (text.bold ? 'bold ' : '') + text.size + 'px sans-serif'
+          ctx.textAlign = text.align
+          // 幅はコアが見積もっている。端末の字体で溢れる分は、ここで詰めて収める。
+          ctx.fillText(text.text, text.x, text.y, text.maxWidth)
+        })
+
+        return canvas.toDataURL('image/png')
+      }
+
+      function show(images) {
+        var drawn = 0
+        images.forEach(function (image) {
+          var section = document.createElement('section')
+          var heading = document.createElement('h2')
+          heading.textContent = image.label
+          section.appendChild(heading)
+
+          if (!image.drawing) {
+            var empty = document.createElement('p')
+            empty.className = 'note'
+            empty.textContent = 'この日は 1 人も入っていないので、描いていない。'
+            section.appendChild(empty)
+            list.appendChild(section)
+            return
+          }
+
+          var url = paint(image.drawing)
+          var link = document.createElement('a')
+          link.href = url
+          link.download = image.fileName
+          link.textContent = '保存する（' + image.fileName + '）'
+          var picture = document.createElement('img')
+          picture.src = url
+          picture.alt = image.title
+          section.appendChild(link)
+          section.appendChild(picture)
+          list.appendChild(section)
+          links.push(link)
+          drawn++
+        })
+
+        say(
+          drawn + ' 枚描いた。保存して、LINE ノートに貼る。'
+            + '保存が始まらないときは、画像を右クリック（スマホは長押し）して保存する。',
+        )
+        if (drawn > 1) {
+          saveAll.textContent = drawn + ' 枚とも保存する'
+          saveAll.hidden = false
+        }
+      }
+
+      saveAll.addEventListener('click', function () {
+        links.forEach(function (link, index) {
+          setTimeout(function () { link.click() }, index * 400)
+        })
+      })
+
+      google.script.run
+        .withSuccessHandler(show)
+        .withFailureHandler(function (error) {
+          say('描けなかった: ' + error.message, true)
+        })
+        .exportImagesFromDialog()
+    </script>
+  </body>
+</html>
