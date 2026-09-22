@@ -83,10 +83,13 @@ const assignments = [
 ]
 const names = { LTS2518500: '小林なんえい', EED2386071: '山本きた', ECK2626643: 'たなか風蔵', LTS2390333: '高木琴音' }
 const nameOf = (studentId) => names[studentId] || ''
+// 友達欄はマス目には並ぶが、配る画像には載らない（担当者が手で寄せるための列である → issue #200）。
+const friends = { EED2386071: '太郎君、同期', LTS2390333: 'ECK2626643' }
+const friendsOf = (studentId) => friends[studentId] || ''
 
 // 殻が読むのと同じ形にする — 見出しは 48 列ぶんで、右の余りは空である（→ shell.js の readGrid）。
 const layouts = gridLayouts(assignmentName)
-const width = 2 + 48
+const width = 3 + 48
 function asRead(grid) {
   const pad = (row) => row.concat(new Array(width - row.length).fill(''))
   return { header: pad(grid.header), rows: grid.rows.map(pad), notes: [] }
@@ -94,7 +97,7 @@ function asRead(grid) {
 const grids = layouts.map((layout, index) => ({
   layout: layout,
   // 2 日目には、1 枠も入っていない人（「この人をここに置かない」の手直しで残る行 → 5-3）を 1 人混ぜる。
-  grid: asRead(toAssignmentGrid(assignments, days[index], nameOf, index === 1 ? ['AAA0000001'] : [])),
+  grid: asRead(toAssignmentGrid(assignments, days[index], nameOf, index === 1 ? ['AAA0000001'] : [], friendsOf)),
 }))
 
 const images = distributionImages(grids, days)
@@ -114,9 +117,14 @@ check('① 列の見出しは枠の開始時刻である', images[1].times.slice
 const drawing = images[1].drawing
 const headerTexts = drawing.texts.filter((text) => text.bold).map((text) => text.text)
 check(
-  '① 見出しは表題・名前の 1 列・時刻だけである（学籍番号の列を描かない）',
+  '① 見出しは表題・名前の 1 列・時刻だけである（学籍番号の列も友達欄の列も描かない）',
   headerTexts,
   [images[1].title, '名前'].concat(images[1].times),
+)
+check(
+  '① 友達欄に書かれたことは、どの画像にも描かれない（→ issue #200）',
+  images.flatMap((image) => (image.drawing ? image.drawing.texts : []).map((text) => text.text)).filter((text) => Object.values(friends).includes(text)),
+  [],
 )
 
 // ---- ② 粒度が落ちない -------------------------------------------------------
@@ -124,8 +132,8 @@ check(
 function triplesOfGrid(grid) {
   const triples = []
   grid.rows.forEach((row) => {
-    grid.header.slice(2).forEach((time, index) => {
-      const role = row[2 + index]
+    grid.header.slice(3).forEach((time, index) => {
+      const role = row[3 + index]
       if (role !== '') triples.push(`${row[1]} ${time} ${role}`)
     })
   })
