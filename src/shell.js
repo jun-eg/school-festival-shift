@@ -52,6 +52,15 @@ function headerRowCount(layout) {
  * 値はどれも、表現を揃えたあとの行の配列である。
  */
 function readInputs(spreadsheet) {
+  return readInputsAndGrids(spreadsheet).inputs
+}
+
+/**
+ * 入力と、読んだマス目 4 枚をいっしょに返す。
+ * マス目も返すのは、色を塗り直すときに、担当者のシートの何行目が誰かを読み直さずに済ませるためである
+ * （→ paintGrids ／ 6 の #2 の実装上の注意）。
+ */
+function readInputsAndGrids(spreadsheet) {
   const inputs = {}
   const grids = []
 
@@ -70,7 +79,7 @@ function readInputs(spreadsheet) {
   })
 
   putGridsIntoInputs(inputs, grids)
-  return inputs
+  return { inputs: inputs, grids: grids }
 }
 
 /**
@@ -149,15 +158,21 @@ function readSection(sheet, layout, section) {
  * 段はつながっているので、前の段が欠けたまま後ろの段だけ走らせても、出てくるのは空である。
  * 空の配列で上書きすると、担当者が割り当てシートに入れた手直し（→ 5-3）が黙って消える。
  * 何が入っていないかは notBuilt が名指しで持っている（→ core.js の coreSteps）。
+ *
+ * gridsAsTheyAre を渡したときは、マス目を書き戻さない（手直しの後の数え直し → recountSpreadsheet）。
+ * 担当者が書いたセルそのものなので、書き戻すと表現を揃えた値で上書きすることになる。
+ * どちらのときも、最後にマス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である（→ paintGrids ／ 6 の #2）。
  */
-function writeOutputs(spreadsheet, output, context) {
+function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   if ((output.notBuilt || []).length > 0) return
+  const toGrid = context || { days: [], nameOf: null }
+  let grids = []
 
   outputNames.forEach((name) => {
     // 割り当てはシート 1 枚でない。日ごとの 4 枚にマス目で敷く（→ writeGrids ／ issue #213）。
-    const grids = gridLayouts(name)
-    if (grids.length > 0) {
-      writeGrids(spreadsheet, grids, output[name], context || { days: [], nameOf: null })
+    const layouts = gridLayouts(name)
+    if (layouts.length > 0) {
+      grids = gridsAsTheyAre || writeGrids(spreadsheet, layouts, output[name], toGrid)
       return
     }
     const layout = findLayout(name)
@@ -173,6 +188,58 @@ function writeOutputs(spreadsheet, output, context) {
     const rows = name === '指標' ? withNamesFromAnswers(output[name], name, (context || {}).nameOf) : output[name]
     sheet.getRange(headerRows + 1, 1, rows.length, columnCount).setValues(rows)
   })
+
+  paintGrids(spreadsheet, grids, output['検証結果'], toGrid.days)
+}
+
+/**
+ * 違反した所の印（→ 6 の #2「違反した所はセルの色と検証結果シートに出る」／ issue #155）。
+ * 文字を赤い太字にする。背景は役割の色に使っている（→ assignment-grid.js の roleColors）ので、
+ * 同じ背景に 2 つの意味を重ねない。
+ */
+const violationMark = { fontColor: '#cc0000', fontWeight: 'bold' }
+
+/**
+ * マス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である。
+ *
+ * 1 枚につき 4 回までで済ませる（セル単位で往復しない → 6 の #2 の実装上の注意）。
+ *   ① データの行ぜんぶの書式を 1 回で消す（下の端 getMaxRows まで。行が減っても前の色が残らない）
+ *   ② 役割の背景色を、データの行の幅で 1 回で置く
+ *   ③④ 違反したセルを RangeList でまとめて、文字の色と太さを 1 回ずつ
+ * 書式を消すので、担当者が自分で付けた色や太字も消える（→ src/README.md の「違反した所は、セルの色で出る」）。
+ * どの色か・どのセルかはコアの側が決める（→ assignment-grid.js の gridBackgrounds ／ violationCells）。
+ */
+function paintGrids(spreadsheet, grids, violations, days) {
+  grids.forEach((one) => {
+    const layout = one.layout
+    const sheet = findSheet(spreadsheet, layout.name)
+    const width = sectionWidth(layout.sections[0])
+    const headerRows = headerRowCount(layout)
+    const maxRows = sheet.getMaxRows()
+    if (maxRows <= headerRows) return
+
+    sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).clearFormat()
+    if (one.grid.rows.length > 0) {
+      sheet.getRange(headerRows + 1, 1, one.grid.rows.length, width).setBackgrounds(gridBackgrounds(one.grid.rows, width))
+    }
+    const cells = violationCells(one.grid.header, one.grid.rows, days[layout.grid.dayIndex], violations)
+    if (cells.length === 0) return
+    const marked = sheet.getRangeList(cells.map((cell) => a1Notation(headerRows + 1 + cell.row, cell.column + 1)))
+    marked.setFontColor(violationMark.fontColor)
+    marked.setFontWeight(violationMark.fontWeight)
+  })
+}
+
+/** 行と列の番号（1 始まり）を A1 の書き方にする。RangeList は A1 の書き方でしか受けない。 */
+function a1Notation(row, column) {
+  let letters = ''
+  let rest = column
+  while (rest > 0) {
+    const digit = (rest - 1) % 26
+    letters = String.fromCharCode(65 + digit) + letters
+    rest = Math.floor((rest - 1) / 26)
+  }
+  return `${letters}${row}`
 }
 
 /**
@@ -201,9 +268,11 @@ function withNamesFromAnswers(rows, name, nameOf) {
  * （→ assignment-grid.js の fromAssignmentGrid）。
  *
  * 条件入力に行が無い日は、名前のある 2 列だけを残して空にする。黙って別の日に寄せない。
+ *
+ * 返すのは敷いたマス目である（{ layout, grid } の配列）。色を塗り直す側が、読み直さずに使う（→ paintGrids）。
  */
 function writeGrids(spreadsheet, grids, assignments, context) {
-  grids.forEach((layout) => {
+  return grids.map((layout) => {
     const sheet = findSheet(spreadsheet, layout.name)
     const section = layout.sections[0]
     const namedCount = section.columns.length
@@ -234,6 +303,7 @@ function writeGrids(spreadsheet, grids, assignments, context) {
     if (grid.rows.length > 0) {
       sheet.getRange(headerRows + 1, 1, grid.rows.length, grid.header.length).setValues(grid.rows)
     }
+    return { layout: layout, grid: grid }
   })
 }
 
@@ -262,6 +332,58 @@ function run(spreadsheet, steps) {
   const output = build(inputs, steps)
   writeOutputs(spreadsheet, output, gridContext(inputs))
   return output.notBuilt
+}
+
+/**
+ * 手直しの後に数え直す。構造を確かめる → 読む → 数え直す → 検証結果と指標を書き、マス目の色を塗り直す
+ * （→ 5 の #8 ／ 6 の #2 ／ issue #155）。
+ *
+ * run と違うのは 2 つだけである。生成を走らせない（→ core.js の recount）ことと、
+ * マス目を書き戻さないことである — マス目は担当者がいま書いたセルそのもので、数える側はそれを読むだけである。
+ * 構造の検証は run と同じに先に通す。崩れたまま読むと、別の列を別の枠として数える。
+ */
+function recountSpreadsheet(spreadsheet) {
+  checkStructure(spreadsheet)
+  const read = readInputsAndGrids(spreadsheet)
+  const output = recount(read.inputs)
+  writeOutputs(spreadsheet, output, gridContext(read.inputs), read.grids)
+  return output
+}
+
+/**
+ * セルが書き換えられたときに呼ばれる口（→ menu.js の onEdit）。返すのは担当者に見せる一言である。
+ *
+ * 数え直すのは、マス目の 4 枚のどれかが書き換えられたときだけである（→ 2 の一覧 8）。
+ * 条件入力は書きかけの途中で型に乗らないことが普通にあるので、1 文字ごとに数え直して名指しを出さない
+ * — 条件を動かした後は、メニューの「生成」を押す（→ 2 の一覧 7）。
+ * スクリプトが書いたセル（生成の書き戻し）では呼ばれない — 単純トリガーは人の編集でしか走らない。
+ *
+ * 止まった理由は捕まえて、文にして返す。単純トリガーの中で投げた例外は、担当者の画面に出ない
+ * （実行ログに残るだけである）。メニューの「生成」が例外をそのまま見せる（→ menu.js の runGeneration）のと
+ * 同じことを、ここでは一言にして出す — 黙って止まらない。
+ * スプレッドシートはイベントから受ける（e.source）。SpreadsheetApp を名指ししない。
+ */
+function recountOnEdit(event) {
+  if (!event || !event.range || !event.source) return null
+  const edited = event.range.getSheet().getName()
+  if (!gridLayouts(assignmentName).some((layout) => layout.name === edited)) return null
+
+  try {
+    const output = recountSpreadsheet(event.source)
+    const kinds = output['検証結果'].map((row) => row[outputColumns('検証結果').indexOf('種別')])
+    const violations = kinds.filter((kind) => kind === checkKind.violation).length
+    const unmet = kinds.filter((kind) => kind === checkKind.unmet).length
+    return {
+      text: `数え直した — 違反 ${violations} 件 ／ 未充足 ${unmet} 件（検証結果と指標を書き換えた。`
+        + `違反した所は${violations === 0 ? '無い' : 'マス目の色で出ている'}）`,
+      seconds: 5,
+    }
+  } catch (error) {
+    return {
+      text: `数え直せなかった。検証結果と指標は前のままである — ${error.message}`,
+      seconds: 30,
+    }
+  }
 }
 
 /**
@@ -339,8 +461,9 @@ function findSheet(spreadsheet, name) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    valueRepresentation, sheetsToRead, headerRowCount, readInputs, readSection, readGrid, putGridsIntoInputs,
-    writeOutputs, withNamesFromAnswers, writeGrids, run, runOnActiveSpreadsheet, gridContext,
+    valueRepresentation, sheetsToRead, headerRowCount, readInputs, readInputsAndGrids, readSection, readGrid,
+    putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids,
+    a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, recountOnEdit, gridContext,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }

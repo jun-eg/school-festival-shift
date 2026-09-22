@@ -64,6 +64,9 @@ class 偽の範囲 {
   setNote() { return this }
   // 書き戻しで時刻の見出しを左に寄せる（→ src/shell.js の writeGrids）。書式だけで、値は動かない。
   setHorizontalAlignment() { return this }
+  // 書き戻しの最後に、マス目の色を塗り直す（→ src/shell.js の paintGrids）。書式だけで、値は動かない。
+  clearFormat() { return this }
+  setBackgrounds() { return this }
 }
 
 class 偽の保護 {
@@ -87,6 +90,7 @@ class 偽のシート {
   setName(name) { this.name = name; return this }
   getSheetId() { return this.id }
   getRange(行, 列, 行数 = 1, 列数 = 1) { return new 偽の範囲(this, 行, 列, 行数, 列数) }
+  getRangeList() { return { setFontColor() { return this }, setFontWeight() { return this } } }
   setFrozenRows(数) { this.frozenRows = 数 }
   setFrozenColumns(数) { this.frozenColumns = 数 }
   insertColumnsAfter(後ろ, 数) { this.maxColumns = Math.max(this.maxColumns, 後ろ + 数) }

@@ -4,6 +4,7 @@
  * 項目は docs/tech-requirements.md 2「担当者がやることの全部」の
  * 操作 3・7・9 と同じ名前である。担当者に新しい操作を 1 つも増やさない。
  * 手直しの画面は作らない（→ 6 の #2）— 手直しはスプレッドシートそのもので行う。
+ * 手直しの後の数え直しは、メニューにも出さない。マス目のセルを書き換えれば走る（→ onEdit ／ issue #155）。
  * 開くのは、名簿の画像を選ぶダイアログ 1 枚だけである（→ 2 の一覧 3・build-form.js）。
  *
  * 中身はそれぞれの issue が入れる。「フォームを作る」（→ build-form.js）と
@@ -26,6 +27,19 @@ function onOpen() {
   const menu = SpreadsheetApp.getUi().createMenu(menuName)
   menuItems.forEach((item) => menu.addItem(item.label, item.functionName))
   menu.addToUi()
+}
+
+/**
+ * マス目のセルを書き換えると、その場で数え直す（→ 5 の #8 ／ 2 の一覧 8 ／ issue #155）。
+ *
+ * 単純トリガーである（onOpen と同じ）。インストール型のトリガーを作らないので、
+ * 承認画面にもスコープの一覧にも何も増えない（→ src/README.md の「要求するのは 3 スコープである」）。
+ * 何を数え直すか・何と言うかは殻が決める（→ shell.js の recountOnEdit）。ここは一言を出すだけである。
+ * スプレッドシートはイベントから受ける — 単純トリガーでも自分が入っているファイルには触れる。
+ */
+function onEdit(e) {
+  const said = recountOnEdit(e)
+  if (said) e.source.toast(said.text, menuName, said.seconds)
 }
 
 /** 画面を出すところまでが menu の仕事である。作るのは build-form.js（→ issue #144）。 */
