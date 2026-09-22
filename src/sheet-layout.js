@@ -14,8 +14,23 @@
  * 「前年の値を既定にしない ◎」（5-1 の #1）を満たしている（→ 6 の #1 の却下側）。
  */
 
-/** 生成シートの保護にかける説明文。保護の強さについては src/README.md を読む。 */
+/**
+ * 保護のかけ方 2 つ。値がそのまま組み立ての記録に出る。強さについては src/README.md を読む。
+ *
+ * 警告のみ — 持ち主も含めて、書き換えようとすると確認が出る（押し切れば書ける）。誰も手で書かないシートにかける。
+ * 持ち主だけ — 持ち主（担当者 ＝ シフト作成者）は確認なしで書け、共有された編集者は書けない（→ issue #234）。
+ *              持ち主は手直しで書き換えるが、ほかの編集者は触らないシートにかける。
+ */
+const protectionKind = { warningOnly: '警告のみ', ownerOnly: '持ち主だけ' }
+
+/** 生成シートの保護にかける説明文。 */
 const protectionNote = 'スクリプトが書くシートである（手で書き換えない）'
+
+/** 割り当ての 4 枚の保護にかける説明文。 */
+const gridProtectionNote = 'シフト作成者（このファイルの持ち主）だけが書き換えるシートである'
+
+/** 条件入力の保護にかける説明文。保護の外に出すのは区画の入力欄だけである（→ openInputs）。 */
+const inputProtectionNote = '見出しと区画のあいだは手で書き換えない（書くのは各区画の列名より下である）'
 
 /**
  * 日ごとの 4 枚の名前 ＝ 希望時間 4 設問のラベル ◎（→ 4-1）。定義はここ 1 か所である。
@@ -70,7 +85,9 @@ function gridSheet(dayIndex) {
   return {
     name: dayLabels[dayIndex],
     staffWrites: true,
-    protect: false,
+    // 担当者は手直しでセルを書き換える（→ 5-3）ので、持ち主は確認なしで書ける形にする。
+    // 共有された編集者は触らない（→ issue #234）。
+    protect: { kind: protectionKind.ownerOnly, note: gridProtectionNote },
     hasSectionHeadings: false,
     frozenRows: 1,
     // 学籍番号と氏名を固定しておかないと、右へ送ったときに誰の行かが読めなくなる。
@@ -84,7 +101,7 @@ function gridSheet(dayIndex) {
         heading: null,
         startColumn: 1,
         note: '生成の結果（→ issue #213）。行が人、列がその日の 30 分枠、セルが役割名 1 つである。'
-          + '担当者がセルを書き換えるのが仕様である（→ 5-3）ので、保護をかけない。'
+          + '担当者がセルを書き換えるのが仕様である（→ 5-3）ので、保護は「持ち主だけ」である — 持ち主は確認なしで書け、共有された編集者は書けない（→ issue #234）。'
           + '書き換えたセルにはメモ「シフト作成者による修正済み」が付き、生成し直しても残る（メモを消すと、次の生成で組み直す → issue #156）。'
           + '時刻の見出しは生成のたびに書き直す — 枠は条件入力の「日ごとの営業時刻」から刻む（→ 規則 1 の ①）。'
           + '氏名と一緒に組みたいお友達は、生成のたびに回答から入る。生成は読まない — '
@@ -104,7 +121,9 @@ const sheetLayout = [
   {
     name: '条件入力',
     staffWrites: true,
-    protect: false,
+    // 担当者が書くのは各区画の列名より下だけである。見出し・区画のあいだ・右端より右は誰も書かない
+    // — 書き換えると走る前の検証で止まる（→ verify-structure.js）ので、そこだけに警告を出す（→ issue #234）。
+    protect: { kind: protectionKind.warningOnly, note: inputProtectionNote, openInputs: true },
     hasSectionHeadings: true,
     frozenRows: 2,
     sections: [
@@ -155,7 +174,7 @@ const sheetLayout = [
   {
     name: '回答',
     staffWrites: false,
-    protect: true,
+    protect: { kind: protectionKind.warningOnly, note: protectionNote },
     hasSectionHeadings: false,
     frozenRows: 1,
     sections: [
@@ -190,7 +209,7 @@ const sheetLayout = [
   {
     name: '検証結果',
     staffWrites: false,
-    protect: true,
+    protect: { kind: protectionKind.warningOnly, note: protectionNote },
     hasSectionHeadings: false,
     frozenRows: 1,
     sections: [
@@ -206,7 +225,7 @@ const sheetLayout = [
   {
     name: '指標',
     staffWrites: false,
-    protect: true,
+    protect: { kind: protectionKind.warningOnly, note: protectionNote },
     hasSectionHeadings: false,
     frozenRows: 1,
     sections: [
@@ -283,7 +302,7 @@ function gridLayouts(of) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    sheetLayout, checkKind, protectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
+    sheetLayout, checkKind, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
     dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }
