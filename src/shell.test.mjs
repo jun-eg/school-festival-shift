@@ -475,6 +475,19 @@ check(
 )
 
 check(
+  '④ 検証結果の氏名も回答から引く。学籍番号の無い行（未充足）は空のまま（→ issue #229）',
+  (() => {
+    const violation = checkResultRow(checkKind.violation, '規則 1: 希望の時間の外に置いている')
+    violation[checkResultColumns.indexOf('学籍番号')] = 'EED2349987'
+    const unmet = checkResultRow(checkKind.unmet, 'あと 1 人')
+    const nameAt = checkResultColumns.indexOf('氏名')
+    return withNamesFromAnswers([violation, unmet], '検証結果', (studentId) => (studentId === 'EED2349987' ? '高木琴音' : ''))
+      .map((row) => row[nameAt])
+  })(),
+  ['高木琴音', ''],
+)
+
+check(
   '④ 割り当ての無い日も、見出しだけは書き直される（前の周の列が残らない）',
   [
     fullBook.getSheetByName(dayLabels[1]).getRange(1, 1, 1, 4).getValues()[0],
@@ -564,7 +577,7 @@ check(
   '⑦ マス目を 1 セル書き換えると、規則 1 の違反が検証結果に出る（人が数えない → 5 の #8・#13 の ①）',
   recountBook.getSheetByName('検証結果').getRange(2, 1, 200, 9).getValues().filter((row) => row[0] === checkKind.violation),
   [
-    [checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '', '規則 1: 希望の時間の外に置いている', ''],
+    [checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '高木琴音', '規則 1: 希望の時間の外に置いている', ''],
   ],
 )
 
@@ -735,13 +748,13 @@ const kindAt = checkResultColumns.indexOf('種別')
 check(
   '⑧ 条件を破る手直しは置かれず、食い違った固定として検証結果の先頭に名指しで出る（違反は 0 件のまま）',
   [
-    conflictBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => [row[0], row[1], row[2], row[4], row[7]]),
+    conflictBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => [row[0], row[1], row[2], row[4], row[6], row[7]]),
     conflictOutput['検証結果'].filter((row) => row[kindAt] === checkKind.violation).length,
   ],
   [
     [
-      [checkKind.fixConflict, '2025-11-02', '10:00', '調理', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
-      [checkKind.fixConflict, '2025-11-03', '07:00', '会計', 'いまの 2025-11-03 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+      [checkKind.fixConflict, '2025-11-02', '10:00', '調理', '高木琴音', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
+      [checkKind.fixConflict, '2025-11-03', '07:00', '会計', '高木琴音', 'いまの 2025-11-03 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
     ],
     0,
   ],

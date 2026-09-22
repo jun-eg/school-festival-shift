@@ -208,7 +208,8 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
       sheet.getRange(headerRows + 1, 1, lastRow - headerRows, columnCount).clearContent()
     }
     if (output[name].length === 0) return
-    const rows = name === '指標' ? withNamesFromAnswers(output[name], name, (context || {}).nameOf) : output[name]
+    // ここに来るのは検証結果と指標で、どちらも氏名を空で返す。違反も指標も、人を学籍番号だけで名指しさせない（→ issue #229）
+    const rows = withNamesFromAnswers(output[name], name, (context || {}).nameOf)
     sheet.getRange(headerRows + 1, 1, rows.length, columnCount).setValues(rows)
   })
 
@@ -267,8 +268,9 @@ function a1Notation(row, column) {
 }
 
 /**
- * 指標の氏名を回答から埋める（→ issue #154）。マス目の氏名と同じ手である（→ writeGrids・namesFromAnswers）。
- * コアは氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、指標の段が返す行の氏名は空である。
+ * 検証結果と指標の氏名を回答から埋める（→ issue #154・#229）。マス目の氏名と同じ手である（→ writeGrids・namesFromAnswers）。
+ * コアは氏名を 1 度も見ない（型 #6 に氏名は無い → 5 の #1）ので、違反・食い違った固定・指標の段が返す行の氏名は空である。
+ * 学籍番号が空の行（未充足 — 枠の話であって人の話ではない）は空のまま残る。
  * 空でない氏名は上書きしない。返す行は新しい配列で、コアの出力を書き換えない。
  */
 function withNamesFromAnswers(rows, name, nameOf) {
