@@ -102,7 +102,7 @@ function toAssignmentGrid(assignments, day, nameOf) {
  * 列に当てるのは位置ではなく、見出しに書いてある時刻そのものである。
  * 位置で当てると、条件入力の営業時刻を動かしたときに、前の周の役割が別の枠へ黙って移る。
  *
- * 氏名は読まない。表示のための列で、生成が見ると 5 の #1（6 種類の外を参照しない）が破れる。
+ * 氏名は読まない。表示のための列で、生成が見ると 5 の #1（7 種類の外を参照しない）が破れる。
  * 戻す行の氏名は空である（生成が置くときと同じ → generate.js の generationNotAimed）。
  */
 function fromAssignmentGrid(header, dataRows, day, label) {

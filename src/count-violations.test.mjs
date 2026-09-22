@@ -71,6 +71,7 @@ function conditionRows(overrides) {
     '調理責任者の学年': [['3年生'], ['4年生']],
     '委員会の指定枠': [],
     '準備・片付けのルール': [['午前と午後の境目', '12:00']],
+    '置き方のルール': [],
   }
   Object.keys(overrides || {}).forEach((name) => { rows[name] = overrides[name] })
   return rows

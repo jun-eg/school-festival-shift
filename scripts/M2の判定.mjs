@@ -22,98 +22,35 @@
 //
 // 何も書き換えない。読むだけである。合格の線を 1 つでも外したら終了コード 1 で落ちる。
 
-import fs from 'node:fs'
-import path from 'node:path'
-import vm from 'node:vm'
-import { fileURLToPath } from 'node:url'
-import { 営業時刻の行, 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
-
-const ここ = path.dirname(fileURLToPath(import.meta.url))
-const 根 = path.dirname(ここ)
-const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
-
-const 宣言 = JSON.parse(読む('scripts/M2の宣言.json'))
+import { 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
+import { 読む, 宣言, 実装の文脈, 取り出す, 判定の入力 } from './判定の入力.mjs'
 
 // ---- 実装を読む ------------------------------------------------------------
-// SpreadsheetApp を文脈に置いていない。置かなくても通ることは src/core.test.mjs の側が見ている。
+// 文脈の作り方も入力の組み方も scripts/判定の入力.mjs が持つ。
+// まとまりと散らしを数える手（scripts/まとまりと散らし.mjs）と同じ案の上で読めるようにするためである。
 
-const 文脈 = vm.createContext({})
-for (const 相対 of 宣言.入力.実装) {
-  vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-}
+const 文脈 = 実装の文脈()
 const {
-  build, builtInSteps, coreSteps, takeIn, expand, toDays, formatDateTime, takeConditions,
+  build, builtInSteps, coreSteps, takeConditions,
   readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind,
   violationRules, violationsNotCounted, ruleRoles,
-} = vm.runInContext(
-  '({ build, builtInSteps, coreSteps, takeIn, expand, toDays, formatDateTime, takeConditions,'
-    + ' readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind,'
-    + ' violationRules, violationsNotCounted, ruleRoles })',
-  文脈,
-)
+} = 取り出す(文脈, [
+  'build', 'builtInSteps', 'coreSteps', 'takeConditions',
+  'readAssignments', 'allNeeds', 'requiredAt', 'rolesInOrder', 'sheetColumns', 'checkKind',
+  'violationRules', 'violationsNotCounted', 'ruleRoles',
+])
 
 // ---- 入力を組む ------------------------------------------------------------
 // 枠も需要も刻み直さない。宣言の行を型に通して、出てきたものをそのまま食わせる。
-
-/** 引用符の中のコンマを割らないだけの CSV の読み。友達欄が引用符付きで入っている。 */
-function CSVを読む(文) {
-  return 文.replace(/^﻿/, '').trim().split(/\r?\n/).map((行) => {
-    const セル = []
-    let 溜め = ''
-    let 引用符の中 = false
-    for (const 文字 of 行) {
-      if (文字 === '"') 引用符の中 = !引用符の中
-      else if (文字 === ',' && !引用符の中) { セル.push(溜め); 溜め = '' }
-      else 溜め += 文字
-    }
-    セル.push(溜め)
-    return セル
-  })
-}
-
-/** モックを回答シートに貼ると、タイムスタンプのセルは日時になる（→ src/take-in.test.mjs の同じ手）。 */
-function 回答シートの行にする(行) {
-  const [年, 月, 日] = 行[0].split(' ')[0].split('/').map(Number)
-  const [時, 分, 秒] = 行[0].split(' ')[1].split(':').map(Number)
-  return [formatDateTime(new Date(年, 月 - 1, 日, 時, 分, 秒))].concat(行.slice(1))
-}
 
 // 条件入力の「日ごとの営業時刻」は、data/ の前回の確定シフトから毎回算出する
 // （→ scripts/前回の5時刻.mjs ／ 宣言の「前回の 5 時刻の置き方」）。この手は刻み方も時刻も持たない。
 const 時刻の検め = 前回の5時刻を検める()
 
-/** 回答の行から、コアに渡す入力の一式を組む。回答以外は宣言のままである。 */
-function 入力一式(回答の行) {
-  return {
-    '日ごとの営業時刻': 営業時刻の行(),
-    '役割と必要人数': 宣言.入力.条件入力.役割と必要人数,
-    '調理責任者の学年': 宣言.入力.条件入力.調理責任者の学年.map((学年) => [学年]),
-    '委員会の指定枠': 宣言.入力.条件入力.委員会の指定枠,
-    '準備・片付けのルール': Object.entries(宣言.入力.条件入力['準備・片付けのルール']).map(([項目, 値]) => [項目, 値]),
-    '回答': 回答の行,
-    '割り当て': [],
-  }
-}
-
-const 回答の全行 = CSVを読む(読む(宣言.入力.回答)).slice(1).map(回答シートの行にする)
-const 日ごと = toDays(営業時刻の行(), '日ごとの営業時刻')
-const 希望 = takeIn(回答の全行)
-
 // 終端 ≤ 始端の区間を書いた人は、展開の段が名指しして止まる（→ 宣言の「展開で止まる 3 人を外すこと」）。
 // 外さないと 1 周が途中で止まり、案が出ない。誰を外したかは名指しで出す。
-const 止まる人 = 希望
-  .filter((一人) => {
-    try {
-      expand([一人], 日ごと)
-      return false
-    } catch (例外) {
-      return true
-    }
-  })
-  .map((一人) => 一人.studentId)
-
-const 組む回答 = 回答の全行.filter((行) => 止まる人.indexOf(String(行[1]).toUpperCase()) === -1)
-const 入力 = 入力一式(組む回答)
+const 組んだ入力 = 判定の入力(文脈)
+const { 入力, 回答の全行, 日ごと, 希望, 止まる人 } = 組んだ入力
 
 // ---- 案を 1 つ組む（秒を測りながら） ---------------------------------------
 // 出すのは、いま判定した案を組んだ 1 周の秒である。上限の合否はここでは言わない（→ 宣言）。

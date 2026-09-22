@@ -6,7 +6,7 @@
 // 見るものは 6 つある。
 //   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
 //   ② 読んだ入力が、そのままコアの入口（checkRepresentation）を通る
-//   ③ 見出しの行を読まない。横に並んだ 5 区画を、区画ごとに切って読む（→ src/README.md）
+//   ③ 見出しの行を読まない。横に並んだ 6 区画を、区画ごとに切って読む（→ src/README.md）
 //   ④ 読み書きは範囲ごとに 1 回で、セル単位で往復しない（→ 6 の #2 の実装上の注意）
 //   ⑤ 段が 1 つでも入っていなければ 1 枚も書かない（手直しが黙って消えない → 5-3）
 //   ⑥ 構造が崩れていれば、1 行も読まず 1 枚も書かずに止まる（→ verify-structure.js・issue #138）
@@ -156,6 +156,8 @@ function filledBook() {
   conditions.put(3, 14, '3年生').put(4, 14, ' 4年生 ')
   // 準備・片付けのルール（V〜W）— 1 行
   conditions.put(3, 22, '午前と午後の境目').put(3, 23, new Date(1899, 11, 30, 12, 0, 0))
+  // 置き方のルール（Y〜Z）— 1 行。長さなので時刻ではない（→ 5-1 の #7）
+  conditions.put(3, 25, '連続して入る最小の長さ').put(3, 26, '1:30')
 
   const answers = book.getSheetByName('回答')
   const answerRow = [
@@ -389,7 +391,8 @@ check(
 
 // 読むのは、走る前の構造の検証がシートごとに 1 回（8 枚）＋ 入力が区画ごとに 1 回である。
 // マス目は見出しの行とデータの行を分けて読むので、中身のある日だけ 2 回になる
-// （filledBook で中身があるのは 準備日 の 1 枚だけ → 5 区画 ＋ 回答 1 ＋ マス目 5）。
+// （filledBook で中身があるのは 準備日 の 1 枚だけ → 条件入力の区画 ＋ 回答 1 ＋ マス目 5）。
+// 区画の数をここに書かない — 区画が 1 つ増えれば読む回数も 1 つ増える（→ sheetLayout）。
 // 書くのは、シート 1 枚につき「消す」と「置く」である。マス目は見出しとデータで 2 組ある。
 const gridCount = dayLabels.length
 check(
@@ -398,7 +401,7 @@ check(
     fullRoundTrips.reads,
     fullRoundTrips.writes <= gridCount * 4 + (vm.runInContext('outputNames.length', context) - 1) * 2,
   ],
-  [sheetLayout.length + 5 + 1 + (gridCount + 1), true],
+  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 1), true],
 )
 
 // ---- シートが無いとき -------------------------------------------------------

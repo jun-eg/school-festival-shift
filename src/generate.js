@@ -23,13 +23,14 @@
  */
 
 /**
- * 生成が踏む 3 段（→ 5-5 ／ 6 の #3）。踏む順である。
+ * 生成が踏む 4 段（→ 5-5 ／ 6 の #3）。踏む順である。
  * 名前で置いてあるのは、どこで何をしているかを隠さないためである。
  */
 const generationOrder = [
   {
     key: 'fill',
-    what: '制約のきつい枠から順に、営業の役割を埋める（貪欲法 → 5-5 の「埋める順」）',
+    what: '制約のきつい枠から順に、営業の役割を埋める（貪欲法 → 5-5 の「埋める順」）。'
+      + '1 人を採ったら、隣り合う枠へ「連続して入る最小の長さ」まで伸ばす（→ 5-5 の「まとまり」・placeRun）',
   },
   {
     key: 'swap',
@@ -54,7 +55,14 @@ const generationNotAimed = [
   {
     what: '規則 3 の ⑥（複数日で偏らせない）',
     why: '上流の △ 5 が決まるまで、違反にも目的関数にも入れない（→ 5-4 の但し書き）。'
-      + '枠の中で誰を採るかの同点の順序は決めてあるが、均した量は測らず、順位も閾値も出さない（→ 5-5・5 の #7）',
+      + '枠の中で誰を採るかの同点の順序は決めてあるが、均した量は測らず、順位も閾値も出さない（→ 5-5・5 の #7）。'
+      + '1 日の中の散らし（その日にまだ置いた枠が少ない人を先に採る → nextToPlace）は ⑥ を先取りしない'
+      + ' — 見ているのはその日だけで、日をまたいだ偏りは測らない（→ issue #215）',
+  },
+  {
+    what: '1 日の上限（例: 中央の 1.5 倍まで）',
+    why: '上限を置くと、置けるのに置かない枠が出る（未充足が増える）。'
+      + 'どこで切るかは上流の △ 5 に触る（→ 9 の △ 5・issue #215 の「決まっていないこと」）',
   },
   {
     what: '5-3 の固定（担当者が割り当てシートに入れた手直し）',
@@ -62,7 +70,48 @@ const generationNotAimed = [
   },
   {
     what: '割り当ての 氏名',
-    why: '型 #6 に氏名は無い（→ 5-1）。埋めると「6 種類の外を参照しない」（5 の #1）が破れるので、空で置く（→ 5-5）',
+    why: '型 #6 に氏名は無い（→ 5-1）。埋めると「7 種類の外を参照しない」（5 の #1）が破れるので、空で置く（→ 5-5）',
+  },
+]
+
+/**
+ * まとまりで置けない端（→ 5-5 の「まとまり」・issue #215）。
+ *
+ * **「連続して入る最小の長さ」に届かない塊は、必ず出る。**
+ * ここに名前で置いてあるのは、どこが例外かをコードの上で隠さないためである
+ * （→ violationsNotCounted と同じ置き方）。**規則ではない** — 違反にも未充足にも数えない。
+ *
+ * 数え直す手（scripts/まとまりと散らし.mjs）は、ここの名前をそのまま読む。
+ * 名前を 2 か所に持つと、片方が古くなる（→ src/README.md）。
+ */
+const runExceptions = [
+  {
+    key: 'wish',
+    what: '希望の切れ目',
+    why: 'その人の候補が隣の枠に無い。希望から外れた割り当ては作らない（→ 規則 1・5 の #13）',
+  },
+  {
+    key: 'band',
+    what: '帯の切れ目',
+    why: '準備帯・調理帯・片付け帯の端である。枠は時刻をまたがない（→ 規則 1 の ①・5-1 の #1）',
+  },
+  {
+    key: 'demand',
+    what: '需要の切れ目',
+    why: '隣の枠にその役割の需要が無い。委員会の指定が 30 分に乗らないことがある ◎'
+      + '（12:00-12:40 → 3 の境界値の表）。指定時間に人を欠かさない側が先である',
+  },
+  {
+    key: 'rule3',
+    what: '規則 3 の端',
+    why: '伸ばすと、その人のその日の準備・片付けが置けなくなる（→ 5-5 の「置かないほうに倒す所」）。'
+      + '3 段目が置く 1 枠も、規則 3 が要るのは「入っていること」なのでここに入る',
+  },
+  {
+    key: 'full',
+    what: 'そこしか置けないとき',
+    why: '隣の枠は要る人数まで置いてある。まとまりのために超過を作らない。'
+      + '人数が足りない枠を埋めるほうが先である（→ 5 の #6）— まとまりを守って未充足を増やさない',
   },
 ]
 
@@ -71,7 +120,7 @@ const generationNotAimed = [
  *
  * 受け取るもの
  *   candidates … その人がその日に入れる候補の枠（展開する段の出力 → #149）
- *   conditions … 条件入力の 5 区画を直した型（→ core.js の takeConditions・input-types.js）
+ *   conditions … 条件入力の 6 区画を直した型（→ core.js の takeConditions・input-types.js）
  *   wishes     … 希望（型 #6。取り込む段の出力 → #146）。規則 4 の学年と規則 5 の調理可否がここにある
  *   fixed      … 前の周の割り当ての行（→ 5-3）。いまは 1 行も見ない（→ generationNotAimed）
  *
@@ -87,14 +136,15 @@ function generate(candidates, conditions, wishes, fixed) {
   checkEveryNeedLands(needs, days)
 
   const boundary = noonBoundaryToPlaceBy(held)
+  const minRun = minRunSlotsToPlaceBy(held)
   const people = peopleToPlace(candidates, wishes)
   const board = { placed: {} }
   const units = demandUnits(needs, days, people, held)
 
-  fillTightestFirst(board, units, boundary)
+  fillTightestFirst(board, units, boundary, minRun)
   swapWithinSlot(board, units, boundary)
   addPrepCleanup(board, needs, days, people, boundary)
-  fillPrepCleanupDemand(board, prepCleanupUnits(needs, days, people, held))
+  fillPrepCleanupDemand(board, prepCleanupUnits(needs, days, people, held), minRun)
 
   return assignmentRows(needs, days, people)
 }
@@ -110,6 +160,22 @@ function noonBoundaryToPlaceBy(conditions) {
   throw new Error(
     `条件入力の「準備・片付けのルール」に「${prepCleanupItems.noonBoundary}」が無い。`
       + '規則 3 を満たす置き方が決まらないので、違反を作らずに止まる（→ 5-1 の #5）',
+  )
+}
+
+/**
+ * まとまりの長さを枠の数にする（→ 5-1 の #7・5-5 の「まとまり」）。
+ *
+ * 入っていなければ既定の 1 時間である（型のほうが既定を持つ → input-types.js の defaultMinRun）ので、
+ * ここでは止まらない。枠の刻みに乗らない値で止まるのも型の側である。
+ * ここがやるのは、分を枠の数に直すことだけである。
+ */
+function minRunSlotsToPlaceBy(conditions) {
+  const minutes = ((conditions || {}).placementRule || {}).minRun
+  if (minutes) return minutes / slotMinutes
+  throw new Error(
+    '条件入力の「置き方のルール」が型に乗っていない（→ 5-1 の #7）。'
+      + `区画が空でも型は既定（${placementItems.minRun}）を持つので、ここが空なのは 6 区画を通っていないということである`,
   )
 }
 
@@ -144,6 +210,7 @@ function peopleToPlace(candidates, wishes) {
         slots: {}, // 「日 枠」→ true（候補にある）
         at: {}, // 「日 枠」→ 役割（置いた）
         count: 0,
+        on: {}, // 日 → その日に置いた枠の数（散らしの鍵 → nextToPlace）
       }
       people.push(byStudentId[candidate.studentId])
     }
@@ -294,15 +361,84 @@ function freeBandSlots(person, day, role) {
 /**
  * 制約のきつい枠から順に埋める（→ generationOrder の 1 段目・6 の #3）。
  * 置ける人が尽きたら、その枠はそこまでである。埋めずに次へ行く（→ 5 の #6）。
+ *
+ * 1 人採ったら、その場で隣の枠へ伸ばす（→ placeRun）。枠ごとに採り直すと、
+ * 同じ人が 30 分ごとに持ち場を変える案になる（→ issue #215 の ①）。
  */
-function fillTightestFirst(board, units, boundary) {
+function fillTightestFirst(board, units, boundary, minRun) {
+  const canTake = (person, unit) => isOpenFor(person, unit, boundary)
   units.forEach((unit) => {
     while (placedCount(board, unit.day.date, unit.slot, unit.role) < unit.required) {
       const person = nextToPlace(unit, boundary)
       if (!person) return
-      place(board, person, unit.day.date, unit.slot, unit.role)
+      placeRun(board, units, person, unit, canTake, minRun)
     }
   })
+}
+
+/**
+ * 1 人を、その枠から「連続して入る最小の長さ」まで伸ばして置く（→ 5-5 の「まとまり」・5-1 の #7）。
+ *
+ * **同じ日・同じ役割の、隣り合う枠**にだけ伸ばす。前へ伸ばすのは、後ろで届かなかったぶんだけである
+ * （枠は日の頭から順に埋まるので、ふつうは後ろで足りる）。
+ *
+ * 届かないことは必ずある。**どこで止まったかは名前で持ってある**（→ runExceptions）。
+ * 届かないからといって置かない、はしない — **人数が足りない枠を埋めるほうが先である**（→ 5 の #6）。
+ * 置いた枠の数を返す。
+ *
+ * 「隣に置けるか」は段から受け取る。段ごとに見るものが違う（1 段目は規則 3 まで見るが、
+ * 4 段目は規則 3 の後なので見ない → fillPrepCleanupDemand）ので、
+ * 伸ばす側だけ別の見方をすると、最初の 1 枠と続きの枠で置ける条件が食い違う。
+ */
+function placeRun(board, units, person, unit, canTake, minRun) {
+  place(board, person, unit.day.date, unit.slot, unit.role)
+  let run = 1
+  run += extendRun(board, units, person, unit, canTake, minRun - run, 1)
+  if (run < minRun) run += extendRun(board, units, person, unit, canTake, minRun - run, -1)
+  return run
+}
+
+/**
+ * まとまりを片側へ伸ばす。step は 1 が後ろ、-1 が前である。置けた枠の数を返す。
+ *
+ * 止まる先は runExceptions の 5 つである — 隣の枠が無い（帯の切れ目）／候補に無い（希望の切れ目）／
+ * その役割の需要が無い（需要の切れ目）／規則 3 を満たせなくなる（規則 3 の端）／
+ * すでに要る人数まで置いてある（そこしか置けないとき）。
+ * **超過を作らない** — まとまりのために、要る人数より多く置くことはしない（→ 5-4 の突き合わせ）。
+ */
+function extendRun(board, units, person, unit, canTake, howMany, step) {
+  let added = 0
+  let at = unit.slotIndex
+
+  while (added < howMany) {
+    const next = nextRunSlot(unit.day, at, step)
+    if (!next) return added // 帯の切れ目（隣り合う枠が無い）
+    const nextUnit = unitAt(units, unit.day.date, next.slot, unit.role)
+    if (!nextUnit) return added // 需要の切れ目
+    if (placedCount(board, unit.day.date, next.slot, unit.role) >= nextUnit.required) return added // 埋まっている
+    if (nextUnit.able.indexOf(person) === -1) return added // 希望の切れ目（規則 1・4・5 もここに入る）
+    if (!canTake(person, nextUnit)) return added // 空いていない ／ 規則 3 の端
+
+    place(board, person, unit.day.date, next.slot, unit.role)
+    at = next.index
+    added += 1
+  }
+
+  return added
+}
+
+/**
+ * 隣り合う枠（→ 5-5 の「まとまり」）。**時刻が続いている枠だけが隣である。**
+ *
+ * 枠の列は帯ごとに刻んである（→ 5-1 の #1）ので、配列で隣でも時刻が飛んでいることがある
+ * （調理終了 と 片付け開始 のあいだ）。飛んでいる所は帯の切れ目で、まとまりはそこで終わる。
+ */
+function nextRunSlot(day, index, step) {
+  const here = day.slots[index]
+  const there = day.slots[index + step]
+  if (!here || !there) return null
+  const joined = step === 1 ? here.end === there.start : there.end === here.start
+  return joined ? { slot: there, index: index + step } : null
 }
 
 /**
@@ -320,17 +456,25 @@ function prepCleanupNotBothBands(person, day, role) {
  * その枠に次に置く 1 人（→ 5-5 の「枠の中で誰を採るか」）。
  *
  * 置ける人（規則 1・4・5）のうち、その枠がまだ空いていて、規則 3 を満たせなくならない人から、
- * 置いた数が少ない順・同数なら候補に出てきた順で 1 人取る。
+ * その日にまだ置いた枠が少ない順・同数なら通しで置いた数が少ない順・同数なら候補に出てきた順で
+ * 1 人取る（→ sortToTake）。
  * 均した量は測らない。⑥ の線はここで引いていない（→ generationNotAimed・5-4 の但し書き）。
  */
 function nextToPlace(unit, boundary) {
-  const ready = unit.able.filter((person) => (
-    isFreeAt(person, unit.day.date, unit.slot)
-      && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary)
-      && prepCleanupNotBothBands(person, unit.day, unit.role)
-  ))
-  ready.sort((a, b) => a.count - b.count || a.order - b.order)
+  const ready = unit.able.filter((person) => isOpenFor(person, unit, boundary))
+  sortToTake(ready, unit.day.date)
   return ready.length === 0 ? null : ready[0]
+}
+
+/**
+ * その人が、その単位の枠でいま空いていて、置いても規則 3 を満たせるか。
+ * 置ける人（規則 1・4・5）かどうかは単位の able が持つ（→ demandUnits）ので、ここでは見ない。
+ * 採る側（nextToPlace ／ takerFor）と、まとまりを伸ばす側（extendRun）が同じここを読む。
+ */
+function isOpenFor(person, unit, boundary) {
+  return isFreeAt(person, unit.day.date, unit.slot)
+    && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary)
+    && prepCleanupNotBothBands(person, unit.day, unit.role)
 }
 
 /**
@@ -381,13 +525,8 @@ function swapOnce(board, unit, units, boundary) {
 
 /** 入れ替えで空く側を引き受ける 1 人。選び方は nextToPlace と同じである。 */
 function takerFor(giving, mover, boundary) {
-  const ready = giving.able.filter((person) => (
-    person !== mover
-      && isFreeAt(person, giving.day.date, giving.slot)
-      && prepCleanupStaysPossible(person, giving.day, giving.slot, boundary)
-      && prepCleanupNotBothBands(person, giving.day, giving.role)
-  ))
-  ready.sort((a, b) => a.count - b.count || a.order - b.order)
+  const ready = giving.able.filter((person) => person !== mover && isOpenFor(person, giving, boundary))
+  sortToTake(ready, giving.day.date)
   return ready.length === 0 ? null : ready[0]
 }
 
@@ -435,13 +574,15 @@ function prepCleanupUnits(needs, days, people, conditions) {
   const units = []
 
   days.forEach((day) => {
-    day.slots.forEach((slot) => {
+    day.slots.forEach((slot, slotIndex) => {
       order.forEach((role) => {
         const required = requiredAt(needs, day, slot, role).count // → name-unmet.js
         if (required === 0) return
         units.push({
           day: day,
           slot: slot,
+          // まとまりを伸ばすのに、枠が日の何番目かが要る（→ extendRun）。1 段目の単位と同じ形にしてある。
+          slotIndex: slotIndex,
           role: role,
           required: required,
           able: people.filter((person) => canStandAt(person, day, slot, role, conditions)),
@@ -466,15 +607,19 @@ function prepCleanupUnits(needs, days, people, conditions) {
  *
  * 置ける人が尽きたら、その枠はそこまでである。埋めずに次へ行き、未充足として名指しで残る（→ 5 の #6）。
  */
-function fillPrepCleanupDemand(board, units) {
+function fillPrepCleanupDemand(board, units, minRun) {
+  // 規則 3 はここで見ない。走るのは 3 段目の後で、①〜④ はもう満たしてある（→ 5-5 の 4 段目）。
+  const canTake = (person, unit) => (
+    isFreeAt(person, unit.day.date, unit.slot) && prepCleanupNotBothBands(person, unit.day, unit.role)
+  )
   units.forEach((unit) => {
     while (placedCount(board, unit.day.date, unit.slot, unit.role) < unit.required) {
-      const ready = unit.able.filter((person) => (
-        isFreeAt(person, unit.day.date, unit.slot) && prepCleanupNotBothBands(person, unit.day, unit.role)
-      ))
-      ready.sort((a, b) => a.count - b.count || a.order - b.order)
+      const ready = unit.able.filter((person) => canTake(person, unit))
+      sortToTake(ready, unit.day.date)
       if (ready.length === 0) return
-      place(board, ready[0], unit.day.date, unit.slot, unit.role)
+      // ここでもまとまりで置く（→ placeRun）。準備日・片付け日は役割が 1 つしか無いので交代は起きないが、
+      // 学祭 2 日の準備帯・片付け帯は店の役割と同じ日にある（→ issue #215 の「対象外」）。
+      placeRun(board, units, ready[0], unit, canTake, minRun)
     }
   })
 }
@@ -510,10 +655,11 @@ function placeInBand(board, needs, person, day, role) {
   slots.forEach((slot) => place(board, person, day.date, slot, role))
 }
 
-/** 置く。台帳と、その人の持ち分の両方を動かす。 */
+/** 置く。台帳と、その人の持ち分（通しの数とその日の数）の両方を動かす。 */
 function place(board, person, date, slot, role) {
   person.at[whereKey(date, slot)] = role
   person.count += 1
+  person.on[date] = (person.on[date] || 0) + 1
   const key = roleSlotKey(date, slot.start, slot.end, role) // → name-unmet.js
   board.placed[key] = (board.placed[key] || 0) + 1
 }
@@ -524,8 +670,30 @@ function unplace(board, person, date, slot) {
   if (!role) throw new Error(`「${person.studentId}」の ${date} ${slot.start}-${slot.end} に、外す行が無い`)
   delete person.at[whereKey(date, slot)]
   person.count -= 1
+  person.on[date] -= 1
   board.placed[roleSlotKey(date, slot.start, slot.end, role)] -= 1
   return role
+}
+
+/** その人が、その日にいま何枠置いてあるか（散らしの鍵 → nextToPlace）。 */
+function placedOn(person, date) {
+  return person.on[date] || 0
+}
+
+/**
+ * その枠で誰を先に採るかの並び（→ 5-5 の「枠の中で誰を採るか」）。
+ *
+ *   ① **その日にまだ置いた枠が少ない人**（1 日の中の散らし。→ issue #215）
+ *   ② 通しで置いた数が少ない人
+ *   ③ 候補に出てきた順（＝ 取り込みが返した順）
+ *
+ * ① を足しただけである。**規則にしていない** — 違反にも未充足にも数えない（→ 5-4・generationNotAimed）。
+ * 均した量は測らず、順位も閾値も出さない。**規則 3 の ⑥（日をまたいだ偏り）とは別である** — 見るのはその日だけで、
+ * ② が残っているので、日をまたいだ同点の順序は動いていない。
+ */
+function sortToTake(ready, date) {
+  ready.sort((a, b) => placedOn(a, date) - placedOn(b, date) || a.count - b.count || a.order - b.order)
+  return ready
 }
 
 /** その枠のその役割に、いま何人置いてあるか。 */
@@ -575,7 +743,7 @@ function roleRank(order, role) {
 
 /**
  * 割り当て 1 件を行にする。
- * 氏名は空である — 型 #6 に氏名は無く、埋めると 6 種類の外を参照することになる（→ 5 の #1・5-5）。
+ * 氏名は空である — 型 #6 に氏名は無く、埋めると 7 種類の外を参照することになる（→ 5 の #1・5-5）。
  */
 function assignmentRow(date, slot, role, studentId) {
   const found = {
@@ -592,11 +760,13 @@ function assignmentRow(date, slot, role, studentId) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    generationOrder, generationNotAimed,
-    generate, noonBoundaryToPlaceBy, peopleToPlace, demandUnits, canStandAt, prepCleanupStaysPossible,
+    generationOrder, generationNotAimed, runExceptions,
+    generate, noonBoundaryToPlaceBy, minRunSlotsToPlaceBy, peopleToPlace, demandUnits, canStandAt,
+    prepCleanupStaysPossible,
     dayStateOf, markHalfOfDay, freeBandSlots, prepCleanupNotBothBands,
     prepCleanupUnits, fillPrepCleanupDemand,
-    fillTightestFirst, nextToPlace, swapWithinSlot, swapOnce, takerFor, unitAt,
+    fillTightestFirst, placeRun, extendRun, nextRunSlot, nextToPlace, isOpenFor, sortToTake, placedOn,
+    swapWithinSlot, swapOnce, takerFor, unitAt,
     addPrepCleanup, prepOrCleanupFor, wantedBandSlots, placeInBand,
     place, unplace, placedCount, isFreeAt, whereKey, assignmentRows, roleRank, assignmentRow,
   }

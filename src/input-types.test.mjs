@@ -4,7 +4,7 @@
 //   使い方: node src/input-types.test.mjs
 //
 // 見るものは 4 つある。
-//   ① 型は 5-1 の 6 種類だけで、その外にある名前が型のどこにも現れない（→ 5 の #1・5-2）
+//   ① 型は 5-1 の 7 種類だけで、その外にある名前が型のどこにも現れない（→ 5 の #1・5-2）
 //   ② 枠が営業時刻から刻まれる。30 分に足りない端は枠にならない（→ 5-1 の #1・規則 1 の ①）
 //   ③ 揃っていない値は、黙って直さずに区画・行・列を名指しして止まる
 //   ④ data/ の希望データのモックが型 #6 に乗る（→ 7 の M1 ②の足がかり）
@@ -29,8 +29,8 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { toType, conditionTypes, toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toWishes, toWish, dayAnswerColumns } = context
-const { inputTypes, slotMinutes } = vm.runInContext('({ inputTypes, slotMinutes })', context)
+const { toType, conditionTypes, toDays, toNeeds, toCookLeaderGrades, toPrepCleanupRule, toPlacementRule, toWishes, toWish, dayAnswerColumns } = context
+const { inputTypes, slotMinutes, defaultMinRun } = vm.runInContext('({ inputTypes, slotMinutes, defaultMinRun })', context)
 
 const failed = []
 const passed = []
@@ -65,10 +65,10 @@ function namesIn(value, found) {
 
 const oneDay = [['2025-11-01', '08:00', '10:00', '18:00', '18:00', '21:00']]
 
-// ---- ① 型は 6 種類である ----------------------------------------------------
+// ---- ① 型は 7 種類である ----------------------------------------------------
 
 check(
-  '① 型は 5-1 の 6 種類で、並びも 5-1 の表と同じである',
+  '① 型は 5-1 の 7 種類で、並びも 5-1 の表と同じである',
   inputTypes.map((type) => [type.number, type.name]),
   [
     [1, '枠'],
@@ -77,13 +77,14 @@ check(
     [4, '委員会の指定枠'],
     [5, '準備・片付けのルール'],
     [6, '希望'],
+    [7, '置き方のルール'],
   ],
 )
 
 check(
-  '① build の入口で行から直すのは条件入力の 5 区画である（型 #6 は規則 2 の畳み込みを通ってから）',
+  '① build の入口で行から直すのは条件入力の 6 区画である（型 #6 は規則 2 の畳み込みを通ってから）',
   conditionTypes().map((type) => type.source),
-  ['日ごとの営業時刻', '役割と必要人数', '調理責任者の学年', '委員会の指定枠', '準備・片付けのルール'],
+  ['日ごとの営業時刻', '役割と必要人数', '調理責任者の学年', '委員会の指定枠', '準備・片付けのルール', '置き方のルール'],
 )
 
 const wish = toWish([
@@ -92,9 +93,9 @@ const wish = toWish([
 ], 0)
 
 check(
-  '① 6 種類とも、型の表の呼び方（行の配列を渡す）で直せる',
+  '① 7 種類とも、型の表の呼び方（行の配列を渡す）で直せる',
   inputTypes.map((type) => typeof type.build),
-  ['function', 'function', 'function', 'function', 'function', 'function'],
+  ['function', 'function', 'function', 'function', 'function', 'function', 'function'],
 )
 
 check(
@@ -157,10 +158,11 @@ const typedValues = [
   toNeeds([['2025-11-02', '16:10', '17:00', 'クリーンパトロール', 3]], '委員会の指定枠'),
   toPrepCleanupRule([['午前と午後の境目', '12:00']], '準備・片付けのルール'),
   [wish],
+  toPlacementRule([['連続して入る最小の長さ', '1:00']], '置き方のルール'),
 ]
 
 check(
-  '① 型に現れる名前が、6 種類が名乗っている名前の外に 1 つも出ない（→ 5 の #1）',
+  '① 型に現れる名前が、7 種類が名乗っている名前の外に 1 つも出ない（→ 5 の #1）',
   typedValues.flatMap((value, i) => namesIn(value).filter((name) => inputTypes[i].fields.indexOf(name) === -1)),
   [],
 )
@@ -240,6 +242,9 @@ const stopped = {
   '終了が開始より後でない': whyItStopped(() => toNeeds([['', '10:00', '10:00', '調理', 2]], '役割と必要人数')),
   '学年が選択肢の外': whyItStopped(() => toCookLeaderGrades([['3年']], '調理責任者の学年')),
   '決めていない項目': whyItStopped(() => toPrepCleanupRule([['昼休み', '12:00']], '準備・片付けのルール')),
+  'まとまりの長さが 30 分の倍数でない': whyItStopped(() => toPlacementRule([['連続して入る最小の長さ', '1:20']], '置き方のルール')),
+  'まとまりの長さが 時:分 でない': whyItStopped(() => toPlacementRule([['連続して入る最小の長さ', '60']], '置き方のルール')),
+  '置き方のルールに決めていない項目': whyItStopped(() => toPlacementRule([['1 日の上限', '8:00']], '置き方のルール')),
   '学籍番号の形式が違う': whyItStopped(() => toWish(['', 'EED234998', '高木琴音', '3年生', 'いいえ', '', '', '', '', ''], 0)),
   '調理担当ですか？ が選択肢の外': whyItStopped(() => toWish(['', 'EED2349987', '高木琴音', '3年生', 'はい？', '', '', '', '', ''], 0)),
 }
@@ -260,6 +265,25 @@ check(
     '「日ごとの営業時刻」の 1 行目（シートの 3 行目）の「準備開始」が HH:MM でない。いま: 8:00',
     '「役割と必要人数」の 1 行目（シートの 3 行目）の「人数」が 1 以上の整数でない。いま: 2 人',
   ],
+)
+
+// 型 #7 は、書かれていなければ既定で走る（→ 5-1 の #7）。止まるのは枠の刻みに乗らないときだけである。
+check(
+  '③ 置き方のルールは、空なら既定の 1 時間で型に乗り、書けばその値で乗る（→ 5-1 の #7）',
+  [
+    toPlacementRule([], '置き方のルール'),
+    toPlacementRule([['連続して入る最小の長さ', defaultMinRun]], '置き方のルール'),
+    toPlacementRule([['連続して入る最小の長さ', '2:00']], '置き方のルール'),
+    toPlacementRule([['連続して入る最小の長さ', '0:30']], '置き方のルール'),
+  ],
+  [{ minRun: 60 }, { minRun: 60 }, { minRun: 120 }, { minRun: 30 }],
+)
+
+check(
+  '③ 30 分の倍数でない長さは、切り上げも切り捨てもせずに名指しして止まる（→ 規則 1 の ①）',
+  stopped['まとまりの長さが 30 分の倍数でない'],
+  '「置き方のルール」の 1 行目（シートの 3 行目）の「値」の「1:20」が 30 分の倍数でない。'
+    + '枠の刻みが 30 分なので、倍数でない長さは枠に乗らない（→ 規則 1 の ①・5-1 の #7）',
 )
 
 check(
