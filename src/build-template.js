@@ -13,7 +13,7 @@ function buildTemplate() {
 }
 
 /**
- * sheetLayout どおりにシートを作り、見出しを置き、8 枚に保護をかける。
+ * sheetLayout どおりにシートを作り、見出しと条件入力の初期値を置き、8 枚に保護をかける。
  * 何度走らせても同じ形になる（足りないものだけ足す）。
  * 名前をコアの build と重ねない（Apps Script は .gs で 1 つのグローバルを共有する）。
  */
@@ -28,6 +28,7 @@ function buildTemplateInto(spreadsheet) {
     }
     widenTo(sheet, layout, log)
     putHeaders(sheet, layout, log)
+    putInitialRows(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
     sheet.setFrozenColumns(layout.frozenColumns || 0)
     spreadsheet.setActiveSheet(sheet)
@@ -77,6 +78,27 @@ function putHeaders(sheet, layout, log) {
     if (!layout.hasSectionHeadings) {
       sheet.getRange(columnNameRow, section.startColumn).setNote(section.note)
     }
+  })
+}
+
+/**
+ * 区画ごとに、列名の下へ初期値を置く（→ sheet-layout.js の initialRows ／ issue #240）。
+ *
+ * 置くのは、区画の入力欄（列名の下から最下行まで・区画の幅）が空のときだけである。
+ * 1 セルでも中身があれば、その区画には置かない — 誰かが書いた値を初期値で上書きしない。
+ * 2 回目に走らせたときも同じで、1 回目に置いた初期値がそのまま残る。
+ */
+function putInitialRows(sheet, layout, log) {
+  const firstInputRow = (layout.hasSectionHeadings ? 2 : 1) + 1
+
+  layout.sections.forEach((section) => {
+    if (!section.initialRows) return
+    const width = sectionWidth(section)
+    const inputArea = sheet.getRange(firstInputRow, section.startColumn, sheet.getMaxRows() - firstInputRow + 1, width)
+    if (!inputArea.getValues().every((row) => row.every((cell) => cell === ''))) return
+
+    sheet.getRange(firstInputRow, section.startColumn, section.initialRows.length, width).setValues(section.initialRows)
+    log.push(`「${layout.name}」の「${section.heading}」に初期値を ${section.initialRows.length} 行置いた`)
   })
 }
 

@@ -8,6 +8,7 @@
 //   ② 枠が営業時刻から刻まれ、30 分に足りない端は枠にならない
 //   ③ 揃っていない値は、区画・行・列を名指しして止まる
 //   ④ data/ の希望データのモックが型 #6 に乗る
+//   ⑤ 条件入力の初期値（→ sheet-layout.js の initialRows）が 6 区画の型に乗る（→ issue #240）
 //
 // 確定シフトのモックが型に乗るかは scripts/M1①の判定.mjs が数える。
 
@@ -339,6 +340,27 @@ check(
   '④ 前回の希望データ 50 行が、1 行残らず型 #6 に乗った（→ 7 の M1 ②の足がかり）',
   [wishes.length, wishes.filter((one) => one.answers.length !== 4).length],
   [50, 0],
+)
+
+// ---- ⑤ 条件入力の初期値が型に乗る（→ issue #240） -----------------------------
+// テンプレートに置いた値のまま「生成」を押しても、型の段で止まらないこと。
+// 型の読み方が動いたのに初期値を直し忘れると、ここで落ちる。
+
+const initialConditions = conditionTypes().map((type) => {
+  const section = vm.runInContext(`conditionSection(${JSON.stringify(type.source)})`, context)
+  return [type.source, whyItStopped(() => toType(type, section.initialRows)) ?? '型に乗った']
+})
+
+check(
+  '⑤ 条件入力の 6 区画とも、初期値が 1 行残らず型に乗る',
+  initialConditions,
+  conditionTypes().map((type) => [type.source, '型に乗った']),
+)
+
+check(
+  '⑤ 初期値の枠は 4 日で、日付はラベル 4 つと 1 対 1 に当たる数である（→ 5-1 の #1）',
+  vm.runInContext('toType(inputTypes[0], conditionSection("日ごとの営業時刻").initialRows).length', context),
+  vm.runInContext('dayLabels.length', context),
 )
 
 // ---- 結果 ------------------------------------------------------------------

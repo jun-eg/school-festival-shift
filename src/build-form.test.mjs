@@ -221,9 +221,13 @@ const lastYearRows = [
   ['2025-11-04', '08:00', '08:00', '08:00', '08:00', '15:00'],
 ]
 
-/** 条件入力の「日ごとの営業時刻」に行を入れる（見出し 2 行の下から）。 */
+/**
+ * 条件入力の「日ごとの営業時刻」に行を入れる（見出し 2 行の下から）。
+ * テンプレートが置いた初期値（→ sheet-layout.js の initialRows）は先に空ける — 重ねて書くと、空や 3 行の入力を作れない。
+ */
 function putBusinessHours(book, rows) {
   const sheet = book.getSheetByName('条件入力')
+  sheet.getRange(3, 1, 4, 6).setValues(Array.from({ length: 4 }, () => Array(6).fill('')))
   rows.forEach((row, i) => sheet.getRange(3 + i, 1, 1, row.length).setValues([row]))
   return book
 }
