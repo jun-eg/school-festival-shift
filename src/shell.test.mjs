@@ -3,7 +3,7 @@
 //
 //   使い方: node src/shell.test.mjs
 //
-// 見るものは 10 ある。
+// 見るものは 11 ある。
 //   ① 値の表現が揃う（Date・真偽値・空白・空のセルが、文字列か数値になる → 6 の #8 の理由 ③）
 //   ② 読んだ入力が、そのままコアの入口（checkRepresentation）を通る
 //   ③ 見出しの行を読まない。横に並んだ 6 区画を、区画ごとに切って読む（→ src/README.md）
@@ -14,6 +14,7 @@
 //   ⑧ 書き換えたセルに手直しの印（メモ）が付き、生成し直しても残る。残せないものは名指しで返る（→ 5-3・issue #156）
 //   ⑨ 配る画像の中身は、いまのマス目のとおりに組まれ、1 セルも書き換えない（→ 5 の #9・issue #157）
 //   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ 5-3・issue #226）
+//   ⑪ 検証結果の、準備・片付け以外の役割の行が、値を変えずに行ぜんぶ黄色になる（→ issue #220）
 //
 // 崩れの名指しのしかたそのものは src/verify-structure.test.mjs が見る。ここは走らないことだけを見る。
 //
@@ -618,10 +619,11 @@ check(
 // （検証結果は前の行が無いので「消す」が起きない → 置く 1 ＋ 指標の消す・置く 2 ＝ 3）。
 // 書式は 1 枚につき「消す」1 回、行がある枚だけ「背景を置く」1 回、違反がある枚だけ「文字の色」「太さ」の 2 回である
 // （行があるのは 準備日 と 片付け の 2 枚、違反があるのは 片付け の 1 枚 → 4 ＋ 2 ＋ 2）。
+// ほかに、検証結果の行の背景を 1 回で置き直す（→ ⑪ ／ issue #220）。
 check(
   '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 4 回までである',
   [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats],
-  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + 2 + 2],
+  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + 2 + 2 + 1],
 )
 
 const conditionEditBook = editedBook()
@@ -905,6 +907,91 @@ check(
     JSON.parse(brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value).rows !== undefined,
   ],
   [true, [['2,7', fixedNote]], true],
+)
+
+// ---- ⑪ 検証結果の黄色（→ issue #220） ---------------------------------------
+// 店の役割（準備・片付け以外）の行だけを、行ぜんぶ黄色にする。値は 1 セルも変えない。
+// 役割が空の行は規則 3（準備・片付けの決まり）の違反なので塗らない（→ assignment-grid.js の checkResultBackgrounds）。
+
+function checkRow(kind, role, detail) {
+  const row = checkResultRow(kind, detail)
+  row[checkResultColumns.indexOf('役割')] = role
+  return row
+}
+
+/** 検証結果の行を差し替えて 1 周する。ほかの段は ④ と同じ差し替えである。 */
+function runWithChecks(book, violations, unmet) {
+  return run(book, {
+    '取り込む': (answers) => answers.map((row) => [row[1], row[3], row[4]]),
+    '展開する': (wishes) => wishes.map((row) => [row[0]]),
+    '生成する': (candidates) => candidates.map((row) => ['2025-11-01', '10:00', '10:30', '調理', row[0], '高木琴音']),
+    '違反を数える': () => violations,
+    '未充足を名指しする': () => unmet,
+    '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
+  })
+}
+
+/** 検証結果の、塗った行の番号（1 始まり）と、その行で塗ったセルの数。 */
+function yellowRows(book) {
+  const byRow = {}
+  ;[...book.getSheetByName('検証結果').backgrounds.entries()].forEach(([key, color]) => {
+    const row = Number(key.split(',')[0])
+    byRow[row] = byRow[row] || []
+    byRow[row].push(color)
+  })
+  return Object.keys(byRow).map((row) => [Number(row), byRow[row].length, [...new Set(byRow[row])]])
+}
+
+const yellowOf = vm.runInContext('checkRowHighlight', context).color
+const mixedViolations = [
+  checkRow(checkKind.violation, '調理', '規則 5: 検便を通っていない'),
+  checkRow(checkKind.violation, '', '規則 3: 午前だけなのに準備に入っていない'),
+]
+const mixedUnmet = [
+  checkRow(checkKind.unmet, '準備', 'あと 3 人'),
+  checkRow(checkKind.unmet, '会計', 'あと 1 人'),
+  checkRow(checkKind.unmet, '片付け', 'あと 2 人'),
+]
+const yellowBook = filledBook()
+roundTrips.formats = 0
+runWithChecks(yellowBook, mixedViolations, mixedUnmet)
+
+check(
+  '⑪ 準備・片付け以外の行だけが、行ぜんぶ（9 列）黄色になる（調理の違反 2 行目 ／ 会計の未充足 5 行目 → issue #220）',
+  yellowRows(yellowBook),
+  [[2, checkResultColumns.length, [yellowOf]], [5, checkResultColumns.length, [yellowOf]]],
+)
+
+check(
+  '⑪ 値は書いた行のとおりで、黄色を足しても 1 セルも変わらない',
+  yellowBook.getSheetByName('検証結果').getRange(2, 1, 6, checkResultColumns.length).getValues(),
+  mixedViolations.concat(mixedUnmet).concat([checkResultColumns.map(() => '')]),
+)
+
+// 生成し直して、店の役割の行が無くなった。前の周の黄色が残ってはいけない。
+runWithChecks(yellowBook, [], [checkRow(checkKind.unmet, '準備', 'あと 3 人')])
+check('⑪ 生成し直して店の役割の行が無くなれば、前の周の黄色は残らない', yellowRows(yellowBook), [])
+
+// 手直しの後の数え直しでも塗る。⑦ と同じ書き換え（片付けの日に準備）は、未充足に会計を出さない入力なので、
+// 役割と必要人数に 会計 を 1 行足して、会計の未充足を出させる。
+const recountYellowBook = editedBook()
+recountYellowBook.getSheetByName('条件入力').put(4, 11, '会計').put(4, 12, 1)
+recountOnEdit({ source: recountYellowBook, range: recountYellowBook.getSheetByName(dayLabels[3]).getRange(2, 3) })
+const recountChecks = recountYellowBook.getSheetByName('検証結果').getRange(2, 1, 200, checkResultColumns.length).getValues()
+  .filter((row) => row[0] !== '')
+const roleColumnIndex = checkResultColumns.indexOf('役割')
+check(
+  '⑪ 数え直しでも塗り直す — 黄色の行は、役割が準備・片付け・空のどれでもない行とちょうど一致する',
+  [
+    recountChecks.some((row) => row[roleColumnIndex] === '会計'),
+    yellowRows(recountYellowBook).map(([row]) => row),
+  ],
+  [
+    true,
+    recountChecks
+      .map((row, i) => (['準備', '片付け', ''].indexOf(row[roleColumnIndex]) === -1 ? i + 2 : null))
+      .filter((row) => row !== null),
+  ],
 )
 
 // ---- ⑨ 配る画像の中身（→ 5 の #9 ／ issue #157） -----------------------------

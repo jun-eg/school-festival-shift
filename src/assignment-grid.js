@@ -443,6 +443,33 @@ function gridBackgrounds(dataRows, width) {
 }
 
 /**
+ * 検証結果の行の背景色（→ issue #220）。店の役割の違反・未充足の行を、行ぜんぶ黄色にする。
+ *
+ * 準備・片付けの行は塗らない。未充足のほとんどはこの 2 つで、何十行も並ぶ（→ 5-4）ので、
+ * 塗ると店の役割の行が埋もれる。役割が空の行（規則 3 の違反 → count-violations.js の countPrepCleanupBroken）も
+ * 準備・片付けの決まりなので塗らない。
+ * 検証結果はマス目と別のシートなので、調理の黄（roleColors）と同じ色でも意味は重ならない。
+ * 標準の黄にしてあるのは、淡い黄だと白い行と見分けにくいからである。
+ */
+const checkRowHighlight = { name: '黄', color: '#ffff00' }
+
+/**
+ * 検証結果の行ぜんぶの背景色を、行と列の並びのまま返す（setBackgrounds にそのまま渡す形）。
+ * 塗らない行は null である。値は見ない側の列にも同じ色を置く — 行ぜんぶを塗る（→ issue #220 のコメント）。
+ */
+function checkResultBackgrounds(rows, width) {
+  const roleColumn = sheetColumns('検証結果').indexOf('役割')
+  const prepCleanup = prepCleanupRoles()
+  return rows.map((row) => {
+    const role = String(row[roleColumn] || '').trim()
+    const color = role !== '' && prepCleanup.indexOf(role) === -1 ? checkRowHighlight.color : null
+    const colors = []
+    for (let column = 0; column < width; column++) colors.push(color)
+    return colors
+  })
+}
+
+/**
  * 違反の行を、1 日ぶんのマス目のセルに当て戻す（→ 6 の #2「違反した所はセルの色に出る」／ issue #155）。
  * 背景は役割の色で使っているので、違反は文字のほうで出す（→ shell.js の violationMark）。
  * 返すのは { row, column } の配列で、どちらもマス目の中の 0 始まりの位置である（row はデータの行）。
@@ -531,6 +558,6 @@ function namesFromAnswers(rows) {
 if (typeof module !== 'undefined') {
   module.exports = {
     gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow,
-    fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, violationCells, namesFromAnswers,
+    fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, checkRowHighlight, checkResultBackgrounds, violationCells, namesFromAnswers,
   }
 }
