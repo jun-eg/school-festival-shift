@@ -26,7 +26,7 @@ const generationOrder = [
   },
   {
     key: 'prepCleanup',
-    what: '規則 3 の ①〜④ を満たす 準備・片付け を置く（→ 3 の規則 3・5-5）',
+    what: '規則 3 の ①〜④ の向きで 準備・片付け を置く。帯に空きの無い人には置かない（→ 3 の規則 3・5-5）',
   },
   {
     key: 'prepCleanupDemand',
@@ -83,8 +83,8 @@ const runExceptions = [
   {
     key: 'rule3',
     what: '規則 3 の端',
-    why: '伸ばすと、その人のその日の準備・片付けが置けなくなる（→ 5-5 の「置かないほうに倒す所」）。'
-      + '3 段目が置く 1 枠も、規則 3 が要るのは「入っていること」なのでここに入る',
+    why: '伸ばすと、その人のその日の準備・片付けと向きが合わなくなる（→ 5-5 の「置かないほうに倒す所」）。'
+      + '3 段目が置く 1 枠も、規則 3 が決めるのは「入れるなら、どちらに入れるか」なのでここに入る',
   },
   {
     key: 'full',
@@ -138,7 +138,7 @@ function generatePlan(candidates, conditions, wishes, fixed) {
     swapWithinSlot(board, units, boundary)
   }
   addPrepCleanup(board, needs, days, people, boundary)
-  fillPrepCleanupDemand(board, prepCleanupUnits(needs, days, people, held), minRun)
+  fillPrepCleanupDemand(board, prepCleanupUnits(needs, days, people, held), boundary, minRun)
 
   return { rows: assignmentRows(needs, days, people), notPlaced: notPlaced.concat(released) }
 }
@@ -263,7 +263,8 @@ function canStandAt(person, day, slot, role, conditions) {
 
 /**
  * その人をその枠に置いても、規則 3 の ①〜⑤ を満たせるか。
- * 置くたびに要る帯に空き枠が残るかを見るので、後の addPrepCleanup が置き場所に困らない。
+ * 見るのは、もう入っている準備・片付けと向きが合うかだけである。帯に空きが残らなくても置く
+ * （準備にも片付けにも入らない日は違反にしない → ADR tech-requirements/0017）。
  * role を渡すとその役割で置いたものとして見る。渡さなければ店の役割である。
  */
 function prepCleanupStaysPossible(person, day, slot, boundary, role) {
@@ -272,28 +273,15 @@ function prepCleanupStaysPossible(person, day, slot, boundary, role) {
 
 /**
  * 規則 3 を満たせなくなるなら、どう満たせないかの文を返す。満たせるなら null である。
- * この時点で準備・片付けに入っているのは手直しだけで、向きはそれで決まっている（→ prepCleanupDetail）。
- * 手直しに向きが合わない置き方はしない。
+ * 店の役割を置くときに入っている準備・片付けは手直しだけで、向きはそれで決まっている（→ prepCleanupDetail）。
+ * 4 段目が準備・片付けを足すときは、3 段目で入れた向きがある。どちらでも、向きが合わない置き方はしない。
  */
 function whyPrepCleanupBreaks(person, day, slot, boundary, role) {
   const toBand = prepCleanupRoles().indexOf(role) !== -1
   const after = dayStateOf(person, day, boundary, toBand ? null : slot)
   if (role === ruleRoles.prep) after.prep = true
   if (role === ruleRoles.cleanup) after.cleanup = true
-  if (!after.morning && !after.afternoon) return null
-  if (after.prep || after.cleanup) return prepCleanupDetail(after, boundary)
-
-  let free = 0
-  if (after.morning) free += freeBandSlots(person, day, ruleRoles.prep).length
-  if (after.afternoon) free += freeBandSlots(person, day, ruleRoles.cleanup).length
-
-  // これから置く枠が、要る帯の中にあるなら、その 1 枠はもう使えない。
-  if (after.morning && isInBand(day, slot, ruleRoles.prep)) free -= 1
-  else if (after.afternoon && isInBand(day, slot, ruleRoles.cleanup)) free -= 1
-
-  if (free > 0) return null
-  const bands = [after.morning ? ruleRoles.prep : null, after.afternoon ? ruleRoles.cleanup : null].filter(Boolean)
-  return `その日の ${bands.join(' ／ ')} の帯に、希望にあって空いている枠が残らない`
+  return prepCleanupDetail(after, boundary)
 }
 
 /**
@@ -484,28 +472,24 @@ function unitAt(units, date, slot, role) {
 }
 
 /**
- * 規則 3 の ①〜⑤ を満たす 準備・片付け を、その日の帯の中に置く（→ 3 の規則 3・5-5）。
+ * 規則 3 の ①〜⑤ の向きで 準備・片付け を、その日の帯の中に置く（→ 3 の規則 3・5-5）。
  *
  *   ② 午前だけ → 準備に入れる ／ ③ 午後だけ → 片付けに入れる
  *   ④ 両方ある → 片方だけに入れる ／ ⑤ どちらも無い → どちらにも入れない
  *
- * 需要の残っている枠を先に取り、無ければ 1 枠だけ置く（規則 3 が要るのは「入っていること」である）。
+ * 需要の残っている枠を先に取り、無ければ 1 枠だけ置く。
+ * 入れる向きの帯に空き枠が無い人は入れずに飛ばす（違反にしない → ADR tech-requirements/0017）。
  */
 function addPrepCleanup(board, needs, days, people, boundary) {
   days.forEach((day) => {
     people.forEach((person) => {
       const state = dayStateOf(person, day, boundary)
       if (!state.morning && !state.afternoon) return // ⑤
-      // 手直しで、もう満たしている日は足さない。
-      if (prepCleanupDetail(state, boundary) === null) return
+      // 手直しで、もう入っている日は足さない（向きの合わない手直しは releaseFixesBreakingRule3 が外してある）。
+      if (state.prep || state.cleanup) return
 
       const role = prepOrCleanupFor(board, needs, person, day, state)
-      if (!role) {
-        // prepCleanupStaysPossible が防いでいるはずの食い違いである。
-        throw internalError(
-          `「${person.studentId}」の ${day.date} に、${ruleRoles.prep} にも ${ruleRoles.cleanup} にも置ける枠が無い`,
-        )
-      }
+      if (!role) return // 帯に空きが無い。店の役割だけの日になる
       placeInBand(board, needs, person, day, role)
     })
   })
@@ -541,13 +525,17 @@ function prepCleanupUnits(needs, days, people, conditions) {
 /**
  * 規則 3 を満たした後で、まだ足りていない 準備・片付け の枠を埋める（→ 5-5 の 4 段目）。
  *
- * ここで置くのは、同じ帯に入っている人への追加か、その日に店の役割が無い人（準備日・片付け日）だけである。
- * もう片方の帯の人は prepCleanupNotBothBands が取らず、午前・午後も動かないので、規則 3 はここで見ない。
+ * ここで置くのは、同じ帯に入っている人への追加か、その日に店の役割が無い人（準備日・片付け日）、
+ * 3 段目で帯に空きが無く入らなかった人のうち、向きが合う人だけである。
+ * もう片方の帯の人は prepCleanupNotBothBands が取らない。3 段目で入らなかった人を逆の帯に入れないために、
+ * 向きも見る（午前だけの人を片付けに入れない → prepCleanupStaysPossible）。
  * 置ける人が尽きた枠は、未充足で残る。
  */
-function fillPrepCleanupDemand(board, units, minRun) {
+function fillPrepCleanupDemand(board, units, boundary, minRun) {
   const canTake = (person, unit) => (
-    isFreeAt(person, unit.day.date, unit.slot) && prepCleanupNotBothBands(person, unit.day, unit.role)
+    isFreeAt(person, unit.day.date, unit.slot)
+      && prepCleanupNotBothBands(person, unit.day, unit.role)
+      && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary, unit.role)
   )
   units.forEach((unit) => {
     while (placedCount(board, unit.day.date, unit.slot, unit.role) < unit.required) {
@@ -692,18 +680,19 @@ function whyFixedCannotStay(one, person, wish, conditions, boundary, alreadyClai
   if (!prepCleanupNotBothBands(person, one.day, one.role)) {
     return `同じ日に${ruleRoles.prep}と${ruleRoles.cleanup}の両方に修正で入っています`
   }
-  // 規則 3 の残り（向きと帯の空き）は、店の割り当てが出そろってから見る（→ releaseFixesBreakingRule3）。
+  // 規則 3 の残り（向き）は、店の割り当てが出そろってから見る（→ releaseFixesBreakingRule3）。
   return null
 }
 
 /**
- * 店の役割が出そろった後で、規則 3 を満たせない日の手直しを外し、{ fix, why } の配列で返す（→ 5-3）。
- * 生成は満たせない向きに店の枠を足さないので、満たせない日は手直しだけで決まっている。
+ * 店の役割が出そろった後で、規則 3 の向きが合わない日の手直しを外し、{ fix, why } の配列で返す（→ 5-3）。
+ * 生成は向きの合わない店の枠を足さないので、合わない日は手直しだけで決まっている。
+ * 帯に空きが無いだけの日は外さない（準備・片付けなしで店に置ける → ADR tech-requirements/0017）。
  *
  * 外す順は、外す手直しが少ないほうから。
  *   ① 向きの合わない準備・片付け（午前だけの日の片付け ／ 午後だけの日の準備）
- *   ② 午前にかかる店の役割（残りが午後だけで、片付けで満たせるなら）
- *   ③ 午後にかかる店の役割（残りが午前だけで、準備で満たせるなら）
+ *   ② 午前にかかる店の役割（残りが午後だけで、片付けと向きが合うなら）
+ *   ③ 午後にかかる店の役割（残りが午前だけで、準備と向きが合うなら）
  *   ④ その日の店の役割ぜんぶ
  */
 function releaseFixesBreakingRule3(board, people, days, boundary) {
@@ -747,22 +736,11 @@ function releaseFixesBreakingRule3(board, people, days, boundary) {
 
 /**
  * その人のその日が規則 3 を満たせないなら、どう満たせないかの文を返す。満たせるなら null である。
- * 3 段目が準備・片付けを置けば満たせる日（帯に空き枠がある）も、満たせるに含む。
+ * 見るのは、手直しで入った準備・片付けと店の役割の向きだけである。
+ * 準備にも片付けにも入っていない日は、3 段目が入れても入れなくても満たせる（→ ADR tech-requirements/0017）。
  */
 function rule3Gap(person, day, boundary) {
-  const state = dayStateOf(person, day, boundary)
-  if (!state.morning && !state.afternoon) return null
-  if (state.prep || state.cleanup) return prepCleanupDetail(state, boundary)
-
-  const prepFree = freeBandSlots(person, day, ruleRoles.prep).length > 0
-  const cleanupFree = freeBandSlots(person, day, ruleRoles.cleanup).length > 0
-  if (state.morning && state.afternoon && (prepFree || cleanupFree)) return null
-  if (state.morning && !state.afternoon && prepFree) return null
-  if (!state.morning && state.afternoon && cleanupFree) return null
-
-  const half = state.morning && state.afternoon ? '午前も午後も' : (state.morning ? '午前だけ' : '午後だけ')
-  const bands = [state.morning ? ruleRoles.prep : null, state.afternoon ? ruleRoles.cleanup : null].filter(Boolean)
-  return `${half}入っていますが、${bands.join('・')}の時間に出られる空きがありません`
+  return prepCleanupDetail(dayStateOf(person, day, boundary), boundary)
 }
 
 /**

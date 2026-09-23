@@ -52,7 +52,7 @@ const violationRules = [
   {
     key: 'rule3',
     label: '準備・片付け',
-    what: '午前だけ → 準備 ／ 午後だけ → 片付け ／ 両方 → 片方だけ ／ どちらも無い → 入れない（①〜⑤）',
+    what: '入れるなら 午前だけ → 準備 ／ 午後だけ → 片付け ／ 両方 → 片方だけ（①〜④。どちらにも入っていないのは違反にしない）',
   },
   { key: 'rule4', label: '調理責任者の学年', what: '調理責任者の枠に置く人は 3 年生または 4 年生である' },
   { key: 'rule5', label: '調理担当', what: '調理の枠に置く人は 調理担当ですか？ が はい である' },
@@ -172,8 +172,10 @@ function noonBoundaryMissingText() {
  * 規則 3 の ①〜⑤ を数える（→ 3 の規則 3）。
  *
  *   ① その人のその日の割り当てが午前か午後かを見る（境目は「午前と午後の境目」）
- *   ② 午前だけ → 準備 ／ ③ 午後だけ → 片付け
- *   ④ 両方 → 片方だけ ／ ⑤ どちらも無い → 入れない
+ *   ② 午前だけ → 入れるなら準備 ／ ③ 午後だけ → 入れるなら片付け
+ *   ④ 両方 → 入れるなら片方だけ ／ ⑤ どちらも無い → 入れない
+ *
+ * 準備にも片付けにも入っていない日は数えない（→ ADR tech-requirements/0017・issue #280）。
  *
  * ① で準備・片付けの行は見ない（見ると、入れた結果が判定を動かす）。
  * 境目に半分かかる枠は、午前と午後の両方に数える。1 人 1 日につき 1 行にする。
@@ -219,19 +221,22 @@ function countPrepCleanupBroken(placed, conditions) {
  * 文は作成者が読むので、②〜④ の番号は出さない（→ issue #249）。
  */
 function prepCleanupDetail(day, boundary) {
+  // ②〜④ は「入れるなら、どちらに入れるか」である。どちらにも入っていなければ違反にしない（→ ADR tech-requirements/0017）。
+  // 作る側は、入れた後で ⑥ のために削る。削った結果の「なし／なし」は負担が軽いだけで、人数の不足は未充足が名指しする。
+  if (!day.prep && !day.cleanup) return null
   const now = `境目 ${boundary}。${prepCleanupHeldText(day)}`
 
-  // ④ 両方 → 片方だけ
+  // ④ 両方 → 入れるなら片方だけ
   if (day.morning && day.afternoon) {
     if (day.prep !== day.cleanup) return null
     return `午前も午後も入っているので、${ruleRoles.prep}か${ruleRoles.cleanup}のどちらか一方だけにしてください（${now}）`
   }
-  // ② 午前だけ → 準備
+  // ② 午前だけ → 入れるなら準備
   if (day.morning) {
     if (day.prep && !day.cleanup) return null
     return `午前だけ入っているので、${ruleRoles.prep}だけにしてください（${now}）`
   }
-  // ③ 午後だけ → 片付け
+  // ③ 午後だけ → 入れるなら片付け
   if (day.afternoon) {
     if (day.cleanup && !day.prep) return null
     return `午後だけ入っているので、${ruleRoles.cleanup}だけにしてください（${now}）`
