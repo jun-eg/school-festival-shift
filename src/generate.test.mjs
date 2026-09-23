@@ -309,19 +309,39 @@ check(
   [],
 )
 
-// 帯を 1 枠も希望していない人は、その日に置けない — 置けば規則 1 か規則 3 のどちらかが破れる（→ 5-5）。
-const noBandPlan = planOf([plainDay], fiveRoles, [wishOf('EED2000202', ['10:00-14:00'])])
+// 帯を 1 枠も希望していない人も、店には置く。準備にも片付けにも入らない（→ 5-5・ADR tech-requirements/0017）。
+const noBandPlan = planOf([plainDay], fiveRoles.concat(prepCleanupNeeds), [wishOf('EED2000202', ['10:00-14:00'])])
 
 check(
-  '② 満たせない枠は埋めずに残す — 帯を 1 枠も希望していない人は置かず、枠は未充足で残る（→ 5-5）',
-  [noBandPlan.rows.length, violationsOf(noBandPlan).length, unmetOf(noBandPlan).length > 0],
-  [0, 0, true],
+  '② 帯を 1 枠も希望していない人も店の役割に置き、準備・片付けには入れない（違反 0 件。埋まらない枠は未充足で残る → 5-5）',
+  [
+    noBandPlan.rows.length > 0,
+    noBandPlan.rows.filter((row) => [ruleRoles.prep, ruleRoles.cleanup].indexOf(columnOf(row, '役割')) !== -1).length,
+    violationsOf(noBandPlan).length,
+    unmetOf(noBandPlan).length > 0,
+  ],
+  [true, 0, 0, true],
 )
 
 check(
   '②「解なし」で止まらない — 1 人も置けなくても案が返る（→ 5 の #6）',
-  Array.isArray(noBandPlan.rows),
+  Array.isArray(notPlaced.rows),
   true,
+)
+
+// 3 段目で入れる帯に空きが無かった人を、4 段目が逆の帯に入れない（午前だけ → 片付けにしない ／ 午後だけ → 準備にしない）。
+const morningOnlyPlan = planOf([plainDay], [['', '', '', '会計', 1]].concat(prepCleanupNeeds), [
+  wishOf('EED2000204', ['10:00-12:00,18:00-20:00']),
+])
+const afternoonOnlyPlan = planOf([plainDay], [['', '', '', '会計', 1]].concat(prepCleanupNeeds), [
+  wishOf('EED2000205', ['8:00-10:00,16:00-18:00']),
+])
+const rolesOf = (plan) => plan.rows.map((row) => columnOf(row, '役割')).filter((role, i, all) => all.indexOf(role) === i)
+
+check(
+  '② 準備の帯に空きの無い午前だけの人は片付けに、片付けの帯に空きの無い午後だけの人は準備に入らない（違反 0 件）',
+  [rolesOf(morningOnlyPlan), violationsOf(morningOnlyPlan).length, rolesOf(afternoonOnlyPlan), violationsOf(afternoonOnlyPlan).length],
+  [['会計'], 0, ['会計'], 0],
 )
 
 check(

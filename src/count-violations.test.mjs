@@ -224,8 +224,18 @@ check(
 const notPlacedInPrep = violationsOf(cleanRows().filter((row) => !(row[4] === people.a.id && row[3] === '準備')))
 
 check(
-  '② 規則 3 の ② — 午前だけの人が準備に入っていなければ、その人のその日が 1 行出る',
-  [labelsOf(notPlacedInPrep), detailOf(notPlacedInPrep).startsWith('午前だけ入っているので、準備だけに'), notPlacedInPrep[0][columns.indexOf('学籍番号')]],
+  '② 規則 3 の ② — 午前だけの人が準備にも片付けにも入っていなければ、違反にしない（入れるなら準備 → ADR tech-requirements/0017）',
+  notPlacedInPrep,
+  [],
+)
+
+const cleanupInsteadOfPrep = violationsOf(cleanRows().map((row) => (
+  row[4] === people.a.id && row[3] === '準備' ? placed(dates[0], '15:00', '片付け', people.a) : row
+)))
+
+check(
+  '② 規則 3 の ② — 午前だけの人を片付けに入れていれば、その人のその日が 1 行出る（逆の方だけ）',
+  [labelsOf(cleanupInsteadOfPrep), detailOf(cleanupInsteadOfPrep).startsWith('午前だけ入っているので、準備だけに'), cleanupInsteadOfPrep[0][columns.indexOf('学籍番号')]],
   [['準備・片付け'], true, people.a.id],
 )
 
@@ -262,9 +272,9 @@ const neitherSide = violationsOf(
 )
 
 check(
-  '② 規則 3 の ④ — 両方にあるのにどちらにも入れていなければ、同じ ④ として 1 行出る',
-  [labelsOf(neitherSide), detailOf(neitherSide).startsWith('午前も午後も入っているので'), detailOf(neitherSide).includes('準備なし')],
-  [['準備・片付け'], true, true],
+  '② 規則 3 の ④ — 両方にあるのにどちらにも入れていなければ、違反にしない（入れるなら片方だけ → ADR tech-requirements/0017）',
+  neitherSide,
+  [],
 )
 
 const afternoonWithBoth = violationsOf(cleanRows().concat([placed(dates[0], '08:00', '準備', people.b)]))
@@ -281,8 +291,8 @@ const otherRule = violationsOf(cleanRows().concat([placed(dates[0], '09:00', '�
 
 check(
   '② 準備も片付けも入っている規則 3 の違反だけを、余分に入っている違反と見分ける（→ issue #258。検証結果で水色にする）',
-  [afternoonWithBoth, bothSides, prepInsteadOfCleanup, notPlacedInPrep, neitherSide, otherRule].map((rows) => isPrepCleanupSurplus(contentOf(rows))),
-  [true, true, false, false, false, false],
+  [afternoonWithBoth, bothSides, prepInsteadOfCleanup, cleanupInsteadOfPrep, otherRule].map((rows) => isPrepCleanupSurplus(contentOf(rows))),
+  [true, true, false, false, false],
 )
 
 // 店の役割が無い日に準備だけ置かれるのは違反ではない（→ ADR tech-requirements/0009）
@@ -325,7 +335,7 @@ check(
 check(
   '② 5 つとも、仕込めば名指しで出た（数えると書いてあるものが全部動いている）',
   violationRules.map((rule) => rule.label).filter((label) => [
-    ...labelsOf(outsideWish), ...labelsOf(notPlacedInPrep), ...labelsOf(youngCookLeader),
+    ...labelsOf(outsideWish), ...labelsOf(cleanupInsteadOfPrep), ...labelsOf(youngCookLeader),
     ...labelsOf(cookWithoutAnswer), ...labelsOf(twiceInOneSlot),
   ].indexOf(label) === -1),
   [],
