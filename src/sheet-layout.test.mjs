@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url)
 
 const {
   sheetLayout, checkKind, sectionWidth,
-  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts, dividerColumn,
+  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts, dividerColumn, widthBaseColumn,
 } = require('./sheet-layout.js')
 
 /** 名前でシート 1 枚の区画を引く（並びの番号だと、並びが動いたとき別の枚を見る）。 */
@@ -211,15 +211,26 @@ check(
 )
 
 check(
-  '友達欄の幅と右の線を持つのはマス目の 4 枚だけで、どちらも名前のある列を指している（→ issue #245）',
+  '右の線を持つのはマス目の 4 枚だけで、名前のある列（友達欄）を指している（→ issue #245）',
   sheetLayout
-    .filter((s) => s.sections.some((k) => k.wideColumns || k.dividerAfter))
-    .map((s) => s.sections.map((k) => [
+    .filter((s) => s.sections.some((k) => k.dividerAfter))
+    .map((s) => s.sections.map((k) => [k.columns.includes(k.dividerAfter), dividerColumn(k)])),
+  dayLabels.map(() => [[true, 3]]),
+)
+
+check(
+  '広く取る列を持つのはマス目の 4 枚（友達欄）と検証結果（候補）で、どれも名前のある列を指し、'
+    + '物差しは広げない列のうち一番右である — マス目は時刻の右端、検証結果は「あと何人」（→ issue #245・#246）',
+  sheetLayout
+    .filter((s) => s.sections.some((k) => k.wideColumns))
+    .map((s) => [s.name, s.sections.map((k) => [
       Object.keys(k.wideColumns).every((name) => k.columns.includes(name)),
-      k.columns.includes(k.dividerAfter),
-      dividerColumn(k),
-    ])),
-  dayLabels.map(() => [[true, true, 3]]),
+      widthBaseColumn(k),
+    ])]),
+  [
+    ...dayLabels.map((name) => [name, [[true, 3 + maxSlotsPerDay]]]),
+    ['検証結果', [[true, 9]]],
+  ],
 )
 
 // ---- 結果 ------------------------------------------------------------------

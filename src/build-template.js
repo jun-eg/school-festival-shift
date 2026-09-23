@@ -105,7 +105,8 @@ function putInitialRows(sheet, layout, log) {
 
 /**
  * 区画ごとに、広く取る列（wideColumns）の幅を置き、境の線（dividerAfter）を見出しから最下行まで引く（→ issue #245）。
- * 幅は区画の右端の列（マス目なら時刻の列）の何倍かで決める — 物差しの列を担当者が広げていれば、それに合わせて広がる。
+ * 幅は物差しの列（広げない列のうち一番右 → sheet-layout.js の widthBaseColumn。マス目なら時刻の列、検証結果なら「あと何人」）の何倍かで決める
+ * — 物差しの列を担当者が広げていれば、それに合わせて広がる。広げる列そのものは物差しにしない（作り直すたびに倍々に伸びる → issue #246）。
  * 線は生成のたびに引き直される（→ shell.js の paintGrids）。ここで引くのは、まだ生成していないテンプレートにも出すためである。
  */
 function shapeColumns(sheet, layout, log) {
@@ -113,7 +114,7 @@ function shapeColumns(sheet, layout, log) {
     const wide = section.wideColumns || {}
     Object.keys(wide).forEach((name) => {
       const column = section.startColumn + section.columns.indexOf(name)
-      const width = sheet.getColumnWidth(section.startColumn + sectionWidth(section) - 1) * wide[name]
+      const width = sheet.getColumnWidth(widthBaseColumn(section)) * wide[name]
       if (sheet.getColumnWidth(column) === width) return
       sheet.setColumnWidth(column, width)
       log.push(`「${layout.name}」の「${name}」を ${width} px に広げた`)
@@ -126,14 +127,17 @@ function shapeColumns(sheet, layout, log) {
   })
 }
 
-/** 空なら書く。同じなら何もしない。違うなら名指しで止まる。 */
+/**
+ * 空なら書く。同じなら何もしない。違うなら名指しで止まる。
+ * 中身のあるセルが全部構成と同じで、空のセルがあるだけなら、空のセルを埋める（後から足した列 → issue #246）。
+ */
 function replaceValues(sheet, row, startColumn, values, sheetName, log) {
   const range = sheet.getRange(row, startColumn, 1, values.length)
   const actual = range.getValues()[0].map((cell) => String(cell))
   const wanted = values.map((cell) => String(cell))
 
   if (actual.join('\t') === wanted.join('\t')) return
-  if (actual.every((cell) => cell === '')) {
+  if (actual.every((cell, i) => cell === '' || cell === wanted[i])) {
     range.setValues([wanted])
     log.push(`「${sheetName}」の ${row} 行目 ${startColumn} 列目から見出しを置いた`)
     return

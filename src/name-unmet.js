@@ -191,6 +191,7 @@ function unmetRow(date, slot, role, required, have) {
     '氏名': '',
     '内容': `${required.sources.join(' ／ ')}: ${required.count} 人に対して ${have} 人しか置いていない`,
     'あと何人': required.count - have,
+    '候補': '', // 希望から入れられる人は build が入れる（→ core.js の withCandidates）
   }
   return sheetColumns('検証結果').map((name) => found[name])
 }

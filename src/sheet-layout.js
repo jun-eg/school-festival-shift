@@ -225,8 +225,11 @@ const sheetLayout = [
         heading: null,
         startColumn: 1,
         note: '違反（置いた人が条件を破っている）と未充足（人数が足りない）を、種別で分けて並べる（→ 5-4）。'
-          + '生成し直したときに残せなかった手直しは、食い違った固定として先頭に並ぶ（→ 5-3）',
-        columns: ['種別', '日', '開始', '終了', '役割', '学籍番号', '氏名', '内容', 'あと何人'],
+          + '生成し直したときに残せなかった手直しは、食い違った固定として先頭に並ぶ（→ 5-3）。'
+          + '候補は、その行の 30 分枠を希望に含む人全員の氏名である — 置いてあるか、ほかの条件に合うかは見ていない（→ issue #246）',
+        columns: ['種別', '日', '開始', '終了', '役割', '学籍番号', '氏名', '内容', 'あと何人', '候補'],
+        // 候補は名前が何人も並ぶので、ほかの列（あと何人）の 5 倍の幅を取る（→ issue #246 ／ widthBaseColumn）。
+        wideColumns: { '候補': 5 },
       },
     ],
   },
@@ -255,6 +258,9 @@ const sheetLayout = [
  */
 const checkKind = { violation: '違反', unmet: '未充足', fixConflict: '食い違った固定' }
 
+/** 検証結果の「候補」で、人と人のあいだに置く区切り。コアは学籍番号を、殻は氏名をこれでつなぐ（→ issue #246）。 */
+const candidateSeparator = '、'
+
 /**
  * 区画の幅（名前のある列 ＋ 名前を持たない列）。
  * 読む幅も列数を見る所も、列名の数ではなくこれを使う。
@@ -281,6 +287,18 @@ function dividerColumn(section) {
   return section.startColumn + section.columns.indexOf(section.dividerAfter)
 }
 
+/**
+ * 広く取る列（wideColumns）の幅の物差しにする列（1 始まり）— 区画の中で、広げない列のうち一番右である。
+ * マス目なら時刻の列、検証結果なら「あと何人」になる。右端の列そのものを広げる区画で右端を物差しにすると、
+ * テンプレートを作り直すたびに幅が倍々に伸びる（→ issue #246）。
+ */
+function widthBaseColumn(section) {
+  const wide = section.wideColumns || {}
+  let column = section.startColumn + sectionWidth(section) - 1
+  while (column > section.startColumn && wide[section.columns[column - section.startColumn]] !== undefined) column -= 1
+  return column
+}
+
 /** 生成が返す行の形。シートの列名で、マス目に載る「割り当て」だけは assignmentColumns である。 */
 function outputColumns(name) {
   if (name === assignmentName) return assignmentColumns
@@ -304,8 +322,8 @@ function gridLayouts(of) {
 // Node から読むためだけの口。Apps Script では module が無いので通らない。
 if (typeof module !== 'undefined') {
   module.exports = {
-    sheetLayout, checkKind, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
-    dividerLine, dividerColumn,
+    sheetLayout, checkKind, candidateSeparator, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
+    dividerLine, dividerColumn, widthBaseColumn,
     dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }

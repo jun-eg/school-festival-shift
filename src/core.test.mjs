@@ -3,12 +3,13 @@
 //
 //   使い方: node src/core.test.mjs
 //
-// 見るものは 5 つある。
+// 見るものは 6 つある。
 //   ① コアの側のファイルに SpreadsheetApp が出てこない（→ 6 の #8）
 //   ② 配列を渡すと配列が返る（→ issue #137）
 //   ③ 中身の入っていない段は、空の配列を返して名指しで持ち帰る
 //   ④ 段を差し替えると、その段だけを先に回せる。生成に渡る固定は手直しだけである（→ 5-3）
 //   ⑤ 表現の揺れ・列数の違い・決めていない種別は、名指しで止まる
+//   ⑥ 検証結果の候補に、その 30 分枠を希望に含む人の学籍番号が並ぶ（→ issue #246）
 //
 // 殻の検査は src/shell.test.mjs が持つ。
 
@@ -27,7 +28,7 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-viola
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
-const { build, recount, inputNames, conditionNames, sheetColumns, builtInSteps } = context
+const { build, recount, inputNames, conditionNames, sheetColumns, builtInSteps, withCandidates } = context
 const { coreSteps, outputNames, sheetLayout, checkKind, inputTypes } = vm.runInContext(
   '({ coreSteps, outputNames, sheetLayout, checkKind, inputTypes })',
   context,
@@ -429,6 +430,69 @@ check(
 )
 
 // ---- 入力の名前が sheet-layout.js から引かれているか ------------------------
+
+// ---- ⑥ 検証結果の候補 ---------------------------------------------------------
+
+const checkColumns = sheetColumns('検証結果')
+const candidateAt = checkColumns.indexOf('候補')
+
+/** 日・開始・終了だけを埋めた検証結果の行。 */
+function rowAt(date, start, end) {
+  const row = checkColumns.map(() => '')
+  row[checkColumns.indexOf('種別')] = checkKind.unmet
+  row[checkColumns.indexOf('日')] = date
+  row[checkColumns.indexOf('開始')] = start
+  row[checkColumns.indexOf('終了')] = end
+  return row
+}
+
+const wishedSlots = [
+  { studentId: 'A1', date: '2025-11-02', slots: [{ start: '10:00', end: '10:30' }, { start: '10:30', end: '11:00' }] },
+  { studentId: 'B2', date: '2025-11-02', slots: [{ start: '10:30', end: '11:00' }] },
+  { studentId: 'C3', date: '2025-11-03', slots: [{ start: '10:00', end: '10:30' }] },
+  { studentId: 'B2', date: '2025-11-02', slots: [{ start: '10:30', end: '11:00' }] },
+]
+
+check(
+  '⑥ その日のその 30 分枠を希望に含む人だけが、展開の順に 1 回ずつ並ぶ（ほかの日・ほかの枠の人は入らない）',
+  withCandidates([rowAt('2025-11-02', '10:00', '10:30'), rowAt('2025-11-02', '10:30', '11:00'), rowAt('2025-11-02', '11:00', '11:30')], wishedSlots)
+    .map((row) => row[candidateAt]),
+  ['A1', 'A1、B2', ''],
+)
+
+check(
+  '⑥ 枠が 1 つに決まらない行（開始か終了が空）は、候補を空のままにする',
+  withCandidates([rowAt('2025-11-02', '', ''), rowAt('2025-11-02', '10:00', '')], wishedSlots).map((row) => row[candidateAt]),
+  ['', ''],
+)
+
+check(
+  '⑥ 渡した行は書き換えない（新しい配列を返す）',
+  (() => {
+    const row = rowAt('2025-11-02', '10:00', '10:30')
+    withCandidates([row], wishedSlots)
+    return row[candidateAt]
+  })(),
+  '',
+)
+
+// 2 人目は準備帯（8:00-10:00）しか希望していないので、調理帯の未充足には入らない。
+const twoPeople = build(skeletonInputs({
+  '回答': [
+    skeletonInputs()['回答'][0],
+    ['2025-09-23 16:40:00', 'EED0000001', '二人目', '1年生', 'いいえ', '', '8:00-10:00', '8:00-10:00', '8:00-10:00', '8:00-10:00'],
+  ],
+  '役割と必要人数': [['', '', '', '調理', 2], ['2025-11-01', '', '', '準備', 5]],
+  '割り当て': [],
+}))
+const unmetAt = (date, start) => twoPeople['検証結果'].filter((row) => row[0] === checkKind.unmet
+  && row[checkColumns.indexOf('日')] === date && row[checkColumns.indexOf('開始')] === start)[0]
+
+check(
+  '⑥ 生成を通すと、未充足の行の候補に、その枠を希望した人の学籍番号が入る（氏名にするのは殻 → shell.test.mjs）',
+  [unmetAt('2025-11-01', '08:00'), unmetAt('2025-11-01', '10:00')].map((row) => row && row[candidateAt]),
+  ['EED2349987、EED0000001', 'EED2349987'],
+)
 
 check(
   '入力の名前は、条件入力の 6 区画 ＋ 回答 ＋ 割り当て ＋ 手直しである（検証結果と指標は入らない）',

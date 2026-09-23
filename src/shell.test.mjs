@@ -496,6 +496,29 @@ check(
 )
 
 check(
+  '④ 検証結果の候補は、学籍番号を氏名に置き換える。回答に氏名の無い人は学籍番号のまま残す（→ issue #246）',
+  (() => {
+    const unmet = checkResultRow(checkKind.unmet, 'あと 1 人')
+    const candidateAt = checkResultColumns.indexOf('候補')
+    unmet[candidateAt] = 'EED2349987、EED0000000'
+    const filled = withNamesFromAnswers([unmet], '検証結果', (studentId) => (studentId === 'EED2349987' ? '高木琴音' : ''))
+    return [filled[0][candidateAt], unmet[candidateAt]]
+  })(),
+  ['高木琴音、EED0000000', 'EED2349987、EED0000000'],
+)
+
+check(
+  '④ 段を差し替えずに回すと、検証結果の J 列（候補）に、その枠を希望した人の氏名が入る（→ issue #246）',
+  (() => {
+    const sheet = builtInBook.getSheetByName('検証結果')
+    const candidateColumn = checkResultColumns.indexOf('候補') + 1
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, candidateColumn).getValues()
+    return [candidateColumn, sheet.getRange(1, candidateColumn, 1, 1).getValues()[0][0], values.some((row) => row[candidateColumn - 1] === '高木琴音')]
+  })(),
+  [10, '候補', true],
+)
+
+check(
   '④ 割り当ての無い日も、見出しだけは書き直される（前の周の列が残らない）',
   [
     fullBook.getSheetByName(dayLabels[1]).getRange(1, 1, 1, 5).getValues()[0],

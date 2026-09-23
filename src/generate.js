@@ -790,6 +790,7 @@ function fixedConflictRow(one, why) {
     '氏名': '',
     '内容': why,
     'あと何人': '',
+    '候補': '', // 希望から入れられる人は build が入れる（→ core.js の withCandidates）
   }
   return sheetColumns('検証結果').map((name) => found[name])
 }
