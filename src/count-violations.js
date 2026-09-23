@@ -219,7 +219,7 @@ function countPrepCleanupBroken(placed, conditions) {
  * 文は作成者が読むので、②〜④ の番号は出さない（→ issue #249）。
  */
 function prepCleanupDetail(day, boundary) {
-  const now = `境目 ${boundary}。今：${ruleRoles.prep}${day.prep ? 'あり' : 'なし'}／${ruleRoles.cleanup}${day.cleanup ? 'あり' : 'なし'}`
+  const now = `境目 ${boundary}。${prepCleanupHeldText(day)}`
 
   // ④ 両方 → 片方だけ
   if (day.morning && day.afternoon) {
@@ -239,6 +239,21 @@ function prepCleanupDetail(day, boundary) {
   // ⑤「どちらも無い → 入れない」は当たらなくなった（→ ADR tech-requirements/0009）。
   // 準備・片付けが需要になったので、店の役割が無い日に準備だけ置かれるのはそれ自体が仕事である。
   return null
+}
+
+/** 規則 3 の文の「今：準備あり／片付けなし」の部分。 */
+function prepCleanupHeldText(day) {
+  return `今：${ruleRoles.prep}${day.prep ? 'あり' : 'なし'}／${ruleRoles.cleanup}${day.cleanup ? 'あり' : 'なし'}`
+}
+
+/**
+ * 検証結果の「内容」が、準備も片付けも入っている規則 3 の違反か（→ issue #258）。
+ * 要る方は入っていて、もう一方が余分に入っているだけである。公平性を取るために作成者が意図的に入れる場合がある。
+ */
+function isPrepCleanupSurplus(content) {
+  const text = String(content || '')
+  const both = `${prepCleanupHeldText({ prep: true, cleanup: true })}）`
+  return text.indexOf(`${labelOf('rule3')}: `) === 0 && text.slice(-both.length) === both
 }
 
 /**
@@ -352,7 +367,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     ruleRoles, cookRoles, violationRules, violationsNotCounted,
     prepCleanupBands, prepCleanupRoles, isInBand,
-    countViolations, cookLeaderGradeBroken, cookAnswerBroken, countPrepCleanupBroken, prepCleanupDetail,
+    countViolations, cookLeaderGradeBroken, cookAnswerBroken, countPrepCleanupBroken, prepCleanupDetail, prepCleanupHeldText, isPrepCleanupSurplus,
     readAssignments, checkOnSlot, wishesByStudentId, wishedSlots, slotKey, violationRow, labelOf, cookAnswerText,
   }
 }

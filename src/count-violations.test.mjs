@@ -24,7 +24,7 @@ const context = vm.createContext({})
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
-const { countViolations, takeConditions, toWishes, build, sheetColumns } = context
+const { countViolations, takeConditions, toWishes, build, sheetColumns, isPrepCleanupSurplus } = context
 const { violationRules, violationsNotCounted, checkKind } = vm.runInContext(
   '({ violationRules, violationsNotCounted, checkKind })',
   context,
@@ -265,6 +265,24 @@ check(
   '② 規則 3 の ④ — 両方にあるのにどちらにも入れていなければ、同じ ④ として 1 行出る',
   [labelsOf(neitherSide), detailOf(neitherSide).startsWith('午前も午後も入っているので'), detailOf(neitherSide).includes('準備なし')],
   [['準備・片付け'], true, true],
+)
+
+const afternoonWithBoth = violationsOf(cleanRows().concat([placed(dates[0], '08:00', '準備', people.b)]))
+
+check(
+  '② 規則 3 の ③ — 午後だけの人を片付けに加えて準備にも入れていれば、1 行出る',
+  [labelsOf(afternoonWithBoth), detailOf(afternoonWithBoth).startsWith('午後だけ入っているので、片付けだけに'), detailOf(afternoonWithBoth).endsWith('今：準備あり／片付けあり）')],
+  [['準備・片付け'], true, true],
+)
+
+const contentOf = (rows) => rows[0][detailColumn]
+// 規則 3 ではない違反を 1 行（同じ枠に二重）
+const otherRule = violationsOf(cleanRows().concat([placed(dates[0], '09:00', '調理責任者', people.a)]))
+
+check(
+  '② 準備も片付けも入っている規則 3 の違反だけを、余分に入っている違反と見分ける（→ issue #258。検証結果で水色にする）',
+  [afternoonWithBoth, bothSides, prepInsteadOfCleanup, notPlacedInPrep, neitherSide, otherRule].map((rows) => isPrepCleanupSurplus(contentOf(rows))),
+  [true, true, false, false, false, false],
 )
 
 // 店の役割が無い日に準備だけ置かれるのは違反ではない（→ ADR tech-requirements/0009）
