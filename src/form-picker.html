@@ -5,6 +5,8 @@
     <meta charset="utf-8" />
     <!--
       「フォームを作る」で出る画面（→ issue #144）。担当者は名簿の画像を選ぶだけである。
+      作り終えたら、画像を選ぶ中身を閉じて、作り終えた中身だけを出す（→ issue #244）。
+      別のダイアログを開かないのは、この経路で開く画面を 1 枚に保つためである（→ scripts/M1②の宣言.json）。
       外から読み込むファイルは 0 個である（→ 6 の #5）。
     -->
     <style>
@@ -20,13 +22,23 @@
       button { font-size: 13px; padding: 6px 16px; }
       #state { white-space: pre-wrap; word-break: break-all; }
       .stopped { color: #b3261e; }
+      .url { word-break: break-all; }
+      h2 { font-size: 15px; margin: 0 0 16px; }
     </style>
   </head>
   <body>
-    <p>委員会から来た<strong>調理名簿の画像</strong>を選ぶ。フォームの中にそのまま貼られる。</p>
-    <p><input type="file" id="picked" accept="image/*" /></p>
-    <p><button id="run">フォームを作る</button></p>
-    <p id="state" class="note"></p>
+    <div id="picker">
+      <p>委員会から来た<strong>調理名簿の画像</strong>を選ぶ。フォームの中にそのまま貼られる。</p>
+      <p><input type="file" id="picked" accept="image/*" /></p>
+      <p><button id="run">フォームを作る</button></p>
+      <p id="state" class="note"></p>
+    </div>
+
+    <div id="built" hidden>
+      <h2>フォーム作成が完了しました！！</h2>
+      <p>配る用 URL（LINE ノートに貼るなど）:<br /><a id="url" class="url" target="_blank"></a></p>
+      <p>フォーム編集用 URL:<br /><a id="editUrl" class="url" target="_blank"></a></p>
+    </div>
 
     <script>
       var button = document.getElementById('run')
@@ -55,7 +67,7 @@
         reader.onload = function () {
           // data:image/png;base64,xxxx の後ろだけを渡す。
           var base64 = String(reader.result).split(',')[1]
-          say('フォームを作っている…（1 分ほどかかることがある）')
+          say('フォーム作成中…（30 秒〜1 分ほどかかります）')
           google.script.run
             .withSuccessHandler(done)
             .withFailureHandler(function (error) {
@@ -71,15 +83,18 @@
         reader.readAsDataURL(file)
       })
 
+      // やったことの記録は createFormFromPicker が実行ログに出しているので、ここには出さない。
       function done(built) {
-        button.disabled = false
-        say(
-          built.log.join('\n')
-            + '\n\n配る URL（LINE ノートに貼る）:\n'
-            + built.url
-            + '\n\nフォームを開く:\n'
-            + built.editUrl,
-        )
+        link('url', built.url)
+        link('editUrl', built.editUrl)
+        document.getElementById('picker').hidden = true
+        document.getElementById('built').hidden = false
+      }
+
+      function link(id, url) {
+        var a = document.getElementById(id)
+        a.href = url
+        a.textContent = url
       }
     </script>
   </body>
