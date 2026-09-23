@@ -9,7 +9,7 @@
 //   ③ 中身の入っていない段は、空の配列を返して名指しで持ち帰る
 //   ④ 段を差し替えると、その段だけを先に回せる。生成に渡る固定は手直しだけである（→ 5-3）
 //   ⑤ 表現の揺れ・列数の違い・決めていない種別は、名指しで止まる
-//   ⑥ 検証結果の候補に、その 30 分枠を希望に含む人の学籍番号が並ぶ（→ issue #246）
+//   ⑥ 検証結果の候補に、その 30 分枠を希望に含み、その枠にまだ置かれていない人の学籍番号が並ぶ（→ issue #246 ／ #254）
 //
 // 殻の検査は src/shell.test.mjs が持つ。
 
@@ -466,6 +466,32 @@ check(
   ['', ''],
 )
 
+/** 割り当て 1 件（役割は何でもよい）。 */
+function placedAt(date, start, end, studentId, role) {
+  const found = { '日': date, '開始': start, '終了': end, '役割': role || '調理', '学籍番号': studentId, '氏名': '' }
+  return sheetColumns('割り当て').map((name) => found[name])
+}
+
+check(
+  '⑥ その枠を希望していても、その枠にもう置かれている人は（役割を問わず）候補に並ばない（→ issue #254）',
+  withCandidates(
+    [rowAt('2025-11-02', '10:00', '10:30'), rowAt('2025-11-02', '10:30', '11:00')],
+    wishedSlots,
+    [placedAt('2025-11-02', '10:30', '11:00', 'A1', '会計')],
+  ).map((row) => row[candidateAt]),
+  ['A1', 'B2'],
+)
+
+check(
+  '⑥ ほかの日・ほかの枠に置かれているだけなら、その枠の候補には並ぶ',
+  withCandidates(
+    [rowAt('2025-11-02', '10:30', '11:00')],
+    wishedSlots,
+    [placedAt('2025-11-02', '10:00', '10:30', 'A1'), placedAt('2025-11-03', '10:30', '11:00', 'B2')],
+  ).map((row) => row[candidateAt]),
+  ['A1、B2'],
+)
+
 check(
   '⑥ 渡した行は書き換えない（新しい配列を返す）',
   (() => {
@@ -489,9 +515,21 @@ const unmetAt = (date, start) => twoPeople['検証結果'].filter((row) => row[0
   && row[checkColumns.indexOf('日')] === date && row[checkColumns.indexOf('開始')] === start)[0]
 
 check(
-  '⑥ 生成を通すと、未充足の行の候補に、その枠を希望した人の学籍番号が入る（氏名にするのは殻 → shell.test.mjs）',
+  '⑥ 生成を通すと、未充足の行の候補に、その枠を希望していて置かれていない人の学籍番号が入る'
+    + '（8:00 の準備は 2 人とも置かれたので空 ／ 氏名にするのは殻 → shell.test.mjs）',
   [unmetAt('2025-11-01', '08:00'), unmetAt('2025-11-01', '10:00')].map((row) => row && row[candidateAt]),
-  ['EED2349987、EED0000001', 'EED2349987'],
+  ['', 'EED2349987'],
+)
+
+// 数え直しでは、マス目に書いてあるとおりが割り当てである。担当者が手で置いた人は、その枠の候補から消える。
+const recountAt = (placed) => recount(skeletonInputs({ '割り当て': placed }))['検証結果']
+  .filter((row) => row[0] === checkKind.unmet
+    && row[checkColumns.indexOf('日')] === '2025-11-02' && row[checkColumns.indexOf('開始')] === '10:00')[0][candidateAt]
+
+check(
+  '⑥ 数え直しでも、マス目でその枠に置いた人は候補から消え、外すと候補に戻る（→ issue #254）',
+  [recountAt([['2025-11-02', '10:00', '10:30', '調理', 'EED2349987', '高木琴音']]), recountAt([])],
+  ['', 'EED2349987'],
 )
 
 check(

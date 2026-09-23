@@ -141,7 +141,8 @@ function build(inputs, steps) {
   const metrics = callStep('指標を出す', [assignments, conditions, wishes])
 
   // 食い違った固定を先頭に置く。未充足は何十行も並ぶので、後ろだと目に入らない。
-  const checks = withCandidates(fixConflicts.concat(violations, unmet), candidates)
+  // 候補から、その枠にもう置かれている人を外すので、割り当ても渡す（数え直しではマス目に書いてあるとおり）。
+  const checks = withCandidates(fixConflicts.concat(violations, unmet), candidates, assignments)
   const output = { '割り当て': assignments, '検証結果': checks, '指標': metrics }
   checkOutput(output)
   output.notBuilt = notBuilt
@@ -170,14 +171,16 @@ function noFixedToCheck() {
 }
 
 /**
- * 検証結果の行ごとに、その 30 分枠を希望に含む人（→ 展開する）を「候補」に入れる（→ issue #246）。
+ * 検証結果の行ごとに、その 30 分枠を希望に含み（→ 展開する）、かつその枠にまだ置かれていない人を「候補」に入れる
+ * （→ issue #246 ／ #254）。
  *
+ * 置かれているかは役割を問わない — その日・その枠の割り当てに 1 件でもあれば、その人は空いていない。
  * コアは氏名を見ない（→ 5 の #1）ので、入れるのは学籍番号で、氏名に置き換えるのは殻である（→ shell.js の withNamesFromAnswers）。
- * 並びは展開が返した順（＝ 取り込みが返した順）である。置いてあるか、ほかの規則に合うかは見ない —
- * 見るのは希望の時間だけで、誰を置くかは担当者が決める（→ 5-3）。
+ * 並びは展開が返した順（＝ 取り込みが返した順）である。ほかの規則（学年・調理可否・規則 3）に合うかは見ない —
+ * 誰を寄せるかは担当者が決める（→ 5-3）。
  * 枠が 1 つに決まらない行（開始か終了が空 — 規則 3 の違反・いまの枠に無い手直し）は空のままにする。
  */
-function withCandidates(rows, candidates) {
+function withCandidates(rows, candidates, assignments) {
   const columns = sheetColumns('検証結果')
   const at = (name) => columns.indexOf(name)
   const wishedBy = {}
@@ -189,13 +192,22 @@ function withCandidates(rows, candidates) {
     })
   })
 
+  // 「日 開始-終了 学籍番号」→ true（その枠に、役割を問わず置かれている）
+  const placedColumns = sheetColumns(assignmentName)
+  const placedAt = (name) => placedColumns.indexOf(name)
+  const placed = {}
+  ;(assignments || []).forEach((one) => {
+    placed[`${one[placedAt('日')]} ${one[placedAt('開始')]}-${one[placedAt('終了')]} ${one[placedAt('学籍番号')]}`] = true
+  })
+
   return rows.map((row) => {
     const filled = row.slice()
     const date = row[at('日')]
     const start = row[at('開始')]
     const end = row[at('終了')]
-    const wished = date === '' || start === '' || end === '' ? [] : wishedBy[`${date} ${start}-${end}`] || []
-    filled[at('候補')] = wished.join(candidateSeparator)
+    const key = `${date} ${start}-${end}`
+    const wished = date === '' || start === '' || end === '' ? [] : wishedBy[key] || []
+    filled[at('候補')] = wished.filter((studentId) => !placed[`${key} ${studentId}`]).join(candidateSeparator)
     return filled
   })
 }
