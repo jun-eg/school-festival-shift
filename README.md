@@ -4,7 +4,7 @@
 
 ## 1. テンプレートファイルをコピーする
 
-**[こちら](https://docs.google.com/spreadsheets/d/1WcbUczLpBnBjQbhmIAGGQUYgsnuphu5Ih2ga9_8zaNs/copy) から Google スプレッドシートをコピーします。**
+**[こちら](https://docs.google.com/spreadsheets/d/196wFP0Jeg_uTdKZgocLKB09slN0ThqGcS2X7VECnEVY/copy) から Google スプレッドシートをコピーします。**
 コピーはご自身の Google ドライブに保存されるため、お手数ですが Google へのログインをお願いします。
 
 ### 1. アカウントを選択します
