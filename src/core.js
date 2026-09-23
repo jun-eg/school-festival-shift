@@ -141,7 +141,8 @@ function build(inputs, steps) {
   const metrics = callStep('指標を出す', [assignments, conditions, wishes])
 
   // 食い違った固定を先頭に置く。未充足は何十行も並ぶので、後ろだと目に入らない。
-  const output = { '割り当て': assignments, '検証結果': fixConflicts.concat(violations, unmet), '指標': metrics }
+  const checks = withCandidates(fixConflicts.concat(violations, unmet), candidates)
+  const output = { '割り当て': assignments, '検証結果': checks, '指標': metrics }
   checkOutput(output)
   output.notBuilt = notBuilt
   return output
@@ -166,6 +167,37 @@ function keepAsPlaced(placed) {
 /** 「固定を照らす」の段の代わり。数え直しでは照らさない（→ recount の注意）。 */
 function noFixedToCheck() {
   return []
+}
+
+/**
+ * 検証結果の行ごとに、その 30 分枠を希望に含む人（→ 展開する）を「候補」に入れる（→ issue #246）。
+ *
+ * コアは氏名を見ない（→ 5 の #1）ので、入れるのは学籍番号で、氏名に置き換えるのは殻である（→ shell.js の withNamesFromAnswers）。
+ * 並びは展開が返した順（＝ 取り込みが返した順）である。置いてあるか、ほかの規則に合うかは見ない —
+ * 見るのは希望の時間だけで、誰を置くかは担当者が決める（→ 5-3）。
+ * 枠が 1 つに決まらない行（開始か終了が空 — 規則 3 の違反・いまの枠に無い手直し）は空のままにする。
+ */
+function withCandidates(rows, candidates) {
+  const columns = sheetColumns('検証結果')
+  const at = (name) => columns.indexOf(name)
+  const wishedBy = {}
+  ;(candidates || []).forEach((candidate) => {
+    ;(candidate.slots || []).forEach((slot) => {
+      const key = `${candidate.date} ${slot.start}-${slot.end}`
+      if (!wishedBy[key]) wishedBy[key] = []
+      if (wishedBy[key].indexOf(candidate.studentId) === -1) wishedBy[key].push(candidate.studentId)
+    })
+  })
+
+  return rows.map((row) => {
+    const filled = row.slice()
+    const date = row[at('日')]
+    const start = row[at('開始')]
+    const end = row[at('終了')]
+    const wished = date === '' || start === '' || end === '' ? [] : wishedBy[`${date} ${start}-${end}`] || []
+    filled[at('候補')] = wished.join(candidateSeparator)
+    return filled
+  })
 }
 
 /** 条件入力の 6 区画を 5-1 の型に直す（→ input-types.js）。キーは型の側の名前である。 */
@@ -252,6 +284,6 @@ function sheetColumns(name) {
 if (typeof module !== 'undefined') {
   module.exports = {
     coreSteps, outputNames, sheetsNotRead, inputNames, conditionNames, builtInSteps,
-    build, recount, keepAsPlaced, noFixedToCheck, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
+    build, recount, keepAsPlaced, noFixedToCheck, withCandidates, takeConditions, findStep, checkRepresentation, checkOutput, sheetSection, sheetColumns,
   }
 }

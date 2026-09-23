@@ -100,6 +100,9 @@ class 偽のシート {
   setFrozenRows(数) { this.frozenRows = 数 }
   setFrozenColumns(数) { this.frozenColumns = 数 }
   insertColumnsAfter(後ろ, 数) { this.maxColumns = Math.max(this.maxColumns, 後ろ + 数) }
+  // 列の幅は組み立てが置くだけで、判定は読まない（→ build-template.js の putWidths）
+  getColumnWidth() { return 100 }
+  setColumnWidth() { return this }
   getProtections() { return [...this.protections] }
   protect() { const p = new 偽の保護(this); this.protections.push(p); return p }
   getFormUrl() { return null }

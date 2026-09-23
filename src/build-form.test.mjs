@@ -92,6 +92,9 @@ class FakeSheet {
   getMaxRows() { return this.maxRows }
   getMaxColumns() { return this.maxColumns }
   insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
+  // 列の幅は、新しいスプレッドシートの既定の 100 ピクセルである
+  getColumnWidth(column) { return (this.widths ??= new Map()).get(column) ?? 100 }
+  setColumnWidth(column, width) { (this.widths ??= new Map()).set(column, width); return this }
   getProtections() { return [...this.protections] }
   protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
   getFormUrl() { return this.formUrl }

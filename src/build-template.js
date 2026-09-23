@@ -28,6 +28,7 @@ function buildTemplateInto(spreadsheet) {
     }
     widenTo(sheet, layout, log)
     putHeaders(sheet, layout, log)
+    putWidths(sheet, layout)
     putInitialRows(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
     sheet.setFrozenColumns(layout.frozenColumns || 0)
@@ -82,6 +83,21 @@ function putHeaders(sheet, layout, log) {
 }
 
 /**
+ * 区画の widthTimes に名前のある列を、区画の 1 列目の何倍かの幅にする（→ sheet-layout.js ／ issue #246）。
+ * 1 列目を基準にするのは、2 回走らせても幅が倍々に伸びないためである。
+ */
+function putWidths(sheet, layout) {
+  layout.sections.forEach((section) => {
+    const times = section.widthTimes || {}
+    const base = sheet.getColumnWidth(section.startColumn)
+    Object.keys(times).forEach((columnName) => {
+      const column = section.startColumn + section.columns.indexOf(columnName)
+      sheet.setColumnWidth(column, base * times[columnName])
+    })
+  })
+}
+
+/**
  * 区画ごとに、列名の下へ初期値を置く（→ sheet-layout.js の initialRows ／ issue #240）。
  *
  * 置くのは、区画の入力欄（列名の下から最下行まで・区画の幅）が空のときだけである。
@@ -102,14 +118,17 @@ function putInitialRows(sheet, layout, log) {
   })
 }
 
-/** 空なら書く。同じなら何もしない。違うなら名指しで止まる。 */
+/**
+ * 空なら書く。同じなら何もしない。違うなら名指しで止まる。
+ * 中身のあるセルが全部構成と同じで、空のセルがあるだけなら、空のセルを埋める（後から足した列 → issue #246）。
+ */
 function replaceValues(sheet, row, startColumn, values, sheetName, log) {
   const range = sheet.getRange(row, startColumn, 1, values.length)
   const actual = range.getValues()[0].map((cell) => String(cell))
   const wanted = values.map((cell) => String(cell))
 
   if (actual.join('\t') === wanted.join('\t')) return
-  if (actual.every((cell) => cell === '')) {
+  if (actual.every((cell, i) => cell === '' || cell === wanted[i])) {
     range.setValues([wanted])
     log.push(`「${sheetName}」の ${row} 行目 ${startColumn} 列目から見出しを置いた`)
     return

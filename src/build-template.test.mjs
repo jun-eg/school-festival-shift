@@ -3,13 +3,14 @@
 //
 //   使い方: node src/build-template.test.mjs
 //
-// 見るものは 5 つある。
+// 見るものは 6 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
 //   ② 8 枚に保護がかかる。割り当ての 4 枚は「持ち主だけ」、ほかの 4 枚は「警告のみ」で、
 //      条件入力だけは区画の入力欄が保護の外にある（→ issue #234）
 //   ③ 2 回走らせても形が変わらない（足りないものだけ足す）
 //   ④ 見出しが構成と違うときは、上書きせずに名指しで止まる（黙って直さない）
 //   ⑤ 条件入力の区画ごとに、列名の下へ初期値が置かれる。入力欄に中身がある区画には置かない（→ issue #240）
+//   ⑥ 検証結果の候補の列は、ほかの列の 5 倍の幅になる。候補の列が無い前の形のシートには、見出しを足して止まらない（→ issue #246）
 //
 // 本物のスプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
 // コピーした先で「持ち主だけ」が誰に効くかは分からない（→ issue #136・real-device-log.md の項目 22）。
@@ -96,6 +97,9 @@ class FakeSheet {
   getMaxRows() { return this.maxRows }
   getMaxColumns() { return this.maxColumns }
   insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
+  // 列の幅は、新しいスプレッドシートの既定の 100 ピクセルである
+  getColumnWidth(column) { return (this.widths ??= new Map()).get(column) ?? 100 }
+  setColumnWidth(column, width) { (this.widths ??= new Map()).set(column, width); return this }
   getProtections() { return [...this.protections] }
   protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
   getLastRow() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[0])), 0) }
@@ -269,6 +273,36 @@ check(
     writtenLog.filter((line) => line.includes('初期値')).length,
   ],
   [true, otherSections.length],
+)
+
+const checkLayout = sheetLayout.find((c) => c.name === '検証結果')
+const candidateColumn = checkLayout.sections[0].columns.indexOf('候補') + 1
+const widthsOf = (target) => {
+  const sheet = target.getSheetByName('検証結果')
+  return checkLayout.sections[0].columns.map((_, i) => sheet.getColumnWidth(i + 1))
+}
+
+check(
+  '⑥ 検証結果の候補は J 列で、ほかの列の 5 倍の幅になる（2 回目を走らせても倍々に伸びない）',
+  [candidateColumn, widthsOf(book)],
+  [10, checkLayout.sections[0].columns.map((name) => (name === '候補' ? 500 : 100))],
+)
+
+// 候補の列を足す前（#246 より前）に作ったシートである。見出しは I 列までしか無い。
+const olderBook = new FakeSpreadsheet(['シート1'])
+buildTemplateInto(olderBook)
+olderBook.getSheetByName('検証結果').getRange(1, candidateColumn, 1, 1).setValues([['']])
+let olderStopped = null
+try {
+  buildTemplateInto(olderBook)
+} catch (error) {
+  olderStopped = error.message
+}
+
+check(
+  '⑥ 候補の列が無い前の形の検証結果には、止まらずに見出しを足す（中身のある見出しは構成と同じなので）',
+  [olderStopped, olderBook.getSheetByName('検証結果').getRange(1, 1, 1, candidateColumn).getValues()[0]],
+  [null, checkLayout.sections[0].columns],
 )
 
 // ---- 結果 -------------------------------------------------------------------

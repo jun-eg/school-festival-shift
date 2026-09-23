@@ -223,16 +223,24 @@ function a1Notation(row, column) {
 /**
  * 検証結果と指標の空の氏名を回答から埋める（コアは氏名を見ない → 5 の #1 ／ issue #229）。
  * 学籍番号が空の行（未充足）は空のまま。コアの出力は書き換えず、新しい配列を返す。
+ * 検証結果の「候補」も、コアが並べた学籍番号を氏名に置き換える（→ issue #246）。
+ * 回答に氏名が無い人だけは、学籍番号のまま残す — 消すと、入れられる人が 1 人減って見える。
  */
 function withNamesFromAnswers(rows, name, nameOf) {
   if (!nameOf) return rows
   const columns = outputColumns(name)
   const studentIdColumn = columns.indexOf('学籍番号')
   const nameColumn = columns.indexOf('氏名')
+  const candidateColumn = columns.indexOf('候補')
   return rows.map((row) => {
-    if (row[nameColumn] !== '') return row
     const filled = row.slice()
-    filled[nameColumn] = nameOf(row[studentIdColumn])
+    if (filled[nameColumn] === '') filled[nameColumn] = nameOf(row[studentIdColumn])
+    if (candidateColumn !== -1 && row[candidateColumn] !== '') {
+      filled[candidateColumn] = String(row[candidateColumn])
+        .split(candidateSeparator)
+        .map((studentId) => nameOf(studentId) || studentId)
+        .join(candidateSeparator)
+    }
     return filled
   })
 }
