@@ -168,8 +168,8 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   return grids
 }
 
-/** 氏名のプルダウンの説明（セルを選ぶと出る）。候補の元と、選ぶと何が起きるかを言う（→ issue #271）。 */
-const nameDropdownHelp = '「回答」シートの氏名から選びます。学籍番号が空の行で選ぶと、学籍番号が自動で入ります。'
+/** 氏名のプルダウンの説明（セルを選ぶと出る）。候補の元と、選ぶと何が起きるかを言う（→ issue #271 ／ #286）。 */
+const nameDropdownHelp = '「回答」シートの氏名から選びます。選ぶと学籍番号が自動で入り、選び直すと入れ替わり、消すと消えます。'
 
 /**
  * マス目の氏名の列を、回答の氏名のプルダウンにする（→ issue #271）。候補はシフト希望を出した全員である。
@@ -437,13 +437,15 @@ function recountOnEdit(event) {
 }
 
 /**
- * 氏名を選んだ行の、空の学籍番号を回答から埋める（→ issue #271）。返すのは埋められなかった氏名である。
+ * 氏名を書き換えた行の学籍番号を、回答から引いて氏名に揃える（→ issue #271 ／ #286）。返すのは揃えられなかった氏名である。
  *   ambiguous … 同じ氏名で学籍番号が異なる人が複数いた（同姓同名。どちらかは担当者が決める）
  *   notFound  … 回答に同じ氏名が無かった（プルダウンの外から貼られたときだけ起きる）
  *
- * 見るのは書き換えた範囲が氏名の列にかかっている行だけで、学籍番号がもう入っている行は上書きしない
- * — 行の持ち主を黙って替えない。
- * スクリプトの書き込みでは onEdit が走らないので、埋めた行には学籍番号を書き換えたときと同じ印を付ける（→ markFixedCells）。
+ * 見るのは書き換えた範囲が氏名の列にかかっている行だけである。氏名を選び直すのは行の持ち主を替えることなので、
+ * 学籍番号が入っていても入れ替え、氏名を消せば学籍番号も消す — 残すと、画面は新しい人なのに前の人で数える。
+ * 揃えられないとき（同姓同名で今の学籍番号がどれでもない・回答に無い）も、前の人の学籍番号は消す。
+ * ただし学籍番号の列も一緒に書き換えた範囲では、学籍番号は担当者が入れた値なので、空のときだけ埋める。
+ * スクリプトの書き込みでは onEdit が走らないので、書き換えた行には学籍番号を書き換えたときと同じ印を付ける（→ markFixedCells）。
  */
 function fillStudentIds(spreadsheet, range) {
   const result = { ambiguous: [], notFound: [] }
@@ -456,33 +458,44 @@ function fillStudentIds(spreadsheet, range) {
   const top = Math.max(range.getRow(), headerRowCount(layout) + 1)
   const bottom = range.getLastRow()
   if (bottom < top || range.getColumn() > nameColumn || range.getLastColumn() < nameColumn) return result
+  const studentIdsEdited = range.getColumn() <= studentIdColumn && range.getLastColumn() >= studentIdColumn
 
   const studentIds = sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).getValues()
   const names = sheet.getRange(top, nameColumn, bottom - top + 1, 1).getValues()
   const waiting = names
-    .map((row, index) => ({ index: index, name: normalizeValue(row[0]) }))
-    .filter((one) => one.name !== '' && normalizeValue(studentIds[one.index][0]) === '')
+    .map((row, index) => ({ index: index, name: normalizeValue(row[0]), studentId: normalizeValue(studentIds[index][0]) }))
+    .filter((one) => (one.name !== '' || one.studentId !== '') && (!studentIdsEdited || one.studentId === ''))
   if (waiting.length === 0) return result
 
-  const answerLayout = findLayout('回答')
-  const studentIdsOf = studentIdsFromAnswers(
-    readSection(findSheet(spreadsheet, answerLayout.name), answerLayout, answerLayout.sections[0]),
-  )
-  const filledRows = []
+  // 回答を読むのは、氏名の入った行があるときだけである（氏名を消しただけなら要らない）。
+  let studentIdsOf = null
+  const changedRows = []
   waiting.forEach((one) => {
-    const found = studentIdsOf(one.name)
-    if (found.length === 1) {
-      studentIds[one.index][0] = found[0]
-      filledRows.push(top + one.index)
-      return
+    let next = ''
+    if (one.name !== '') {
+      if (!studentIdsOf) {
+        const answerLayout = findLayout('回答')
+        studentIdsOf = studentIdsFromAnswers(
+          readSection(findSheet(spreadsheet, answerLayout.name), answerLayout, answerLayout.sections[0]),
+        )
+      }
+      const found = studentIdsOf(one.name)
+      if (found.indexOf(one.studentId.toUpperCase()) !== -1) return
+      if (found.length === 1) {
+        next = found[0]
+      } else {
+        const list = found.length === 0 ? result.notFound : result.ambiguous
+        if (list.indexOf(one.name) === -1) list.push(one.name)
+      }
     }
-    const list = found.length === 0 ? result.notFound : result.ambiguous
-    if (list.indexOf(one.name) === -1) list.push(one.name)
+    if (next === one.studentId) return
+    studentIds[one.index][0] = next
+    changedRows.push(top + one.index)
   })
-  if (filledRows.length === 0) return result
+  if (changedRows.length === 0) return result
 
   sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).setValues(studentIds)
-  filledRows.forEach((row) => markFixedCells(sheet.getRange(row, studentIdColumn)))
+  changedRows.forEach((row) => markFixedCells(sheet.getRange(row, studentIdColumn)))
   return result
 }
 

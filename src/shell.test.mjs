@@ -15,7 +15,7 @@
 //   ⑨ 配る画像はいまのマス目のとおりに組まれ、1 セルも書き換えない（→ issue #157）
 //   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ issue #226）
 //   ⑪ 検証結果の違反の行が赤、店の役割の行が黄色に、値を変えずに塗られる（→ issue #220）
-//   ⑫ マス目の氏名が回答の氏名のプルダウンになり、選ぶと空の学籍番号が埋まる（同姓同名は埋めずに知らせる → issue #271）
+//   ⑫ マス目の氏名が回答の氏名のプルダウンになり、選ぶと学籍番号が氏名に揃う（同姓同名は埋めずに知らせる → issue #271 ／ #286）
 //
 // 崩れの名指しのしかたは src/verify-structure.test.mjs が見る。
 // 本物で Date がどう返るかはここでは分からない（→ src/real-device-log.md）。
@@ -1198,7 +1198,7 @@ check(
   '⑫ プルダウンの候補は「回答」の氏名の列（3 列目）の見出しの下ぜんぶで、候補の外は打てない',
   (() => {
     const rule = validationsOf(dropdownRun, dayLabels[0])[0][1]
-    return [rule.candidates, rule.showDropdown, rule.allowInvalid, rule.helpText.includes('学籍番号が自動で入ります')]
+    return [rule.candidates, rule.showDropdown, rule.allowInvalid, rule.helpText.includes('学籍番号が自動で入り、選び直すと入れ替わり、消すと消えます')]
   })(),
   [{ sheet: '回答', row: 2, column: 3, rows: 999, columns: 1 }, true, false, true],
 )
@@ -1241,12 +1241,58 @@ check(
   true,
 )
 
-const ownedBook = dropdownBook()
-edit(ownedBook, dayLabels[0], 2, 2, '森田咲良')
+// 1 日目の 2 行目は高木琴音（EED2349987）の行で、役割が入っている。
+const reselectBook = dropdownBook()
+const reselectSaid = edit(reselectBook, dayLabels[0], 2, 2, '森田咲良')
 check(
-  '⑫ 学籍番号がもう入っている行では、氏名を選び直しても学籍番号を上書きしない（行の持ち主を黙って替えない）',
-  ownedBook.getSheetByName(dayLabels[0]).cells.get('2,1'),
-  'EED2349987',
+  '⑫ 学籍番号が入っている行で氏名を選び直すと、学籍番号も入れ替わり、その人で数え直し、役割に手直しの印が付く（→ issue #286）',
+  [
+    reselectBook.getSheetByName(dayLabels[0]).cells.get('2,1'),
+    reselectSaid.text.startsWith('集計し直しました'),
+    notesOf(reselectBook, dayLabels[0]).filter(([key]) => key.startsWith('2,')).every(([, note]) => note === fixedNote),
+    notesOf(reselectBook, dayLabels[0]).some(([key]) => key.startsWith('2,')),
+  ],
+  ['ECK2626643', true, true, true],
+)
+
+const clearedBook = dropdownBook()
+edit(clearedBook, dayLabels[0], 2, 2, '')
+check(
+  '⑫ 氏名を消すと、学籍番号も消える（→ issue #286）',
+  clearedBook.getSheetByName(dayLabels[0]).cells.get('2,1') ?? '',
+  '',
+)
+
+const sameNameOwnedBook = dropdownBook()
+sameNameOwnedBook.getSheetByName(dayLabels[1]).put(2, 1, 'esa0000002')
+const sameNameOwnedSaid = edit(sameNameOwnedBook, dayLabels[1], 2, 2, '佐藤花')
+check(
+  '⑫ 同姓同名でも、今の学籍番号がその中の 1 人なら残し、知らせない（大文字小文字は揃えて比べる → issue #286）',
+  [sameNameOwnedBook.getSheetByName(dayLabels[1]).cells.get('2,1'), sameNameOwnedSaid.text.startsWith('集計し直しました')],
+  ['esa0000002', true],
+)
+
+const sameNameOtherBook = dropdownBook()
+const sameNameOtherSaid = edit(sameNameOtherBook, dayLabels[0], 2, 2, '佐藤花')
+check(
+  '⑫ 同姓同名で、今の学籍番号がその中に無ければ、前の人の学籍番号を消して知らせる（→ issue #286）',
+  [
+    sameNameOtherBook.getSheetByName(dayLabels[0]).cells.get('2,1') ?? '',
+    sameNameOtherSaid.text.startsWith('同じ氏名で異なる学籍番号の人が複数いたため'),
+  ],
+  ['', true],
+)
+
+check(
+  '⑫ 学籍番号と氏名を一緒に書き換えた（行ごと貼った）ときは、学籍番号は貼った値のまま（→ issue #286）',
+  (() => {
+    const book = dropdownBook()
+    const sheet = book.getSheetByName(dayLabels[1])
+    sheet.put(2, 1, 'ESA0000001').put(2, 2, '森田咲良')
+    recountOnEdit({ source: book, range: sheet.getRange(2, 1, 1, 2) })
+    return sheet.cells.get('2,1')
+  })(),
+  'ESA0000001',
 )
 
 // 役割を先に書いた（学籍番号が空なので数え直しは止まっていた）行で、後から氏名を選ぶ。
