@@ -68,6 +68,8 @@ class 偽の範囲 {
   clearFormat() { return this }
   setBackgrounds() { return this }
   setBorder() { return this }
+  // 結合はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑧）。ここでは見ない。
+  merge() { return this }
 }
 
 class 偽の保護 {

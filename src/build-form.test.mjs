@@ -3,13 +3,14 @@
 //
 //   使い方: node src/build-form.test.mjs
 //
-// 見るものは 6 つある。
+// 見るものは 7 つある。
 //   ① 定義の順どおりに置かれる（設問 9 つ ＋ 画像アイテム 1 つ）
 //   ② 選んだ画像が画像アイテムに入る（選ばれていなければ止まる）
 //   ③ 回答先がこのスプレッドシート自身に向く
 //   ④ フォームが作った回答シートが構成の「回答」になる
 //   ⑤ 2 回目・回答がある・見出しが違う、で名指しして止まる
 //   ⑥ 題と営業時間が「日ごとの営業時刻」から出る。不正な入力ならフォームを作らずに止まる
+//   ⑦ 配る用と編集用の URL が「条件入力」の C9 ／ C10 に残る。URL 欄があっても、営業時刻は 8 行目までしか読まない（→ issue #255）
 //
 // 条件入力には前回の値を入れるので、出来上がるフォームは 4 の表と一致するはずである（→ 仕様 #2）。
 // 本物の Google フォームでの振る舞いは実機が持つ（→ src/real-device-log.md）。
@@ -57,6 +58,8 @@ class FakeRange {
   }
   // 罫線はテンプレートの組み立てが引く（→ build-template.test.mjs の ⑥）。ここでは見ない。
   setBorder() { return this }
+  // 結合はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑧）。ここでは見ない。
+  merge() { return this }
 }
 
 class FakeProtection {
@@ -582,6 +585,36 @@ check(
     one.getSheetByName('回答').getFormUrl(),
   ]),
   [[8, true, null], [8, true, null], [8, true, null]],
+)
+
+// ---- ⑦ URL 欄 ----------------------------------------------------------------
+
+check(
+  '⑦ フォームを作ると、条件入力の C9 に配る用、C10 に編集用の URL が入る（見出しはそのまま）',
+  book.getSheetByName('条件入力').getRange(9, 1, 2, 3).getValues(),
+  [
+    ['配布用googleフォームurl:', '', 'https://forms.example/viewform'],
+    ['編集用googleフォームurl:', '', 'https://forms.example/edit'],
+  ],
+)
+
+check(
+  '⑦ 止まったときは、URL 欄は空のままである（フォームが作られていない）',
+  [onEmpty.book, onThreeRows.book, onReversed.book].map((one) => one.getSheetByName('条件入力').getRange(9, 3, 2, 1).getValues()),
+  [[[''], ['']], [[''], ['']], [[''], ['']]],
+)
+
+// 5 行目・6 行目（7・8 行目）は営業時刻として読む — 多すぎる行は名指しで止まる。9 行目より下は読まない。
+const onSixRows = stoppedOn('six-days', [
+  ...lastYearRows,
+  ['2025-11-05', '08:00', '08:00', '08:00', '08:00', '15:00'],
+  ['2025-11-06', '08:00', '08:00', '08:00', '08:00', '15:00'],
+])
+
+check(
+  '⑦ 「日ごとの営業時刻」に 6 行（8 行目まで）書けば、6 行として名指しして止まる — URL 欄の 9 行目は数えない',
+  [onSixRows.stopped?.includes('6 行です'), onSixRows.madeForms],
+  [true, 0],
 )
 
 // ---- 結果 -------------------------------------------------------------------

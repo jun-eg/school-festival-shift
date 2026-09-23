@@ -60,6 +60,8 @@ class 偽の範囲 {
   clearFormat() { return this }
   setBackgrounds() { return this }
   setBorder() { return this }
+  // 結合はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑧）。ここでは見ない。
+  merge() { return this }
   // 手直しの印はセルのメモ（→ src/assignment-grid.js の fixedNote）。見るのは値だけなので、読めば空、書けば捨てる。
   getNotes() { return this.getValues().map((行) => 行.map(() => '')) }
   setNotes() { return this }

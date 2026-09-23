@@ -111,10 +111,11 @@ function readGrid(sheet, layout) {
  *
  * 区画は横に並ぶので、短い区画の下は空の行で埋まる。落とすのは下の空の行だけで、途中の空の行は残す
  * — 詰めると名指しの「N 行目」がずれる（→ input-types.js の whereIs）。
+ * lastRow を持つ区画は、そこより下を読まない — 下にフォームの URL 欄がある（→ sheet-layout.js の formUrlBlock ／ issue #255）。
  */
 function readSection(sheet, layout, section) {
   const headerRows = headerRowCount(layout)
-  const lastRow = sheet.getLastRow()
+  const lastRow = sectionLastRow(section, sheet.getLastRow())
   if (lastRow <= headerRows) return []
 
   const rows = sheet

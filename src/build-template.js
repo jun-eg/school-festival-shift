@@ -29,6 +29,7 @@ function buildTemplateInto(spreadsheet) {
     widenTo(sheet, layout, log)
     putHeaders(sheet, layout, log)
     putInitialRows(sheet, layout, log)
+    putFormUrlBlock(sheet, layout, log)
     shapeColumns(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
     sheet.setFrozenColumns(layout.frozenColumns || 0)
@@ -85,7 +86,7 @@ function putHeaders(sheet, layout, log) {
 /**
  * 区画ごとに、列名の下へ初期値を置く（→ sheet-layout.js の initialRows ／ issue #240）。
  *
- * 置くのは、区画の入力欄（列名の下から最下行まで・区画の幅）が空のときだけである。
+ * 置くのは、区画の入力欄（列名の下から最下行 — lastRow を持つ区画はそこ — まで・区画の幅）が空のときだけである。
  * 1 セルでも中身があれば、その区画には置かない — 誰かが書いた値を初期値で上書きしない。
  * 2 回目に走らせたときも同じで、1 回目に置いた初期値がそのまま残る。
  */
@@ -95,12 +96,33 @@ function putInitialRows(sheet, layout, log) {
   layout.sections.forEach((section) => {
     if (!section.initialRows) return
     const width = sectionWidth(section)
-    const inputArea = sheet.getRange(firstInputRow, section.startColumn, sheet.getMaxRows() - firstInputRow + 1, width)
+    const lastRow = sectionLastRow(section, sheet.getMaxRows())
+    const inputArea = sheet.getRange(firstInputRow, section.startColumn, lastRow - firstInputRow + 1, width)
     if (!inputArea.getValues().every((row) => row.every((cell) => cell === ''))) return
 
     sheet.getRange(firstInputRow, section.startColumn, section.initialRows.length, width).setValues(section.initialRows)
     log.push(`「${layout.name}」の「${section.heading}」に初期値を ${section.initialRows.length} 行置いた`)
   })
+}
+
+/**
+ * 条件入力の 9〜10 行目に、フォームの URL 欄を置く（→ sheet-layout.js の formUrlBlock ／ issue #255）。
+ * 見出しは A:B、URL は C:E を結合し、A9:E10 を太枠で囲う。URL は空のまま置き、埋めるのはフォームを作るとき（→ build-form.js）。
+ * すでに入っている URL は消さない — フォームを作った後に走らせ直しても、URL が残る。
+ * 見出しが構成と違えば、上書きせずに止まる（→ replaceValues）。
+ */
+function putFormUrlBlock(sheet, layout, log) {
+  if (layout.name !== formUrlBlock.sheet) return
+  const block = formUrlBlock
+
+  block.rows.forEach((one, i) => {
+    const row = block.row + i
+    replaceValues(sheet, row, block.labelColumn, [one.label], layout.name, log)
+    sheet.getRange(row, block.labelColumn, 1, block.labelWidth).merge().setFontWeight('bold')
+    sheet.getRange(row, block.urlColumn, 1, block.urlWidth).merge()
+  })
+  sheet.getRange(block.row, block.labelColumn, block.rows.length, block.urlColumn + block.urlWidth - block.labelColumn)
+    .setBorder(true, true, true, true, null, null, formUrlBorder.color, SpreadsheetApp.BorderStyle[formUrlBorder.style])
 }
 
 /**
@@ -176,14 +198,19 @@ function applyProtection(sheet, layout, log) {
 }
 
 /**
- * 保護の外に出す入力欄 — 区画ごとに、列名の行の下からシートの最下行まで、区画の幅だけである。
+ * 保護の外に出す入力欄 — 区画ごとに、列名の行の下からシートの最下行（lastRow を持つ区画はそこ）まで、区画の幅だけである。
  * 見出し・列名・区画のあいだの列・右端より右は保護の内に残る（→ verify-structure.js が見る所である）。
+ * フォームの URL 欄（→ formUrlBlock）も保護の内に残る。書くのはスクリプトだけである（→ issue #255）。
  * 最下行より下に行を足すと、足した行は保護の内になる（警告が出るだけで、書ける）。
  */
 function inputRanges(sheet, layout) {
   const firstInputRow = (layout.hasSectionHeadings ? 2 : 1) + 1
-  const rowCount = sheet.getMaxRows() - firstInputRow + 1
-  return layout.sections.map((section) => sheet.getRange(firstInputRow, section.startColumn, rowCount, sectionWidth(section)))
+  return layout.sections.map((section) => sheet.getRange(
+    firstInputRow,
+    section.startColumn,
+    sectionLastRow(section, sheet.getMaxRows()) - firstInputRow + 1,
+    sectionWidth(section),
+  ))
 }
 
 /** 新しいスプレッドシートに最初からある空のシートを消す。中身があれば残して名指しする。 */

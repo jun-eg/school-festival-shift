@@ -200,8 +200,8 @@ const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
   sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote, distributionImagesOn,
 } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine })',
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine, formUrlBlock } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine, formUrlBlock })',
   context,
 )
 
@@ -222,7 +222,10 @@ function whyItStopped(work) {
   }
 }
 
-/** sheetLayout どおりに見出しを置いた、空の 8 枚を作る（テンプレートを組んだ直後の形である）。 */
+/**
+ * sheetLayout どおりに見出しを置いた、空の 8 枚を作る（テンプレートを組んだ直後の形である）。
+ * 条件入力の 9〜10 行目には、フォームの URL 欄の見出しも置く（→ formUrlBlock ／ issue #255）。
+ */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
     // マス目の 4 枚は既定の 26 列に収まらない（→ build-template.js の widenTo）
@@ -232,6 +235,9 @@ function emptyTemplate() {
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
       section.columns.forEach((columnName, i) => sheet.put(columnNameRow, section.startColumn + i, columnName))
     })
+    if (layout.name === formUrlBlock.sheet) {
+      formUrlBlock.rows.forEach((one, i) => sheet.put(formUrlBlock.row + i, formUrlBlock.labelColumn, one.label))
+    }
     return sheet
   })
   return new FakeSpreadsheet(sheets)
@@ -255,6 +261,8 @@ function filledBook() {
   conditions.put(3, 22, '午前と午後の境目').put(3, 23, new Date(1899, 11, 30, 12, 0, 0))
   // 置き方のルール（Y〜Z）— 1 行。長さなので時刻ではない（→ 5-1 の #7）
   conditions.put(3, 25, '連続して入る最小の長さ').put(3, 26, '1:30')
+  // フォームを作った後の URL 欄（C9 ／ C10）。「日ごとの営業時刻」の下にあるが、読まない（→ issue #255）
+  conditions.put(9, 3, 'https://forms.example/viewform').put(10, 3, 'https://forms.example/edit')
 
   const answers = book.getSheetByName('回答')
   const answerRow = [
@@ -317,7 +325,7 @@ check(
 )
 
 check(
-  '③ 条件入力は 2 行目までが見出しなので、3 行目から読む',
+  '③ 条件入力は 2 行目までが見出しなので、3 行目から読む — 9〜10 行目のフォームの URL 欄は読まず、4 行のままである',
   inputs['日ごとの営業時刻'],
   [
     ['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00'],
