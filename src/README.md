@@ -368,6 +368,8 @@
 **「日ごとの営業時刻」だけは 8 行目までである** — 下の 9〜10 行目にフォームの URL 欄があるからで、**読むのも 8 行目まで**である
 （→ [`sheet-layout.js`](sheet-layout.js) の `formUrlBlock` と区画の `lastRow` ／ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）。
 **URL 欄は保護の内（警告のみ）に残す。** 書くのはフォームを作るときのスクリプトだけで、**警告のみはスクリプトを止めない。**
+**13 行目には引き継ぎ書の所在（リポジトリの URL）を置く** — テンプレートを作るときに書き、URL 欄と同じく保護の内に残す
+（→ [`sheet-layout.js`](sheet-layout.js) の `handoverBlock` ／ [#274](https://github.com/jun-eg/school-festival-shift/issues/274)）。
 
 **保護は構造を壊さないための片方である**（→ 2 の「止まる箇所」#8）。
 もう片方（**走る前に構造を検証し、崩れていれば名指しで出す**）が下の節である。

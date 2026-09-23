@@ -224,8 +224,8 @@ const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
   sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote, distributionImagesOn, isPrepCleanupSurplus,
 } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine, formUrlBlock } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine, formUrlBlock })',
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine, formUrlBlock, handoverBlock } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine, formUrlBlock, handoverBlock })',
   context,
 )
 
@@ -249,6 +249,7 @@ function whyItStopped(work) {
 /**
  * sheetLayout どおりに見出しを置いた、空の 8 枚を作る（テンプレートを組んだ直後の形である）。
  * 条件入力の 9〜10 行目には、フォームの URL 欄の見出しも置く（→ formUrlBlock ／ issue #255）。
+ * 13 行目には、引き継ぎ書の所在も置く（→ handoverBlock ／ issue #274）。
  */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
@@ -261,6 +262,9 @@ function emptyTemplate() {
     })
     if (layout.name === formUrlBlock.sheet) {
       formUrlBlock.rows.forEach((one, i) => sheet.put(formUrlBlock.row + i, formUrlBlock.labelColumn, one.label))
+    }
+    if (layout.name === handoverBlock.sheet) {
+      sheet.put(handoverBlock.row, handoverBlock.labelColumn, handoverBlock.label).put(handoverBlock.row, handoverBlock.urlColumn, handoverBlock.url)
     }
     return sheet
   })

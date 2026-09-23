@@ -3,7 +3,7 @@
 //
 //   使い方: node src/build-template.test.mjs
 //
-// 見るものは 8 つある。
+// 見るものは 9 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
 //   ② 8 枚に保護がかかる。割り当ての 4 枚は「持ち主だけ」、ほかの 4 枚は「警告のみ」で、
 //      条件入力だけは区画の入力欄が保護の外にある（→ issue #234）
@@ -13,6 +13,7 @@
 //   ⑥ 割り当ての 4 枚で、友達欄が時刻の列 3 つ分の幅になり、友達欄の右に太い線が引かれる（→ issue #245）
 //   ⑦ 検証結果の候補の列は、ほかの列の 5 倍の幅になる。候補の列が無い前の形のシートには、見出しを足して止まらない（→ issue #246）
 //   ⑧ 条件入力の 9〜10 行目に、フォームの URL 欄（見出しと空の URL 欄・結合・太枠）が置かれ、保護の内に残る（→ issue #255）
+//   ⑨ 条件入力の 13 行目に、引き継ぎ書の所在（見出しと URL・結合・太枠）が置かれ、保護の内に残る（→ issue #274）
 //
 // 本物のスプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
 // コピーした先で「持ち主だけ」が誰に効くかは分からない（→ issue #136・real-device-log.md の項目 22）。
@@ -148,8 +149,8 @@ for (const name of ['sheet-layout.js', 'build-template.js']) {
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { buildTemplateInto } = context
-const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine, formUrlBlock } = vm.runInContext(
-  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine, formUrlBlock })',
+const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine, formUrlBlock, handoverBlock } = vm.runInContext(
+  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine, formUrlBlock, handoverBlock })',
   context,
 )
 
@@ -345,12 +346,12 @@ check(
   [['配布用googleフォームurl:', '', '', '', ''], ['編集用googleフォームurl:', '', '', '', '']],
 )
 check(
-  '⑧ 見出しは A:B、URL は C:E で結合され、A9:E10 が黒の太枠で囲われる — ほかのシートには無い',
-  book.getSheets().map((s) => [s.getName(), [...s.merges].sort(), [...s.boxes]]),
+  '⑧⑨ 見出しは A:B、URL は C:E で結合され、A9:E10 と A13:E13 が黒の太枠で囲われる — ほかのシートには無い',
+  book.getSheets().map((s) => [s.getName(), [...s.merges].sort(), [...s.boxes].sort()]),
   sheetLayout.map((c) => [
     c.name,
-    c.name === '条件入力' ? ['10,1,1,2', '10,3,1,3', '9,1,1,2', '9,3,1,3'] : [],
-    c.name === '条件入力' ? ['9,1,2,5 #000000 solid-thick'] : [],
+    c.name === '条件入力' ? ['10,1,1,2', '10,3,1,3', '13,1,1,2', '13,3,1,3', '9,1,1,2', '9,3,1,3'] : [],
+    c.name === '条件入力' ? ['13,1,1,5 #000000 solid-thick', '9,1,2,5 #000000 solid-thick'] : [],
   ]),
 )
 const insideAny = (row, column) => protectionOf('条件入力').unprotectedRanges.some((r) => (
@@ -381,6 +382,43 @@ check(
   '⑧ URL が入った後に走らせ直しても止まらず、URL を消さない',
   [urlsStopped, bookWithUrls.getSheetByName('条件入力').getRange(9, 3, 2, 1).getValues()],
   [null, [['https://forms.example/pub'], ['https://forms.example/edit']]],
+)
+
+check(
+  '⑨ 条件入力の A13 に「引き継ぎ書所在:」、C13 にリポジトリの URL が入り、B13 ／ D13:E13 は空である',
+  conditionSheet.getRange(13, 1, 1, 5).getValues(),
+  [['引き継ぎ書所在:', '', 'https://github.com/jun-eg/school-festival-shift', '', '']],
+)
+check(
+  '⑨ A13 は太字である',
+  conditionSheet.bold.get('13,1'),
+  'bold',
+)
+check(
+  '⑨ A13:E13 は、保護の外に出す入力欄のどれにも入らない（保護の内に残る）',
+  [1, 2, 3, 4, 5].map((column) => insideAny(13, column)),
+  Array(5).fill(false),
+)
+check(
+  '⑨ 位置・見出し・URL は構成（handoverBlock）が持つ',
+  [handoverBlock.row, handoverBlock.label, handoverBlock.url],
+  [13, '引き継ぎ書所在:', 'https://github.com/jun-eg/school-festival-shift'],
+)
+
+// 引き継ぎ書の所在が構成と違う URL に書き換えられていたら、上書きせずに止まる。
+const bookWithOtherUrl = new FakeSpreadsheet(['シート1'])
+buildTemplateInto(bookWithOtherUrl)
+bookWithOtherUrl.getSheetByName('条件入力').getRange(13, 3, 1, 1).setValues([['https://example.com/other']])
+let otherUrlStopped = null
+try {
+  buildTemplateInto(bookWithOtherUrl)
+} catch (error) {
+  otherUrlStopped = error.message
+}
+check(
+  '⑨ C13 が構成と違う URL なら、上書きせずに名指しで止まる',
+  [otherUrlStopped !== null && otherUrlStopped.includes('13 行目 3 列目'), bookWithOtherUrl.getSheetByName('条件入力').getRange(13, 3, 1, 1).getValues()],
+  [true, [['https://example.com/other']]],
 )
 
 // ---- 結果 -------------------------------------------------------------------
