@@ -3,7 +3,7 @@
 //
 //   使い方: node src/assignment-grid.test.mjs
 //
-// 見るものは 9 つある。
+// 見るものは 10 ある。
 //   ① 従来の形に敷ける（行が人・列が 30 分枠・セルが役割名 1 つ）
 //   ② 行の並びは学籍番号の昇順で、入力から決まる
 //   ③ 敷いて戻すと元の行に戻る
@@ -13,6 +13,7 @@
 //   ⑦ 背景は役割の色である（8 役割・7 色）
 //   ⑧ 手直しの印が付いたセルだけを手直しとして読み、書き戻すときに印を付け直す
 //   ⑨ 友達欄は回答に書かれたとおりに並ぶが、戻すときには読まない
+//   ⑩ 氏名から学籍番号を引ける（表記の完全一致。同姓同名は 2 つ返り、出し直しは 1 つに数える → issue #271）
 //
 // 前回の確定シフトが本当にこの形に敷けるかは scripts/前回のシフト表.mjs が見る。
 
@@ -31,7 +32,7 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
 const {
-  toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, friendsFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf,
+  toAssignmentGrid, fromAssignmentGrid, namesFromAnswers, friendsFromAnswers, studentIdsFromAnswers, toDays, violationCells, outputColumns, gridBackgrounds, roleColorOf,
   fixedFromAssignmentGrid, gridNotes, isFixedNote, conflictNote,
 } = context
 const { dayLabels, assignmentColumns, checkKind, roleColors, fixedNote } = vm.runInContext(
@@ -421,6 +422,34 @@ check(
     [3, '学籍番号', conflictNote('会計', 'いまの 2025-11-02 の枠に「07:00」が無い')],
     [3, '12:00', fixedNote],
   ],
+)
+
+// ---- ⑩ 氏名から学籍番号を引く（→ issue #271） --------------------------------
+
+const studentIdsOf = studentIdsFromAnswers([
+  ['2025-10-01 10:00:00', 'EED2402549', '高木琴音', '3年生', 'はい', '', '', '', '', ''],
+  ['2025-10-01 11:00:00', 'ESA0000001', '佐藤花', '1年生', 'いいえ', '', '', '', '', ''],
+  ['2025-10-01 12:00:00', 'ESA0000002', '佐藤花', '2年生', 'いいえ', '', '', '', '', ''],
+  ['2025-10-02 10:00:00', 'eed2402549', ' 高木琴音 ', '3年生', 'はい', '', '', '', '', ''],
+  ['2025-10-02 11:00:00', '', '学籍番号なし', '1年生', 'いいえ', '', '', '', '', ''],
+])
+
+check(
+  '⑩ 氏名が 1 人なら学籍番号 1 つ（出し直しは大文字に揃えて 1 つに数え、両端の空白は落とす）',
+  [studentIdsOf('高木琴音'), studentIdsOf(' 高木琴音')],
+  [['EED2402549'], ['EED2402549']],
+)
+
+check(
+  '⑩ 同姓同名は学籍番号が 2 つ返る（どちらかは決めない）',
+  studentIdsOf('佐藤花'),
+  ['ESA0000001', 'ESA0000002'],
+)
+
+check(
+  '⑩ 表記が 1 字でも違えば引けない。回答に無い氏名・学籍番号の無い行・オブジェクトの持ち物の名前も空である',
+  [studentIdsOf('高木 琴音'), studentIdsOf('山田太郎'), studentIdsOf('学籍番号なし'), studentIdsOf('constructor')],
+  [[], [], [], []],
 )
 
 // ---- 結果 ------------------------------------------------------------------
