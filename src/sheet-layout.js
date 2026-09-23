@@ -100,6 +100,29 @@ function gridSheet(dayIndex) {
  */
 const dividerLine = { color: '#b7b7b7', style: 'SOLID_THICK' }
 
+/**
+ * 条件入力の 9〜10 行目に置く、フォームの URL 欄（→ issue #255）。完了画面を閉じた後も、ここから開ける。
+ * 見出しは A:B、URL は C:E を結合して置き、A9:E10 を太枠で囲う。書くのはフォームを作るときのスクリプトだけで、
+ * 人は書き換えない — 保護の外に出す入力欄（→ build-template.js の inputRanges）に入れない。
+ * 「日ごとの営業時刻」（A〜F 列）の下にあるので、その区画は lastRow より下を読まない。
+ * key は build-form.js が書く URL の名前である（published ＝ 配る用、edit ＝ フォーム編集用）。
+ */
+const formUrlBlock = {
+  sheet: '条件入力',
+  row: 9,
+  labelColumn: 1,
+  labelWidth: 2,
+  urlColumn: 3,
+  urlWidth: 3,
+  rows: [
+    { key: 'published', label: '配布用googleフォームurl:' },
+    { key: 'edit', label: '編集用googleフォームurl:' },
+  ],
+}
+
+/** URL 欄の枠の線。style は SpreadsheetApp.BorderStyle の名前で持つ（→ dividerLine と同じ）。 */
+const formUrlBorder = { color: '#000000', style: 'SOLID_THICK' }
+
 const sheetLayout = [
   {
     name: '条件入力',
@@ -120,6 +143,9 @@ const sheetLayout = [
         note: '1 日 1 行、4 日分（準備日・学祭1日目・学祭2日目・片付け の順）。'
           + '時刻は 8:00 のように、左から早い順に書きます。片付け終了がその日の終わりです。',
         columns: ['日付', '準備開始', '調理開始', '調理終了', '片付け開始', '片付け終了'],
+        // 下の URL 欄（→ formUrlBlock）の 1 つ上の行までが入力欄である。読むのも、初期値を置くのも、保護の外に出すのもここまで。
+        // 4 行より多く書いたときに名指しで止まれるよう、4 行ちょうどでは切らない（→ input-types.js の toDays）。
+        lastRow: formUrlBlock.row - 1,
         initialRows: [
           ['2025-11-01', '08:00', '21:00', '21:00', '21:00', '21:00'],
           ['2025-11-02', '08:00', '10:00', '18:00', '18:00', '20:00'],
@@ -300,6 +326,14 @@ function sectionRightEdge(layout) {
   return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + sectionWidth(section) - 1), 0)
 }
 
+/**
+ * 区画の入力欄が何行目までか。lastRow を持たない区画は、シートの最下行（sheetLastRow）までである。
+ * 読む側（→ shell.js の readSection）は getLastRow を、置く側と保護する側は getMaxRows を渡す。
+ */
+function sectionLastRow(section, sheetLastRow) {
+  return section.lastRow ? Math.min(section.lastRow, sheetLastRow) : sheetLastRow
+}
+
 /** 区画の dividerAfter が何列目か（1 始まり）。線を引かない区画は null である。 */
 function dividerColumn(section) {
   if (!section.dividerAfter) return null
@@ -342,7 +376,7 @@ function gridLayouts(of) {
 if (typeof module !== 'undefined') {
   module.exports = {
     sheetLayout, checkKind, candidateSeparator, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
-    dividerLine, dividerColumn, widthBaseColumn,
+    dividerLine, dividerColumn, widthBaseColumn, formUrlBlock, formUrlBorder, sectionLastRow,
     dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }

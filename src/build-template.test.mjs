@@ -3,7 +3,7 @@
 //
 //   使い方: node src/build-template.test.mjs
 //
-// 見るものは 7 つある。
+// 見るものは 8 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
 //   ② 8 枚に保護がかかる。割り当ての 4 枚は「持ち主だけ」、ほかの 4 枚は「警告のみ」で、
 //      条件入力だけは区画の入力欄が保護の外にある（→ issue #234）
@@ -12,6 +12,7 @@
 //   ⑤ 条件入力の区画ごとに、列名の下へ初期値が置かれる。入力欄に中身がある区画には置かない（→ issue #240）
 //   ⑥ 割り当ての 4 枚で、友達欄が時刻の列 3 つ分の幅になり、友達欄の右に太い線が引かれる（→ issue #245）
 //   ⑦ 検証結果の候補の列は、ほかの列の 5 倍の幅になる。候補の列が無い前の形のシートには、見出しを足して止まらない（→ issue #246）
+//   ⑧ 条件入力の 9〜10 行目に、フォームの URL 欄（見出しと空の URL 欄・結合・太枠）が置かれ、保護の内に残る（→ issue #255）
 //
 // 本物のスプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
 // コピーした先で「持ち主だけ」が誰に効くかは分からない（→ issue #136・real-device-log.md の項目 22）。
@@ -57,9 +58,17 @@ class FakeRange {
     this.positions().forEach((key) => this.sheet.notes.set(key, note))
     return this
   }
-  /** 見るのは右の線だけである（→ issue #245）。 */
+  /** 見るのは、四方を囲う枠（→ issue #255）と、右だけの線（→ issue #245）である。 */
   setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
-    if (right === true) this.positions().forEach((key) => this.sheet.rightBorders.set(key, `${color} ${style}`))
+    if (top === true && left === true && bottom === true && right === true) {
+      this.sheet.boxes.add(`${this.row},${this.column},${this.rowCount},${this.columnCount} ${color} ${style}`)
+    } else if (right === true) {
+      this.positions().forEach((key) => this.sheet.rightBorders.set(key, `${color} ${style}`))
+    }
+    return this
+  }
+  merge() {
+    this.sheet.merges.add(`${this.row},${this.column},${this.rowCount},${this.columnCount}`)
     return this
   }
 }
@@ -92,7 +101,7 @@ class FakeSheet {
   // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
   constructor(name) {
     Object.assign(this, {
-      name, cells: new Map(), bold: new Map(), notes: new Map(), rightBorders: new Map(), columnWidths: new Map(), protections: [],
+      name, cells: new Map(), bold: new Map(), notes: new Map(), rightBorders: new Map(), boxes: new Set(), merges: new Set(), columnWidths: new Map(), protections: [],
       frozenRows: 0, frozenColumns: 0, maxRows: 1000, maxColumns: 26,
     })
   }
@@ -139,8 +148,8 @@ for (const name of ['sheet-layout.js', 'build-template.js']) {
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { buildTemplateInto } = context
-const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine } = vm.runInContext(
-  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine })',
+const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine, formUrlBlock } = vm.runInContext(
+  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine, formUrlBlock })',
   context,
 )
 
@@ -202,14 +211,14 @@ check(
 )
 
 check(
-  '② 条件入力だけ、区画ごとの入力欄（列名の下から最下行まで・区画の幅）が保護の外にある',
+  '② 条件入力だけ、区画ごとの入力欄（列名の下から最下行まで — 日ごとの営業時刻は URL 欄の上の 8 行目まで・区画の幅）が保護の外にある',
   book.getSheets().map((s) => [
     s.getName(),
     protectionOf(s.getName()).unprotectedRanges.map((r) => [r.row, r.column, r.rowCount, r.columnCount]),
   ]),
   sheetLayout.map((c) => [
     c.name,
-    c.name === '条件入力' ? c.sections.map((section) => [3, section.startColumn, 998, sectionWidth(section)]) : [],
+    c.name === '条件入力' ? c.sections.map((section) => [3, section.startColumn, section.lastRow ? section.lastRow - 2 : 998, sectionWidth(section)]) : [],
   ]),
 )
 
@@ -326,6 +335,52 @@ check(
   '⑦ 候補の列が無い前の形の検証結果には、止まらずに見出しを足す（中身のある見出しは構成と同じなので）',
   [olderStopped, olderBook.getSheetByName('検証結果').getRange(1, 1, 1, candidateColumn).getValues()[0]],
   [null, checkLayout.sections[0].columns],
+)
+
+const conditionSheet = book.getSheetByName('条件入力')
+
+check(
+  '⑧ 条件入力の A9 ／ A10 に URL 欄の見出しが入り、B 列と C9:E10 は空である',
+  conditionSheet.getRange(9, 1, 2, 5).getValues(),
+  [['配布用googleフォームurl:', '', '', '', ''], ['編集用googleフォームurl:', '', '', '', '']],
+)
+check(
+  '⑧ 見出しは A:B、URL は C:E で結合され、A9:E10 が黒の太枠で囲われる — ほかのシートには無い',
+  book.getSheets().map((s) => [s.getName(), [...s.merges].sort(), [...s.boxes]]),
+  sheetLayout.map((c) => [
+    c.name,
+    c.name === '条件入力' ? ['10,1,1,2', '10,3,1,3', '9,1,1,2', '9,3,1,3'] : [],
+    c.name === '条件入力' ? ['9,1,2,5 #000000 solid-thick'] : [],
+  ]),
+)
+const insideAny = (row, column) => protectionOf('条件入力').unprotectedRanges.some((r) => (
+  row >= r.row && row < r.row + r.rowCount && column >= r.column && column < r.column + r.columnCount
+))
+check(
+  '⑧ A9:E10 は、保護の外に出す入力欄のどれにも入らない（保護の内に残る）',
+  [9, 10].flatMap((row) => [1, 2, 3, 4, 5].map((column) => insideAny(row, column))),
+  Array(10).fill(false),
+)
+check(
+  '⑧ URL 欄の位置と見出しは構成（formUrlBlock）が持つ',
+  [formUrlBlock.row, formUrlBlock.rows.map((one) => one.label)],
+  [9, ['配布用googleフォームurl:', '編集用googleフォームurl:']],
+)
+
+// フォームを作った後に、テンプレートを走らせ直したときである。
+const bookWithUrls = new FakeSpreadsheet(['シート1'])
+buildTemplateInto(bookWithUrls)
+bookWithUrls.getSheetByName('条件入力').getRange(9, 3, 2, 1).setValues([['https://forms.example/pub'], ['https://forms.example/edit']])
+let urlsStopped = null
+try {
+  buildTemplateInto(bookWithUrls)
+} catch (error) {
+  urlsStopped = error.message
+}
+check(
+  '⑧ URL が入った後に走らせ直しても止まらず、URL を消さない',
+  [urlsStopped, bookWithUrls.getSheetByName('条件入力').getRange(9, 3, 2, 1).getValues()],
+  [null, [['https://forms.example/pub'], ['https://forms.example/edit']]],
 )
 
 // ---- 結果 -------------------------------------------------------------------

@@ -88,6 +88,10 @@ function buildFormOn(spreadsheet, rosterImage) {
   SpreadsheetApp.flush()
   log.push(`回答先をこのスプレッドシート自身に向けた（${spreadsheet.getId()}）`)
 
+  const urls = { published: form.getPublishedUrl(), edit: form.getEditUrl() }
+  // 回答シートを繋ぐ前に書く。繋ぐところで止まっても、できたフォームの URL は残る。
+  writeFormUrls(spreadsheet, urls, log)
+
   const created = spreadsheet
     .getSheets()
     .filter((sheet) => sheetIdsBefore.indexOf(sheet.getSheetId()) === -1)
@@ -100,7 +104,18 @@ function buildFormOn(spreadsheet, rosterImage) {
 
   linkAnswerSheet(spreadsheet, templateSheet, created[0], layout, expectedHeader, log)
 
-  return { url: form.getPublishedUrl(), editUrl: form.getEditUrl(), log }
+  return { url: urls.published, editUrl: urls.edit, log }
+}
+
+/**
+ * 条件入力の URL 欄（C9 ／ C10）に、フォームの URL を書く（→ sheet-layout.js の formUrlBlock ／ issue #255）。
+ * 完了画面を閉じた後も、ここから開ける。欄は保護の内にあるが「警告のみ」なので、スクリプトは書ける。
+ */
+function writeFormUrls(spreadsheet, urls, log) {
+  const block = formUrlBlock
+  const sheet = findSheet(spreadsheet, block.sheet) // → shell.js
+  sheet.getRange(block.row, block.urlColumn, block.rows.length, 1).setValues(block.rows.map((one) => [urls[one.key]]))
+  log.push(`フォームの URL を「${block.sheet}」の ${block.row}〜${block.row + block.rows.length - 1} 行目に書いた`)
 }
 
 /**
