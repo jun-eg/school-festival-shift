@@ -44,9 +44,10 @@ function checkStructure(spreadsheet) {
   const breakages = nameBreakages(spreadsheet)
   if (breakages.length === 0) return breakages
 
+  // 黙って直さない。生成・書き換え後の数え直し・画像の書き出しのどれからも呼ばれるので、「生成」とは言わない。
   throw new Error(
-    `シートの構造が ${breakages.length} 箇所崩れているので、生成を走らせない（黙って直さない）。`
-      + '戻せないときは、テンプレートをもう 1 回コピーして条件を入れ直す。\n'
+    `シートの見出しや列が ${breakages.length} か所変わっているため、処理できません。`
+      + '元に戻すか、テンプレートをコピーし直して条件を入れ直してください。\n'
       + breakages.map(breakageToText).join('\n'),
   )
 }
@@ -54,18 +55,18 @@ function checkStructure(spreadsheet) {
 /** 崩れ 1 つを、場所を名指しした 1 行にする。 */
 function breakageToText(breakage) {
   if (breakage.kind === breakageKind.missingSheet) {
-    return `シート「${breakage.sheet}」が無い`
+    return `シート「${breakage.sheet}」が見つかりません`
   }
   if (breakage.kind === breakageKind.tooFewColumns) {
-    return `シート「${breakage.sheet}」の列が ${breakage.actual[0]} 列しかない（構成は ${breakage.expected[0]} 列である）`
+    return `シート「${breakage.sheet}」の列が ${breakage.actual[0]} 列しかありません（本来は ${breakage.expected[0]} 列です）`
   }
   const where = `「${breakage.sheet}」の ${breakage.row} 行目 ${breakage.column} 列目`
   if (breakage.kind === breakageKind.unknownColumn) {
-    return `${where} に、構成に無い「${breakage.actual[0]}」がある`
+    return `${where} に、本来ない「${breakage.actual[0]}」があります`
   }
   const width = breakage.expected.length > 1 ? `から ${breakage.expected.length} 列` : ''
-  return `${where}${width} が構成と違う。`
-    + `いま: ${breakage.actual.map(showBlank).join(' / ')} ／ 構成: ${breakage.expected.join(' / ')}`
+  return `${where}${width} が本来と違います。`
+    + `今: ${breakage.actual.map(showBlank).join(' / ')} ／ 本来: ${breakage.expected.join(' / ')}`
 }
 
 /** シートの列が構成の要る数だけあるかを見る（列をまとめて消されたとき、範囲外の例外より先に名指しする）。 */

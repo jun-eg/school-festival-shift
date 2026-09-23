@@ -147,7 +147,7 @@ function generatePlan(candidates, conditions, wishes, fixed) {
 function noonBoundaryToPlaceBy(conditions) {
   const boundary = (conditions.prepCleanupRule || {}).noonBoundary || ''
   if (boundary !== '') return boundary
-  throw new Error(`条件入力の「準備・片付けのルール」に「${prepCleanupItems.noonBoundary}」が無い`)
+  throw new Error(noonBoundaryMissingText()) // → count-violations.js
 }
 
 /**
@@ -157,7 +157,7 @@ function noonBoundaryToPlaceBy(conditions) {
 function minRunSlotsToPlaceBy(conditions) {
   const minutes = ((conditions || {}).placementRule || {}).minRun
   if (minutes) return minutes / slotMinutes
-  throw new Error(
+  throw internalError(
     `条件入力の「置き方のルール」が型に乗っていない（空でも既定の ${placementItems.minRun} を持つはずである）`,
   )
 }
@@ -175,7 +175,7 @@ function peopleToPlace(candidates, wishes) {
   ;(candidates || []).forEach((candidate) => {
     const wish = wishBy[candidate.studentId]
     if (!wish) {
-      throw new Error(`候補に学籍番号「${candidate.studentId}」があるのに、希望にその人が無い`)
+      throw internalError(`候補に学籍番号「${candidate.studentId}」があるのに、希望にその人が無い`)
     }
     if (!byStudentId[candidate.studentId]) {
       byStudentId[candidate.studentId] = {
@@ -256,9 +256,7 @@ function canStandAt(person, day, slot, role, conditions) {
 
   const allowed = (conditions || {}).cookLeaderGrades || []
   if (allowed.length === 0) {
-    throw new Error(
-      `条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の必要人数が書いてある`,
-    )
+    throw new Error(`${cookLeaderGradesMissingText}（${ruleRoles.cookLeader}の必要人数が書いてあります）`)
   }
   return allowed.indexOf(person.grade) !== -1
 }
@@ -504,7 +502,7 @@ function addPrepCleanup(board, needs, days, people, boundary) {
       const role = prepOrCleanupFor(board, needs, person, day, state)
       if (!role) {
         // prepCleanupStaysPossible が防いでいるはずの食い違いである。
-        throw new Error(
+        throw internalError(
           `「${person.studentId}」の ${day.date} に、${ruleRoles.prep} にも ${ruleRoles.cleanup} にも置ける枠が無い`,
         )
       }
@@ -669,31 +667,30 @@ function fixedToPlace(fixed, days) {
 /**
  * 手直し 1 つを置けない理由を返す。置けるなら null である。
  * 見る順は 枠 → 二重 → 規則 1 → 5 → 4 → 規則 3 の ④ で、最初に当たった 1 つだけを返す。
- * 文の頭の名前は、違反を数える側と同じである（→ violationRules）。
+ * 文はそのままセルのメモと検証結果の「内容」に出る（→ assignment-grid.js の conflictNote）ので、
+ * 違反の頭の名前（→ violationRules）は付けず、作成者が読んで分かる一文にする（→ issue #249）。
  */
 function whyFixedCannotStay(one, person, wish, conditions, boundary, alreadyClaimed) {
   if (!one.slot) {
-    return `いまの ${one.date} の枠に「${one.start === '' ? '（空）' : one.start}」が無い`
-      + '（条件入力の「日ごとの営業時刻」が動いた）'
+    return `営業時刻が変わったため、${one.date} の ${one.start === '' ? '（空）' : one.start} の列がなくなりました`
   }
-  if (alreadyClaimed) return `${labelOf('doubleBooked')}: 同じ人の同じ 30 分枠に、手直しがもう 1 つある`
-  if (!wish) return `${labelOf('rule1')}: この人の回答が無い`
-  if (!person || !person.slots[whereKey(one.date, one.slot)]) return `${labelOf('rule1')}: 希望の時間の外である`
+  if (alreadyClaimed) return '同じ時間に修正が 2 つあります'
+  if (!wish) return 'この人の回答がありません'
+  if (!person || !person.slots[whereKey(one.date, one.slot)]) return '希望時間の外です'
   if (cookRoles.indexOf(one.role) !== -1 && !person.canCook) {
-    return `${labelOf('rule5')}: 調理の枠（${one.role}）だが、${wishColumns.canCook} が ${cookAnswerText(false)} である`
+    return `調理担当ではない人が${one.role}に入っています`
   }
   if (one.role === ruleRoles.cookLeader) {
     const allowed = (conditions || {}).cookLeaderGrades || []
     if (allowed.length === 0) {
-      throw new Error(`条件入力の「調理責任者の学年」に 1 行も無いのに、${ruleRoles.cookLeader} の手直しがある`)
+      throw new Error(`${cookLeaderGradesMissingText}（${ruleRoles.cookLeader}に修正したセルがあります）`)
     }
     if (allowed.indexOf(person.grade) === -1) {
-      return `${labelOf('rule4')}: ${ruleRoles.cookLeader} の枠だが、学年が ${allowed.join(' / ')} でない（いま: ${person.grade}）`
+      return `${ruleRoles.cookLeader}にできる学年（${allowed.join('・')}）ではありません（今: ${person.grade}）`
     }
   }
   if (!prepCleanupNotBothBands(person, one.day, one.role)) {
-    const other = prepCleanupRoles().filter((role) => role !== one.role)[0]
-    return `${labelOf('rule3')}: その日の ${other} にも手直しで入っていて、片方だけにならない`
+    return `同じ日に${ruleRoles.prep}と${ruleRoles.cleanup}の両方に修正で入っています`
   }
   // 規則 3 の残り（向きと帯の空き）は、店の割り当てが出そろってから見る（→ releaseFixesBreakingRule3）。
   return null
@@ -717,7 +714,7 @@ function releaseFixesBreakingRule3(board, people, days, boundary) {
       if (fixedSlots.length === 0) return
       const gap = rule3Gap(person, day, boundary)
       if (gap === null) return
-      const why = `${labelOf('rule3')}: ${gap}`
+      const why = gap
 
       const state = dayStateOf(person, day, boundary)
       const misfit = state.morning && !state.afternoon ? ruleRoles.cleanup : ruleRoles.prep
@@ -763,9 +760,9 @@ function rule3Gap(person, day, boundary) {
   if (state.morning && !state.afternoon && prepFree) return null
   if (!state.morning && state.afternoon && cleanupFree) return null
 
-  const half = state.morning && state.afternoon ? '午前と午後の両方' : (state.morning ? '午前だけ' : '午後だけ')
+  const half = state.morning && state.afternoon ? '午前も午後も' : (state.morning ? '午前だけ' : '午後だけ')
   const bands = [state.morning ? ruleRoles.prep : null, state.afternoon ? ruleRoles.cleanup : null].filter(Boolean)
-  return `その日の割り当てが${half}にあるが、${bands.join(' ／ ')} の帯に希望にあって空いている枠が無い`
+  return `${half}入っていますが、${bands.join('・')}の時間に出られる空きがありません`
 }
 
 /**
@@ -807,7 +804,7 @@ function place(board, person, date, slot, role) {
 /** 外す。入れ替えのときだけ呼ぶ（→ swapOnce）。外した役割を返す。 */
 function unplace(board, person, date, slot) {
   const role = person.at[whereKey(date, slot)]
-  if (!role) throw new Error(`「${person.studentId}」の ${date} ${slot.start}-${slot.end} に、外す行が無い`)
+  if (!role) throw internalError(`「${person.studentId}」の ${date} ${slot.start}-${slot.end} に、外す行が無い`)
   delete person.at[whereKey(date, slot)]
   person.count -= 1
   person.on[date] -= 1

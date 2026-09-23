@@ -30,25 +30,25 @@ const coreSteps = [
 function builtInSteps() {
   // 手で貼るので貼り忘れがある。入っている段を「まだ作っていない」に混ぜず、名指しして止まる。
   if (typeof takeIn !== 'function') {
-    throw new Error('take-in.js が貼られていない')
+    throw internalError('take-in.js が貼られていない')
   }
   if (typeof expand !== 'function') {
-    throw new Error('expand.js が貼られていない')
+    throw internalError('expand.js が貼られていない')
   }
   if (typeof generate !== 'function') {
-    throw new Error('generate.js が貼られていない')
+    throw internalError('generate.js が貼られていない')
   }
   if (typeof nameFixedConflicts !== 'function') {
-    throw new Error('generate.js が古い。貼り直す')
+    throw internalError('generate.js が古い。貼り直す')
   }
   if (typeof countViolations !== 'function') {
-    throw new Error('count-violations.js が貼られていない')
+    throw internalError('count-violations.js が貼られていない')
   }
   if (typeof nameUnmet !== 'function') {
-    throw new Error('name-unmet.js が貼られていない')
+    throw internalError('name-unmet.js が貼られていない')
   }
   if (typeof fairnessMetrics !== 'function') {
-    throw new Error('fairness-metrics.js が貼られていない')
+    throw internalError('fairness-metrics.js が貼られていない')
   }
   return {
     '取り込む': takeIn,
@@ -210,7 +210,7 @@ function takeConditions(inputs) {
 /** 段の名前から coreSteps の 1 行を引く。名前が表に無ければ、そこで止まる。 */
 function findStep(name) {
   const step = coreSteps.filter((row) => row.name === name)[0]
-  if (!step) throw new Error(`コアの段に「${name}」が無い（coreSteps と build が食い違っている）`)
+  if (!step) throw internalError(`コアの段に「${name}」が無い（coreSteps と build が食い違っている）`)
   return { name: step.name, issue: step.issue, writesTo: step.writesTo, whatItDoes: step.whatItDoes }
 }
 
@@ -219,23 +219,23 @@ function findStep(name) {
  * 揺れたまま入ってきたら、黙って直さずに名指しで止まる（→ 6 の #8）。
  */
 function checkRepresentation(inputs) {
-  if (!inputs || typeof inputs !== 'object') throw new Error('入力が、名前と行の配列の対応になっていない')
+  if (!inputs || typeof inputs !== 'object') throw internalError('入力が、名前と行の配列の対応になっていない')
 
   const names = inputNames()
   names.forEach((name) => {
-    if (!Array.isArray(inputs[name])) throw new Error(`入力に「${name}」の行の配列が無い`)
+    if (!Array.isArray(inputs[name])) throw internalError(`入力に「${name}」の行の配列が無い`)
   })
   Object.keys(inputs).forEach((name) => {
-    if (names.indexOf(name) === -1) throw new Error(`入力の名前に無い「${name}」が渡っている`)
+    if (names.indexOf(name) === -1) throw internalError(`入力の名前に無い「${name}」が渡っている`)
   })
 
   names.forEach((name) => {
     inputs[name].forEach((row, rowIndex) => {
-      if (!Array.isArray(row)) throw new Error(`「${name}」の ${rowIndex + 1} 行目が配列でない`)
+      if (!Array.isArray(row)) throw internalError(`「${name}」の ${rowIndex + 1} 行目が配列でない`)
       row.forEach((cell, columnIndex) => {
         const type = typeof cell
         if (type === 'string' || type === 'number') return
-        throw new Error(
+        throw internalError(
           `「${name}」の ${rowIndex + 1} 行目 ${columnIndex + 1} 列目の表現が揃っていない。`
             + `いま: ${type === 'object' ? Object.prototype.toString.call(cell) : type}（殻で文字列か数値に揃える）`,
         )
@@ -250,7 +250,7 @@ function checkOutput(output) {
     const columns = sheetColumns(name)
     output[name].forEach((row, rowIndex) => {
       if (Array.isArray(row) && row.length === columns.length) return
-      throw new Error(
+      throw internalError(
         `「${name}」に返された ${rowIndex + 1} 行目の列数が構成と違う。`
           + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${columns.length}（${columns.join(' / ')}）`,
       )
@@ -261,7 +261,7 @@ function checkOutput(output) {
   const allowedKinds = Object.keys(checkKind).map((key) => checkKind[key])
   output['検証結果'].forEach((row, rowIndex) => {
     if (allowedKinds.indexOf(row[kindColumn]) !== -1) return
-    throw new Error(
+    throw internalError(
       `検証結果の ${rowIndex + 1} 行目の種別「${row[kindColumn]}」が決まった種別でない（${allowedKinds.join(' ／ ')} のどれか）`,
     )
   })
@@ -271,7 +271,7 @@ function checkOutput(output) {
 function sheetSection(name) {
   if (name === assignmentName) return assignmentSection()
   const layout = sheetLayout.filter((c) => c.name === name)[0]
-  if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
+  if (!layout) throw internalError(`シートの構成に「${name}」が無い`)
   return layout.sections[0]
 }
 

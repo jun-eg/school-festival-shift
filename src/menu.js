@@ -36,7 +36,7 @@ function createForm() {
 
 /**
  * 生成を 1 回走らせる（→ issue #151）。
- * 書かなかったとき（欠けた段がある）は、何が無いかを名指しで出す。残せなかった手直しがあれば数も言う。
+ * 書かなかったとき（欠けた段がある）は開発者への連絡を促し、何が無いかは実行ログに出す。残せなかった手直しがあれば数も言う。
  * シートの崩れはここで捕まえず、例外の文をそのまま見せる。
  */
 function runGeneration() {
@@ -46,19 +46,16 @@ function runGeneration() {
     const kindAt = outputColumns('検証結果').indexOf('種別')
     const conflicts = output['検証結果'].filter((row) => row[kindAt] === checkKind.fixConflict).length
     SpreadsheetApp.getActive().toast(
-      '生成した（手直しの印があるセルは残した）'
-        + (conflicts === 0 ? '' : `。残せなかった手直しが ${conflicts} 件（理由は検証結果の先頭と、そのセルのメモ）`),
+      'シフトを作成しました（修正済みのセルはそのまま残しています）'
+        + (conflicts === 0 ? '' : `。修正済みのうち ${conflicts} 件は反映できませんでした。理由は「検証結果」シートの先頭と、そのセルのメモを見てください`),
       menuName,
       conflicts === 0 ? 5 : 15,
     )
     return
   }
-  SpreadsheetApp.getActive().toast(
-    'まだ作っていない段があるので、何も書いていない: '
-      + notBuilt.map((step) => `${step.name}（issue #${step.issue}）`).join(' ／ '),
-    menuName,
-    10,
-  )
+  // 段は全部そろっているので、ここに来るのはコードが食い違ったときだけである。何が欠けたかは実行ログに残す。
+  console.error('まだ作っていない段: ' + notBuilt.map((step) => `${step.name}（issue #${step.issue}）`).join(' ／ '))
+  SpreadsheetApp.getActive().toast('シフトを作成できませんでした。開発者に連絡してください', menuName, 10)
 }
 
 /**

@@ -25,7 +25,7 @@
     </style>
   </head>
   <body>
-    <p id="state" class="note">割り当ての 4 枚を読んでいる…</p>
+    <p id="state" class="note">シフト表を読み込み中…</p>
     <p><button id="saveAll" hidden></button></p>
     <div id="images"></div>
 
@@ -85,7 +85,7 @@
           if (!image.drawing) {
             var empty = document.createElement('p')
             empty.className = 'note'
-            empty.textContent = 'この日は 1 人も入っていない（描いていない）。'
+            empty.textContent = 'この日はシフトが入っていないため、画像はありません。'
             section.appendChild(empty)
             list.appendChild(section)
             return
@@ -95,7 +95,7 @@
           var link = document.createElement('a')
           link.href = url
           link.download = image.fileName
-          link.textContent = '保存する（' + image.fileName + '）'
+          link.textContent = '保存（' + image.fileName + '）'
           var picture = document.createElement('img')
           picture.src = url
           picture.alt = image.title
@@ -107,11 +107,11 @@
         })
 
         say(
-          drawn + ' 枚描いた。保存して LINE ノートに貼る。'
-            + '保存が始まらないときは、画像を右クリック（スマホは長押し）で保存する。',
+          drawn + ' 枚の画像を作成しました。保存して LINE ノートに貼ってください。'
+            + '保存が始まらないときは、画像を右クリック（スマホは長押し）で保存できます。',
         )
         if (drawn > 1) {
-          saveAll.textContent = drawn + ' 枚とも保存する'
+          saveAll.textContent = drawn + ' 枚まとめて保存'
           saveAll.hidden = false
         }
       }
@@ -125,7 +125,7 @@
       google.script.run
         .withSuccessHandler(show)
         .withFailureHandler(function (error) {
-          say('描けなかった: ' + error.message, true)
+          say('画像を作成できませんでした：' + error.message, true)
         })
         .exportImagesFromDialog()
     </script>

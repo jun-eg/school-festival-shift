@@ -61,7 +61,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -611,12 +611,12 @@ check(
   '⑦ 条件を破る固定は置かず、どの規則で置けないかを名指しで返す（見る順は 枠 → 二重 → 規則 1 → 5 → 4 → 3）',
   conflictsOf(conflictPlan),
   [
-    ['10:00', '調理', 'EED2000001', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
-    ['10:30', '調理責任者', 'EED2000000', '規則 4: 調理責任者 の枠だが、学年が 3年生 / 4年生 でない（いま: 1年生）'],
-    ['11:00', '会計', 'EED2009999', '規則 1: この人の回答が無い'],
-    ['12:00', '列整理', 'EED2000004', '同じ枠に二重: 同じ人の同じ 30 分枠に、手直しがもう 1 つある'],
-    ['15:00', '会計', 'EED2000200', '規則 1: 希望の時間の外である'],
-    ['07:00', '会計', 'EED2000002', 'いまの 2025-11-01 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+    ['10:00', '調理', 'EED2000001', '調理担当ではない人が調理に入っています'],
+    ['10:30', '調理責任者', 'EED2000000', '調理責任者にできる学年（3年生・4年生）ではありません（今: 1年生）'],
+    ['11:00', '会計', 'EED2009999', 'この人の回答がありません'],
+    ['12:00', '列整理', 'EED2000004', '同じ時間に修正が 2 つあります'],
+    ['15:00', '会計', 'EED2000200', '希望時間の外です'],
+    ['07:00', '会計', 'EED2000002', '営業時刻が変わったため、2025-11-01 の 07:00 の列がなくなりました'],
   ],
 )
 
@@ -651,10 +651,10 @@ const rule3Plan = fixedPlanOf(fiveRoles.concat(prepCleanupNeeds), rule3Wishes, [
 
 check(
   '⑦ 規則 3 と向きの合わない準備・片付けの固定は、どう合わないかを名指しで返す（→ 3 の規則 3 の ③④）',
-  conflictsOf(rule3Plan).map((one) => [one[0], one[1], one[2], one[3].slice(0, 7)]),
+  conflictsOf(rule3Plan).map((one) => [one[0], one[1], one[2], one[3].slice(0, 6)]),
   [
-    ['18:30', '片付け', 'EED2000007', '規則 3: そ'],
-    ['08:00', '準備', 'EED2000300', '規則 3: ③'],
+    ['18:30', '片付け', 'EED2000007', '同じ日に準備'],
+    ['08:00', '準備', 'EED2000300', '午後だけ入っ'],
   ],
 )
 
@@ -737,7 +737,7 @@ check(
 
 check(
   '⑥ どの 30 分枠にも重ならない需要は、黙って落とさずに名指しして止まる（→ 5-4）',
-  whyItStopped(() => planOf([plainDay], [['2025-11-09', '', '', '会計', 1]], wholeDayWishes))?.includes('30 分枠に 1 つも重ならない'),
+  whyItStopped(() => planOf([plainDay], [['2025-11-09', '', '', '会計', 1]], wholeDayWishes))?.includes('どの時間にも当たりません'),
   true,
 )
 
@@ -862,7 +862,7 @@ check(
 check(
   '⑦ 前回のモックで名指しされるのは、規則 3 を満たせない日の手直しだけで、名指しは手直しの 1 割に満たない',
   [
-    mockConflicts.every((row) => row[checkResultColumns.indexOf('内容')].startsWith('規則 3: ')),
+    mockConflicts.every((row) => row[checkResultColumns.indexOf('内容')].match(/^(午前|午後|同じ日に準備と片付け)/) !== null),
     mockConflicts.length * 10 < mockFixes.length,
   ],
   [true, true],

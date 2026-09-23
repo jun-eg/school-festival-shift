@@ -95,7 +95,7 @@ function cutIntervals(answer, day, studentId) {
   String(answer).split(intervalSeparator).forEach((piece) => {
     if (!wishIntervalPattern.test(piece)) {
       throw new Error(
-        `${whereWished(studentId, day)}の「${showBlankValue(piece)}」が HH:MM-HH:MM でない`,
+        `${whereWished(studentId, day)}「${showBlankValue(piece)}」は、10:00-15:00 のような時間帯になっていません`,
       )
     }
 
@@ -110,7 +110,7 @@ function cutIntervals(answer, day, studentId) {
 
     if (toMinutes(interval.end) <= toMinutes(interval.start)) {
       throw new Error(
-        `${whereWished(studentId, day)}の区間「${piece}」の終端が、始端より後になっていない`,
+        `${whereWished(studentId, day)}「${piece}」は、終わりの時刻が始まりより前です`,
       )
     }
 
@@ -136,7 +136,7 @@ function checkDayCount(wish, days) {
   const answers = (wish.answers || []).length
   if (answers === days.length) return
   throw new Error(
-    `「${wish.studentId}」の回答が ${answers} 日ぶんなのに、条件入力の「日ごとの営業時刻」が ${days.length} 行である`,
+    `条件入力の「日ごとの営業時刻」を ${answers} 日分入れてください（今: ${days.length} 行）`,
   )
 }
 

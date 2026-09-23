@@ -47,7 +47,7 @@ function estimateTextWidth(text, size) {
 /** `2025-11-01` を `11月1日` にする（前回の表題の書き方）。 */
 function monthDayOf(date) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date))
-  if (!match) throw new Error(`日付「${date}」が YYYY-MM-DD でない`)
+  if (!match) throw internalError(`日付「${date}」が YYYY-MM-DD でない`)
   return `${Number(match[2])}月${Number(match[3])}日`
 }
 
@@ -78,15 +78,15 @@ function distributionTable(header, dataRows, day, label) {
     const name = String(row[nameColumn] || '').trim()
     if (name === '') {
       throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目（学籍番号「${String(row[studentIdColumn] || '')}」）に役割が入っているが、氏名が空である。`
-          + '回答にその学籍番号があるかを見て、メニューの「生成」を押す',
+        `シート「${label}」の ${rowIndex + 2} 行目（学籍番号「${String(row[studentIdColumn] || '')}」）の氏名が空のため、画像にできません。`
+          + '「回答」シートにその学籍番号があるかを確かめてから、メニューの「生成」を押してください',
       )
     }
     const blank = times.map((time, index) => (time === '' && roles[index] !== '' ? index : -1)).filter((index) => index !== -1)
     if (blank.length > 0) {
       throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目の ${named.length + blank[0] + 1} 列目に「${roles[blank[0]]}」が入っているが、`
-          + '見出しの時刻が空である。何時の枠か描けない',
+        `シート「${label}」の ${named.length + blank[0] + 1} 列目の時刻の見出しが空のため、画像にできません`
+          + `（${rowIndex + 2} 行目に「${roles[blank[0]]}」が入っています）。メニューの「生成」を押してください`,
       )
     }
     rows.push({ name: name, cells: roles.map((role) => ({ role: role, color: roleColorOf(role) })) })
@@ -185,9 +185,7 @@ function distributionImages(grids, days) {
       const day = days[one.layout.grid.dayIndex]
       if (!day) {
         if (one.grid.rows.length === 0) return { label: label, fileName: '', title: '', times: [], rows: [], drawing: null }
-        throw new Error(
-          `シート「${label}」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い`,
-        )
+        throw new Error(missingDayText(label)) // → assignment-grid.js
       }
       const table = distributionTable(one.grid.header, one.grid.rows, day, label)
       return {
@@ -197,7 +195,7 @@ function distributionImages(grids, days) {
     })
 
   if (images.every((image) => image.rows.length === 0)) {
-    throw new Error('割り当ての 4 枚に、役割の入ったセルが 1 つも無い。先にメニューの「生成」を押す')
+    throw new Error('シフト表がまだ空です。先にメニューの「生成」を押してください')
   }
   return images
 }

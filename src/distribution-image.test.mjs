@@ -50,7 +50,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -201,15 +201,15 @@ const noName = asRead({ header: grids[1].grid.header, rows: [['EED2386071', '', 
 check(
   '⑥ 役割が入っているのに氏名が空なら、行と学籍番号を名指しして止まる',
   whyItStopped(() => distributionTable(noName.header, noName.rows, days[1], '学祭1日目')),
-  'シート「学祭1日目」の 2 行目（学籍番号「EED2386071」）に役割が入っているが、氏名が空である。'
-    + '回答にその学籍番号があるかを見て、メニューの「生成」を押す',
+  'シート「学祭1日目」の 2 行目（学籍番号「EED2386071」）の氏名が空のため、画像にできません。'
+    + '「回答」シートにその学籍番号があるかを確かめてから、メニューの「生成」を押してください',
 )
 
 const emptyGrids = layouts.map((layout, index) => ({ layout: layout, grid: asRead(toAssignmentGrid([], days[index], nameOf)) }))
 check(
   '⑥ 4 枚とも役割が 1 つも無ければ、生成を先に押すよう言って止まる',
   whyItStopped(() => distributionImages(emptyGrids, days)),
-  '割り当ての 4 枚に、役割の入ったセルが 1 つも無い。先にメニューの「生成」を押す',
+  'シフト表がまだ空です。先にメニューの「生成」を押してください',
 )
 check(
   '⑥ 日付が YYYY-MM-DD でなければ止まる',
@@ -219,7 +219,7 @@ check(
 check(
   '⑥ 条件入力にその日の行が無いのに中身があれば止まる',
   whyItStopped(() => distributionImages(grids, days.slice(0, 1))),
-  'シート「学祭1日目」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い',
+  '条件入力の「日ごとの営業時刻」を 4 日分入れてください（学祭1日目 の日の行がありません）',
 )
 
 // ---- ⑦ 外から読み込むファイルが 0 個 ----------------------------------------

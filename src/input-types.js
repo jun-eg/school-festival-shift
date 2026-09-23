@@ -148,7 +148,7 @@ function toDays(rows, source) {
       cleanupEnd: readTime(source, columns, row, rowIndex, '片付け終了'),
     }
     if (days.some((seen) => seen.date === day.date)) {
-      throw new Error(`${whereIs(source, rowIndex)}の「${day.date}」が、すでに上の行にある（1 日 1 行である）`)
+      throw new Error(`${whereIs(source, rowIndex)}の「${day.date}」は、すでに上の行にあります（1 日 1 行で書いてください）`)
     }
     checkAscending(source, rowIndex, day)
     day.slots = cutSlots(day)
@@ -166,7 +166,7 @@ function checkAscending(source, rowIndex, day) {
   for (let i = 1; i < times.length; i++) {
     if (toMinutes(times[i - 1]) <= toMinutes(times[i])) continue
     throw new Error(
-      `${whereIs(source, rowIndex)}の時刻が早い順でない（「${order[i - 1]}」が ${times[i - 1]}、「${order[i]}」が ${times[i]}）`,
+      `${whereIs(source, rowIndex)}の時刻を、左から早い順に書いてください（今:「${order[i - 1]}」が ${times[i - 1]}、「${order[i]}」が ${times[i]}）`,
     )
   }
 }
@@ -205,10 +205,10 @@ function toNeeds(rows, source) {
       count: readCount(source, columns, row, rowIndex, '人数'),
     }
     if ((need.start === '') !== (need.end === '')) {
-      throw new Error(`${whereIs(source, rowIndex)}の時間帯が片側しか無い（両方書くか、両方空ける）`)
+      throw new Error(`${whereIs(source, rowIndex)}の開始と終了は、両方書くか、両方空けてください`)
     }
     if (need.start !== '' && toMinutes(need.end) <= toMinutes(need.start)) {
-      throw new Error(`${whereIs(source, rowIndex)}の終了 ${need.end} が、開始 ${need.start} より後になっていない`)
+      throw new Error(`${whereIs(source, rowIndex)}の終了 ${need.end} が、開始 ${need.start} より前です。終了を開始より後にしてください`)
     }
     needs.push(need)
   })
@@ -230,7 +230,7 @@ function toCookLeaderGrades(rows, source) {
     const grade = `${number}年生`
     if (grades.indexOf(grade) === -1) {
       throw new Error(
-        `${whereIs(source, rowIndex)}の「${number}」が学年の数字でない（${grades.map((g) => g.replace('年生', '')).join(' / ')} のどれか）`,
+        `${whereIs(source, rowIndex)}の「${number}」は、学年を ${grades.map((g) => g.replace('年生', '')).join('・')} のどれかの数字で書いてください`,
       )
     }
     if (chosen.indexOf(grade) === -1) chosen.push(grade)
@@ -252,11 +252,11 @@ function toPrepCleanupRule(rows, source) {
     const item = readText(source, columns, row, rowIndex, '項目')
     if (item !== prepCleanupItems.noonBoundary) {
       throw new Error(
-        `${whereIs(source, rowIndex)}の項目「${item}」は書けない（書けるのは ${prepCleanupItems.noonBoundary} だけ）`,
+        `${whereIs(source, rowIndex)}の項目「${item}」は使えません（書けるのは「${prepCleanupItems.noonBoundary}」だけです）`,
       )
     }
     if (rule.noonBoundary !== '') {
-      throw new Error(`${whereIs(source, rowIndex)}の「${item}」が、すでに上の行にある`)
+      throw new Error(`${whereIs(source, rowIndex)}の「${item}」は、すでに上の行にあります`)
     }
     rule.noonBoundary = readTime(source, columns, row, rowIndex, '値')
   })
@@ -278,11 +278,11 @@ function toPlacementRule(rows, source) {
     const item = readText(source, columns, row, rowIndex, '項目')
     if (item !== placementItems.minRun) {
       throw new Error(
-        `${whereIs(source, rowIndex)}の項目「${item}」は書けない（書けるのは ${placementItems.minRun} だけ）`,
+        `${whereIs(source, rowIndex)}の項目「${item}」は使えません（書けるのは「${placementItems.minRun}」だけです）`,
       )
     }
     if (written) {
-      throw new Error(`${whereIs(source, rowIndex)}の「${item}」が、すでに上の行にある`)
+      throw new Error(`${whereIs(source, rowIndex)}の「${item}」は、すでに上の行にあります`)
     }
     rule.minRun = readRunLength(source, columns, row, rowIndex, '値')
     written = true
@@ -299,12 +299,12 @@ function readRunLength(source, columns, row, rowIndex, columnName) {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
   const text = typeof cell.value === 'number' ? String(cell.value) : cell.value
   if (!/^\d{1,2}:[0-5]\d$/.test(text)) {
-    throw new Error(`${cell.where}が 時:分 でない。いま: ${showBlankValue(text)}（${defaultMinRun} のように書く）`)
+    throw new Error(`${cell.where}は ${defaultMinRun} のような長さで書いてください（今: ${showBlankValue(text)}）`)
   }
   const minutes = toRunMinutes(text)
   if (minutes < slotMinutes || minutes % slotMinutes !== 0) {
     throw new Error(
-      `${cell.where}の「${text}」が ${slotMinutes} 分の倍数でない`,
+      `${cell.where}の「${text}」は、${slotMinutes} 分単位（1:00・1:30 など）で書いてください`,
     )
   }
   return minutes
@@ -342,14 +342,14 @@ function toWish(row, rowIndex) {
   const grade = readText(source, columns, row, rowIndex, wishColumns.grade)
   if (grades.indexOf(grade) === -1) {
     throw new Error(
-      `${whereIs(source, rowIndex)}の学年「${grade}」が選択肢の外である（${grades.join(' / ')} のどれか）`,
+      `${whereIs(source, rowIndex)}の学年「${grade}」は、${grades.join('・')} のどれかにしてください`,
     )
   }
 
   const cookAnswer = readText(source, columns, row, rowIndex, wishColumns.canCook)
   if (!Object.prototype.hasOwnProperty.call(cookAnswers, cookAnswer)) {
     throw new Error(
-      `${whereIs(source, rowIndex)}の${wishColumns.canCook}「${cookAnswer}」が選択肢の外である（${Object.keys(cookAnswers).join(' / ')} のどれか）`,
+      `${whereIs(source, rowIndex)}の${wishColumns.canCook}「${cookAnswer}」は、${Object.keys(cookAnswers).join('・')} のどちらかにしてください`,
     )
   }
 
@@ -379,7 +379,7 @@ function conditionSection(heading) {
   const section = sheetLayout
     .filter((layout) => layout.name === '条件入力')[0]
     .sections.filter((candidate) => candidate.heading === heading)[0]
-  if (!section) throw new Error(`条件入力の区画に「${heading}」が無い`)
+  if (!section) throw internalError(`条件入力の区画に「${heading}」が無い`)
   return section
 }
 
@@ -395,11 +395,31 @@ function eachFilledRow(source, section, rows, use) {
   })
 }
 
-/** 名指しの文の前半。区画の中の行番号と、担当者が直すシートの行番号を両方出す。 */
+/**
+ * 名指しの文の前半。担当者が直すシートの名前と行番号を出す（→ issue #249）。
+ * 条件入力の区画なら「条件入力の 3 行目（日ごとの営業時刻）」、シート 1 枚なら「「回答」シートの 2 行目」である。
+ */
 function whereIs(source, rowIndex) {
   const headerRows = headerRowsOf(source)
   if (headerRows === null) return `「${source}」の ${rowIndex + 1} 行目`
-  return `「${source}」の ${rowIndex + 1} 行目（シートの ${rowIndex + 1 + headerRows} 行目）`
+  const sheetRow = sheetRowOf(source, rowIndex)
+  const sheet = sheetOfSource(source)
+  if (sheet.name === source) return `「${source}」シートの ${sheetRow} 行目`
+  return `${sheet.name}の ${sheetRow} 行目（${source}）`
+}
+
+/** 区画の中の行番号（0 始まり）を、シートの行番号に直す。 */
+function sheetRowOf(source, rowIndex) {
+  return rowIndex + 1 + headerRowsOf(source)
+}
+
+/** その名前が、どのシート（シート名そのものか、区画の見出し）かを引く。 */
+function sheetOfSource(source) {
+  const layout = sheetLayout.filter((candidate) => (
+    candidate.name === source || candidate.sections.some((section) => section.heading === source)
+  ))[0]
+  if (!layout) throw internalError(`シートの構成に「${source}」が無い`)
+  return layout
 }
 
 /**
@@ -408,11 +428,7 @@ function whereIs(source, rowIndex) {
  */
 function headerRowsOf(source) {
   if (source === assignmentName) return null
-  const layout = sheetLayout.filter((candidate) => (
-    candidate.name === source || candidate.sections.some((section) => section.heading === source)
-  ))[0]
-  if (!layout) throw new Error(`シートの構成に「${source}」が無い`)
-  return layout.hasSectionHeadings ? 2 : 1
+  return sheetOfSource(source).hasSectionHeadings ? 2 : 1
 }
 
 /**
@@ -423,7 +439,7 @@ function headerRowsOf(source) {
 function checkRowWidth(source, section, row, rowIndex) {
   const width = sectionWidth(section)
   if (Array.isArray(row) && row.length === width) return
-  throw new Error(
+  throw internalError(
     `${whereIs(source, rowIndex)}の列数が構成と違う。`
       + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${width}（${sectionColumnsText(section)}）`,
   )
@@ -432,7 +448,7 @@ function checkRowWidth(source, section, row, rowIndex) {
 /** 1 セルを取る。列は名前か、何列目か（0 から数える）で指す。 */
 function cellOf(source, columns, row, rowIndex, column) {
   const at = typeof column === 'number' ? column : columns.indexOf(column)
-  if (at === -1) throw new Error(`「${source}」の構成に「${column}」の列が無い`)
+  if (at === -1) throw internalError(`「${source}」の構成に「${column}」の列が無い`)
   const which = typeof column === 'number' ? `${at + 1} 列目` : `「${column}」`
   return { value: row[at], where: `${whereIs(source, rowIndex)}の${which}` }
 }
@@ -441,7 +457,7 @@ function cellOf(source, columns, row, rowIndex, column) {
 function readText(source, columns, row, rowIndex, column, blankAllowed) {
   const cell = cellOf(source, columns, row, rowIndex, column)
   const text = typeof cell.value === 'number' ? String(cell.value) : cell.value
-  if (text === '' && !blankAllowed) throw new Error(`${cell.where}が空である`)
+  if (text === '' && !blankAllowed) throw new Error(`${cell.where}が空です`)
   return text
 }
 
@@ -453,7 +469,7 @@ function readStudentId(source, columns, row, rowIndex) {
   const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
   if (!studentIdPattern.test(studentId)) {
     throw new Error(
-      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が形式と違う（10 桁の英数字）`,
+      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」は、10 桁の英数字で書いてください`,
     )
   }
   return studentId.toUpperCase()
@@ -464,7 +480,7 @@ function readDate(source, columns, row, rowIndex, columnName, blankAllowed) {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
   if (cell.value === '' && blankAllowed) return ''
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cell.value)) {
-    throw new Error(`${cell.where}が YYYY-MM-DD でない。いま: ${showBlankValue(cell.value)}`)
+    throw new Error(`${cell.where}は 2025-11-01 のような日付で書いてください（今: ${showBlankValue(cell.value)}）`)
   }
   return cell.value
 }
@@ -474,7 +490,7 @@ function readTime(source, columns, row, rowIndex, columnName, blankAllowed) {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
   if (cell.value === '' && blankAllowed) return ''
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cell.value)) {
-    throw new Error(`${cell.where}が HH:MM でない。いま: ${showBlankValue(cell.value)}`)
+    throw new Error(`${cell.where}は 08:00 のような時刻で書いてください（今: ${showBlankValue(cell.value)}）`)
   }
   return cell.value
 }
@@ -483,7 +499,7 @@ function readTime(source, columns, row, rowIndex, columnName, blankAllowed) {
 function readCount(source, columns, row, rowIndex, columnName) {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
   if (typeof cell.value !== 'number' || !isFinite(cell.value) || Math.floor(cell.value) !== cell.value || cell.value < 1) {
-    throw new Error(`${cell.where}が 1 以上の整数でない。いま: ${showBlankValue(cell.value)}`)
+    throw new Error(`${cell.where}は 1 以上の整数で書いてください（今: ${showBlankValue(cell.value)}）`)
   }
   return cell.value
 }

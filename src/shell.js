@@ -281,7 +281,7 @@ function writeGrids(spreadsheet, grids, assignments, context, checks) {
     const grid = toAssignmentGrid(assignments, day, context.nameOf, fixedToday, context.friendsOf)
 
     if (grid.header.length > width) {
-      throw new Error(
+      throw internalError(
         `シート「${layout.name}」に ${grid.header.length - namedCount} 枠を敷こうとしたが、`
           + `時刻の列は ${width - namedCount} 列しかない`,
       )
@@ -373,14 +373,15 @@ function recountOnEdit(event) {
     const kinds = output['検証結果'].map((row) => row[outputColumns('検証結果').indexOf('種別')])
     const violations = kinds.filter((kind) => kind === checkKind.violation).length
     const unmet = kinds.filter((kind) => kind === checkKind.unmet).length
+    // 違反のセルの印は色ではなく赤い太字である（→ paintGrids）。
     return {
-      text: `数え直した — 違反 ${violations} 件 ／ 未充足 ${unmet} 件`
-        + `（違反した所は${violations === 0 ? '無い' : 'マス目の色で出ている'}）`,
+      text: `集計し直しました：違反 ${violations} 件／人数不足 ${unmet} 件`
+        + (violations === 0 ? '' : '（違反のセルは赤い太字です）'),
       seconds: 5,
     }
   } catch (error) {
     return {
-      text: `数え直せなかった（検証結果と指標は前のまま）— ${error.message}`,
+      text: `集計し直せませんでした（検証結果・指標は前のままです）：${error.message}`,
       seconds: 30,
     }
   }
@@ -542,17 +543,20 @@ function twoDigits(number) {
 /** sheetLayout から 1 枚を引く。無ければ名指しで止まる。 */
 function findLayout(name) {
   const layout = sheetLayout.filter((c) => c.name === name)[0]
-  if (!layout) throw new Error(`シートの構成に「${name}」が無い`)
+  if (!layout) throw internalError(`シートの構成に「${name}」が無い`)
   return layout
+}
+
+/** シートが見つからないときの文。build-form.js も使う。 */
+function sheetNotFoundText(name) {
+  return `シート「${name}」が見つかりません。名前を変えたり消したりした場合は元に戻してください`
 }
 
 /** スプレッドシートから 1 枚を引く。無ければ名指しで止まる（黙って作らない）。 */
 function findSheet(spreadsheet, name) {
   const sheet = spreadsheet.getSheetByName(name)
   if (!sheet) {
-    throw new Error(
-      `シート「${name}」が無い。テンプレートを組み立て直す`,
-    )
+    throw new Error(sheetNotFoundText(name))
   }
   return sheet
 }

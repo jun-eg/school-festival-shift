@@ -39,23 +39,26 @@ function prepCleanupRoles() {
 /** その枠が、その役割の帯の中にあるか。 */
 function isInBand(day, slot, role) {
   const band = prepCleanupBands().filter((one) => one.role === role)[0]
-  if (!band) throw new Error(`準備・片付けの帯に「${role}」が無い（prepCleanupBands と食い違っている）`)
+  if (!band) throw internalError(`準備・片付けの帯に「${role}」が無い（prepCleanupBands と食い違っている）`)
   return toMinutes(slot.start) >= toMinutes(day[band.from]) && toMinutes(slot.end) <= toMinutes(day[band.to])
 }
 
-/** 数える違反 5 つ（→ 5-4）。label は検証結果の「内容」の頭に出る名前、what は何を見ているか。 */
+/**
+ * 数える違反 5 つ（→ 5-4）。label は検証結果の「内容」の頭に出る名前、what は何を見ているか。
+ * label は作成者が読むので、規則の番号ではなく何の条件かで書く（→ issue #249）。key の rule1 などが規則の番号である。
+ */
 const violationRules = [
-  { key: 'rule1', label: '規則 1', what: '希望の時間の外に置いていない（→ 3 の規則 1）' },
+  { key: 'rule1', label: '希望時間外', what: '希望の時間の外に置いていない（→ 3 の規則 1）' },
   {
     key: 'rule3',
-    label: '規則 3',
+    label: '準備・片付け',
     what: '午前だけ → 準備 ／ 午後だけ → 片付け ／ 両方 → 片方だけ ／ どちらも無い → 入れない（①〜⑤）',
   },
-  { key: 'rule4', label: '規則 4', what: '調理責任者の枠に置く人は 3 年生または 4 年生である' },
-  { key: 'rule5', label: '規則 5', what: '調理の枠に置く人は 調理担当ですか？ が はい である' },
+  { key: 'rule4', label: '調理責任者の学年', what: '調理責任者の枠に置く人は 3 年生または 4 年生である' },
+  { key: 'rule5', label: '調理担当', what: '調理の枠に置く人は 調理担当ですか？ が はい である' },
   {
     key: 'doubleBooked',
-    label: '同じ枠に二重',
+    label: '同じ時間に二重',
     what: '同じ人が同じ 30 分枠に 2 つ入っている（規則ではない。枠の定義から出る → 5-4）',
   },
 ]
@@ -97,8 +100,8 @@ function countViolations(assignments, conditions, wishes, candidates) {
       violations.push(violationRow(
         labelOf('rule1'),
         wishBy[one.studentId]
-          ? '希望の時間の外に置いている'
-          : '希望の時間の外に置いている（この人の回答が無い）',
+          ? '希望していない時間に入っています'
+          : '希望していない時間に入っています（この人の回答がありません）',
         one,
       ))
     }
@@ -115,7 +118,7 @@ function countViolations(assignments, conditions, wishes, candidates) {
 
     // 規則ではない — 同じ人が同じ 30 分枠に二重に入っている
     if (firstAt[key]) {
-      violations.push(violationRow(labelOf('doubleBooked'), `同じ 30 分枠に 2 つ目が入っている（1 つ目は ${firstAt[key]}）`, one))
+      violations.push(violationRow(labelOf('doubleBooked'), `同じ時間に 2 つ目の役割が入っています（1 つ目は ${firstAt[key]}）`, one))
     } else {
       firstAt[key] = one.role
     }
@@ -131,17 +134,15 @@ function countViolations(assignments, conditions, wishes, candidates) {
 function cookLeaderGradeBroken(one, conditions, wishBy) {
   const allowed = conditions.cookLeaderGrades || []
   if (allowed.length === 0) {
-    throw new Error(
-      '条件入力の「調理責任者の学年」に 1 行も無い（規則 4 を数えられない）',
-    )
+    throw new Error(cookLeaderGradesMissingText)
   }
 
   const wish = wishBy[one.studentId]
   if (wish && allowed.indexOf(wish.grade) !== -1) return []
   return [violationRow(
     labelOf('rule4'),
-    `${ruleRoles.cookLeader} の枠に置いているが、学年が ${allowed.join(' / ')} でない`
-      + `（いま: ${wish ? wish.grade : 'この人の回答が無い'}）`,
+    `${ruleRoles.cookLeader}にできる学年（${allowed.join('・')}）ではありません`
+      + `（今: ${wish ? wish.grade : 'この人の回答がありません'}）`,
     one,
   )]
 }
@@ -152,10 +153,19 @@ function cookAnswerBroken(one, wishBy) {
   if (wish && wish.canCook) return []
   return [violationRow(
     labelOf('rule5'),
-    `調理の枠（${one.role}）に置いているが、${wishColumns.canCook} が`
-      + (wish ? ` ${cookAnswerText(false)} である` : '分からない（この人の回答が無い）'),
+    wish
+      ? `調理担当ではない人が${one.role}に入っています`
+      : `調理担当か分からない人が${one.role}に入っています（この人の回答がありません）`,
     one,
   )]
+}
+
+/** 条件入力の「調理責任者の学年」が空で、数えられないときの文。 */
+const cookLeaderGradesMissingText = '条件入力の「調理責任者の学年」に学年を書いてください'
+
+/** 条件入力の「午前と午後の境目」が空で、準備・片付けの置き方が決まらないときの文。 */
+function noonBoundaryMissingText() {
+  return `条件入力の「準備・片付けのルール」に「${prepCleanupItems.noonBoundary}」の時刻を書いてください`
 }
 
 /**
@@ -170,11 +180,7 @@ function cookAnswerBroken(one, wishBy) {
  */
 function countPrepCleanupBroken(placed, conditions) {
   const boundary = (conditions.prepCleanupRule || {}).noonBoundary || ''
-  if (boundary === '') {
-    throw new Error(
-      `条件入力の「準備・片付けのルール」に「${prepCleanupItems.noonBoundary}」が無い（規則 3 を数えられない）`,
-    )
-  }
+  if (boundary === '') throw new Error(noonBoundaryMissingText())
 
   const perDay = {}
   const order = []
@@ -208,23 +214,27 @@ function countPrepCleanupBroken(placed, conditions) {
   return violations
 }
 
-/** その人のその日が規則 3 の ②〜⑤ を満たしていれば null、でなければ「どれが、どう違うか」の文を返す。 */
+/**
+ * その人のその日が規則 3 の ②〜⑤ を満たしていれば null、でなければ「どれが、どう違うか」の文を返す。
+ * 文は作成者が読むので、②〜④ の番号は出さない（→ issue #249）。
+ */
 function prepCleanupDetail(day, boundary) {
-  const now = `いま: ${day.prep ? ruleRoles.prep + 'に入っている' : ruleRoles.prep + 'に入っていない'}`
-    + ` ／ ${day.cleanup ? ruleRoles.cleanup + 'に入っている' : ruleRoles.cleanup + 'に入っていない'}`
-  const where = `境目は ${boundary} である`
+  const now = `境目 ${boundary}。今：${ruleRoles.prep}${day.prep ? 'あり' : 'なし'}／${ruleRoles.cleanup}${day.cleanup ? 'あり' : 'なし'}`
 
+  // ④ 両方 → 片方だけ
   if (day.morning && day.afternoon) {
     if (day.prep !== day.cleanup) return null
-    return `④ その日の割り当てが午前と午後の両方にあるので、${ruleRoles.prep} と ${ruleRoles.cleanup} の片方だけに入れる。${where}。${now}`
+    return `午前も午後も入っているので、${ruleRoles.prep}か${ruleRoles.cleanup}のどちらか一方だけにしてください（${now}）`
   }
+  // ② 午前だけ → 準備
   if (day.morning) {
     if (day.prep && !day.cleanup) return null
-    return `② その日の割り当てが午前だけなので、${ruleRoles.prep} に入れて ${ruleRoles.cleanup} には入れない。${where}。${now}`
+    return `午前だけ入っているので、${ruleRoles.prep}だけにしてください（${now}）`
   }
+  // ③ 午後だけ → 片付け
   if (day.afternoon) {
     if (day.cleanup && !day.prep) return null
-    return `③ その日の割り当てが午後だけなので、${ruleRoles.cleanup} に入れて ${ruleRoles.prep} には入れない。${where}。${now}`
+    return `午後だけ入っているので、${ruleRoles.cleanup}だけにしてください（${now}）`
   }
   // ⑤「どちらも無い → 入れない」は当たらなくなった（→ ADR tech-requirements/0009）。
   // 準備・片付けが需要になったので、店の役割が無い日に準備だけ置かれるのはそれ自体が仕事である。
@@ -261,12 +271,12 @@ function readAssignments(rows, conditions) {
 function checkOnSlot(source, rowIndex, one, days) {
   const day = (days || []).filter((candidate) => candidate.date === one.date)[0]
   if (!day) {
-    throw new Error(
+    throw internalError(
       `${whereIs(source, rowIndex)}の「${one.date}」が、条件入力の「日ごとの営業時刻」に無い`,
     )
   }
   if (day.slots.some((slot) => slot.start === one.start && slot.end === one.end)) return
-  throw new Error(
+  throw internalError(
     `${whereIs(source, rowIndex)}の ${one.start}-${one.end} が、その日の 30 分枠に無い`,
   )
 }
@@ -280,7 +290,7 @@ function wishesByStudentId(wishes) {
   const byId = {}
   all.forEach((wish) => {
     if (byId[wish.studentId]) {
-      throw new Error(
+      throw internalError(
         `希望に学籍番号「${wish.studentId}」が 2 件ある（規則 2 で 1 人 1 件に畳まれていない）`,
       )
     }
@@ -328,7 +338,7 @@ function violationRow(label, detail, at) {
 /** 数える違反 5 つのうち 1 つの名前を引く。表に無ければ、そこで止まる。 */
 function labelOf(key) {
   const rule = violationRules.filter((row) => row.key === key)[0]
-  if (!rule) throw new Error(`数える違反に「${key}」が無い（violationRules と countViolations が食い違っている）`)
+  if (!rule) throw internalError(`数える違反に「${key}」が無い（violationRules と countViolations が食い違っている）`)
   return rule.label
 }
 

@@ -51,7 +51,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -287,21 +287,21 @@ check(
   whyItStopped(() => takeIn([
     answerRow(early, 'LTR2569911', earlyAnswers),
     answerRow(early, 'LTR2569911', laterAnswers),
-  ]))?.includes('同じタイムスタンプ'),
+  ]))?.includes('同じ時刻（'),
   true,
 )
 
 check(
   '④ タイムスタンプが空の行で止まる（畳み込みのキーが無いまま畳まない）',
   whyItStopped(() => takeIn([answerRow('', 'LTR2569911', earlyAnswers)]))
-    ?.includes('YYYY-MM-DD HH:MM:SS でない'),
+    ?.includes('タイムスタンプが日時になっていません'),
   true,
 )
 
 check(
   '④ タイムスタンプの表現が揃っていない行で止まる（黙って解釈し直さない）',
   whyItStopped(() => takeIn([answerRow('2025/10/20 21:50:43', 'LTR2569911', earlyAnswers)]))
-    ?.includes('「回答」の 1 行目（シートの 2 行目）の「タイムスタンプ」'),
+    ?.includes('「回答」シートの 2 行目のタイムスタンプ'),
   true,
 )
 
@@ -310,7 +310,7 @@ check(
   whyItStopped(() => takeIn([
     answerRow(early, 'LTR2569911', earlyAnswers, { grade: '5年生' }),
     answerRow(later, 'LTR2569911', laterAnswers),
-  ]))?.includes('学年「5年生」が選択肢の外である'),
+  ]))?.includes('学年「5年生」は、1年生・2年生・3年生・4年生 のどれかに'),
   true,
 )
 

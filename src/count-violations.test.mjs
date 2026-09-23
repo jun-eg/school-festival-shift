@@ -44,7 +44,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -169,7 +169,7 @@ function detailOf(rows) {
 check(
   '① 数える違反は 5 つである（→ 5-4 の「違反」の行）',
   violationRules.map((rule) => rule.label),
-  ['規則 1', '規則 3', '規則 4', '規則 5', '同じ枠に二重'],
+  ['希望時間外', '準備・片付け', '調理責任者の学年', '調理担当', '同じ時間に二重'],
 )
 
 check(
@@ -207,7 +207,7 @@ const outsideWish = violationsOf(cleanRows(), {
 check(
   '② 規則 1 — 希望の時間の外に置いた 1 枠が、名指しで出る',
   [labelsOf(outsideWish), detailOf(outsideWish), outsideWish[0][columns.indexOf('開始')]],
-  [['規則 1'], '希望の時間の外に置いている', '09:00'],
+  [['希望時間外'], '希望していない時間に入っています', '09:00'],
 )
 
 const noAnswerRows = cleanRows().concat([
@@ -217,16 +217,16 @@ const noAnswerRows = cleanRows().concat([
 
 check(
   '② 規則 1 — 回答が無い人を置いた枠も、外に置いたものとして出る（枠の数だけ出る）',
-  [labelsOf(violationsOf(noAnswerRows)), violationsOf(noAnswerRows)[0][detailColumn].includes('回答が無い')],
-  [['規則 1', '規則 1'], true],
+  [labelsOf(violationsOf(noAnswerRows)), violationsOf(noAnswerRows)[0][detailColumn].includes('回答がありません')],
+  [['希望時間外', '希望時間外'], true],
 )
 
 const notPlacedInPrep = violationsOf(cleanRows().filter((row) => !(row[4] === people.a.id && row[3] === '準備')))
 
 check(
   '② 規則 3 の ② — 午前だけの人が準備に入っていなければ、その人のその日が 1 行出る',
-  [labelsOf(notPlacedInPrep), detailOf(notPlacedInPrep).slice(0, 1), notPlacedInPrep[0][columns.indexOf('学籍番号')]],
-  [['規則 3'], '②', people.a.id],
+  [labelsOf(notPlacedInPrep), detailOf(notPlacedInPrep).startsWith('午前だけ入っているので、準備だけに'), notPlacedInPrep[0][columns.indexOf('学籍番号')]],
+  [['準備・片付け'], true, people.a.id],
 )
 
 const prepInsteadOfCleanup = violationsOf(cleanRows().map((row) => (
@@ -235,8 +235,8 @@ const prepInsteadOfCleanup = violationsOf(cleanRows().map((row) => (
 
 check(
   '② 規則 3 の ③ — 午後だけの人を準備に入れていれば、1 行出る',
-  [labelsOf(prepInsteadOfCleanup), detailOf(prepInsteadOfCleanup).slice(0, 1)],
-  [['規則 3'], '③'],
+  [labelsOf(prepInsteadOfCleanup), detailOf(prepInsteadOfCleanup).startsWith('午後だけ入っているので、片付けだけに')],
+  [['準備・片付け'], true],
 )
 
 /** 午前と午後の両方にある人を、準備と片付けの両方に入れた割り当て（規則 3 の ④）。 */
@@ -251,8 +251,8 @@ const bothSides = violationsOf(bothSidesRows())
 
 check(
   '② 規則 3 の ④ — 午前と午後の両方にある人を、準備と片付けの両方に入れていれば 1 行出る',
-  [labelsOf(bothSides), detailOf(bothSides).slice(0, 1)],
-  [['規則 3'], '④'],
+  [labelsOf(bothSides), detailOf(bothSides).startsWith('午前も午後も入っているので、準備か片付けのどちらか一方だけに')],
+  [['準備・片付け'], true],
 )
 
 const neitherSide = violationsOf(
@@ -263,8 +263,8 @@ const neitherSide = violationsOf(
 
 check(
   '② 規則 3 の ④ — 両方にあるのにどちらにも入れていなければ、同じ ④ として 1 行出る',
-  [labelsOf(neitherSide), detailOf(neitherSide).slice(0, 1), detailOf(neitherSide).includes('準備に入っていない')],
-  [['規則 3'], '④', true],
+  [labelsOf(neitherSide), detailOf(neitherSide).startsWith('午前も午後も入っているので'), detailOf(neitherSide).includes('準備なし')],
+  [['準備・片付け'], true, true],
 )
 
 // 店の役割が無い日に準備だけ置かれるのは違反ではない（→ ADR tech-requirements/0009）
@@ -282,8 +282,8 @@ const youngCookLeader = violationsOf(cleanRows().map((row) => (
 
 check(
   '② 規則 4 — 調理責任者の枠に 1年生 を置いていれば、1 行出る',
-  [labelsOf(youngCookLeader), youngCookLeader[0][detailColumn].includes('3年生 / 4年生')],
-  [['規則 4'], true],
+  [labelsOf(youngCookLeader), youngCookLeader[0][detailColumn].includes('3年生・4年生')],
+  [['調理責任者の学年'], true],
 )
 
 const cookWithoutAnswer = violationsOf(cleanRows().map((row) => (
@@ -292,8 +292,8 @@ const cookWithoutAnswer = violationsOf(cleanRows().map((row) => (
 
 check(
   '② 規則 5 — 調理の枠に 調理担当ですか？ が いいえ の人を置いていれば、1 行出る',
-  [labelsOf(cookWithoutAnswer), cookWithoutAnswer[0][detailColumn].includes('いいえ')],
-  [['規則 5'], true],
+  [labelsOf(cookWithoutAnswer), cookWithoutAnswer[0][detailColumn].includes('調理担当ではない人')],
+  [['調理担当'], true],
 )
 
 const twiceInOneSlot = violationsOf(cleanRows().concat([placed(dates[0], '09:00', '調理責任者', people.a)]))
@@ -301,7 +301,7 @@ const twiceInOneSlot = violationsOf(cleanRows().concat([placed(dates[0], '09:00'
 check(
   '② 同じ枠に二重 — 同じ人が同じ 30 分枠に 2 つ入っていれば、2 つ目が 1 行出る（規則ではない → 5-4）',
   [labelsOf(twiceInOneSlot), twiceInOneSlot[0][columns.indexOf('役割')], twiceInOneSlot[0][detailColumn].includes('1 つ目は 調理')],
-  [['同じ枠に二重'], '調理責任者', true],
+  [['同じ時間に二重'], '調理責任者', true],
 )
 
 check(
@@ -434,7 +434,7 @@ const output = build({
 check(
   '⑤ build から呼ばれて、検証結果の行が返る（→ core.js の builtInSteps）',
   [output['検証結果'].length, labelsOf(output['検証結果'])],
-  [1, ['規則 3']],
+  [1, ['準備・片付け']],
 )
 
 check(

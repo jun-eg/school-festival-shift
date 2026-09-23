@@ -48,7 +48,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -307,7 +307,7 @@ check(
   recounted['検証結果']
     .filter((row) => row[kindColumn] === checkKind.violation)
     .map((row) => [row[checkResultColumns.indexOf('開始')], row[checkResultColumns.indexOf('内容')]]),
-  [['16:00', '規則 1: 希望の時間の外に置いている']],
+  [['16:00', '希望時間外: 希望していない時間に入っています']],
 )
 
 check(
@@ -348,8 +348,8 @@ check(
     .filter((row) => row[kindColumn] === checkKind.fixConflict)
     .map((row) => [row[checkResultColumns.indexOf('日')], row[checkResultColumns.indexOf('開始')], row[checkResultColumns.indexOf('内容')]]),
   [
-    ['2025-11-02', '10:00', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
-    ['2025-11-03', '07:00', 'いまの 2025-11-03 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+    ['2025-11-02', '10:00', '調理担当ではない人が調理に入っています'],
+    ['2025-11-03', '07:00', '営業時刻が変わったため、2025-11-03 の 07:00 の列がなくなりました'],
   ],
 )
 
