@@ -69,8 +69,17 @@ class FakeRange {
     roundTrips.formats += 1
     for (let r = this.row; r < this.row + this.rowCount; r++) {
       for (let c = this.column; c < this.column + this.columnCount; c++) {
-        ;['backgrounds', 'fontColors', 'fontWeights'].forEach((map) => this.sheet[map].delete(`${r},${c}`))
+        ;['backgrounds', 'fontColors', 'fontWeights', 'rightBorders'].forEach((map) => this.sheet[map].delete(`${r},${c}`))
       }
+    }
+    return this
+  }
+  /** 罫線を置く。見るのは右の線だけである（→ issue #245）。書式として数える。 */
+  setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
+    roundTrips.formats += 1
+    if (right !== true) return this
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.rightBorders.set(`${r},${c}`, `${color} ${style}`)
     }
     return this
   }
@@ -126,7 +135,7 @@ class FakeRange {
 class FakeSheet {
   constructor(name, minColumns = 26) {
     Object.assign(this, {
-      name, cells: new Map(), notes: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), minColumns,
+      name, cells: new Map(), notes: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), rightBorders: new Map(), minColumns,
     })
   }
   getName() { return this.name }
@@ -182,7 +191,8 @@ class FakeSpreadsheet {
 
 // ---- 読み込む ---------------------------------------------------------------
 
-const context = vm.createContext({})
+// 殻が名前で引く罫線の種類だけを置く（→ paintGrids）。
+const context = vm.createContext({ SpreadsheetApp: { BorderStyle: { SOLID_THICK: 'solid-thick' } } })
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'distribution-image.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
@@ -190,8 +200,8 @@ const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
   sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote, distributionImagesOn,
 } = context
-const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote } = vm.runInContext(
-  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote })',
+const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine } = vm.runInContext(
+  '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine })',
   context,
 )
 
@@ -597,6 +607,19 @@ check(
   ],
 )
 
+check(
+  '⑦ 書式を消した後に、友達欄の右の線がデータの行の下の端まで引き直され、他の列には引かれない（→ issue #245）',
+  dayLabels.map((name) => {
+    const sheet = recountBook.getSheetByName(name)
+    const borders = [...sheet.rightBorders.entries()]
+    return [
+      borders.length === sheet.getMaxRows() - 1,
+      borders.every(([key, line]) => key.split(',')[1] === '3' && Number(key.split(',')[0]) >= 2 && line === `${dividerLine.color} solid-thick`),
+    ]
+  }),
+  dayLabels.map(() => [true, true]),
+)
+
 const grayOf = roleColors.filter((one) => one.roles.indexOf('準備') !== -1)[0].color
 
 check(
@@ -644,11 +667,11 @@ check(
 
 // 読むのは run と同じで、マス目は中身のある 2 枚だけが 2 回。
 // 書くのは検証結果の置く 1 ＋ 指標の消す・置く 2 ＝ 3 で、マス目には書かない。
-// 書式は 消す 4 ＋ 背景 2（準備日・片付け）＋ 文字の色と太さ 2（片付け）＋ 検証結果の背景 1。
+// 書式は 消す 4 ＋ 境の線 4 ＋ 背景 2（準備日・片付け）＋ 文字の色と太さ 2（片付け）＋ 検証結果の背景 1。
 check(
-  '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 4 回までである',
+  '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 5 回までである',
   [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats],
-  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + 2 + 2 + 1],
+  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + gridCount + 2 + 2 + 1],
 )
 
 const conditionEditBook = editedBook()

@@ -170,10 +170,11 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
 const violationMark = { fontColor: '#cc0000', fontWeight: 'bold' }
 
 /**
- * マス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である。1 枚につき 4 回まで。
+ * マス目の色を塗り直す — 背景は役割の色、違反した所は赤い太字である。1 枚につき 5 回まで。
  *   ① 書式を下の端（getMaxRows）まで消す（担当者が付けた色も消える）
- *   ② 役割の背景色を置く
- *   ③④ 違反したセルに、RangeList で文字の色と太さ
+ *   ② 友達欄と時刻の列の境の線を引き直す（① で消えるため → sheet-layout.js の dividerLine ／ issue #245）
+ *   ③ 役割の背景色を置く
+ *   ④⑤ 違反したセルに、RangeList で文字の色と太さ
  */
 function paintGrids(spreadsheet, grids, violations, days) {
   grids.forEach((one) => {
@@ -185,6 +186,11 @@ function paintGrids(spreadsheet, grids, violations, days) {
     if (maxRows <= headerRows) return
 
     sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).clearFormat()
+    const divider = dividerColumn(layout.sections[0])
+    if (divider !== null) {
+      sheet.getRange(headerRows + 1, divider, maxRows - headerRows, 1)
+        .setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
+    }
     if (one.grid.rows.length > 0) {
       sheet.getRange(headerRows + 1, 1, one.grid.rows.length, width).setBackgrounds(gridBackgrounds(one.grid.rows, width))
     }
@@ -305,7 +311,7 @@ function writeGrids(spreadsheet, grids, assignments, context, checks) {
 }
 
 /**
- * メニューの「生成」から呼ぶ入口（→ menu.js の runGeneration）。SpreadsheetApp を名指しするのはこの 1 行だけである。
+ * メニューの「生成」から呼ぶ入口（→ menu.js の runGeneration）。開いているスプレッドシートを掴むのはこの 1 行だけである。
  * steps を渡さなければ、中身が入っている段だけが走る。
  */
 function runOnActiveSpreadsheet(steps) {

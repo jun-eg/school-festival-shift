@@ -55,6 +55,8 @@ class FakeRange {
     this.positions().forEach((key) => this.sheet.notes.set(key, note))
     return this
   }
+  // 罫線はテンプレートの組み立てが引く（→ build-template.test.mjs の ⑥）。ここでは見ない。
+  setBorder() { return this }
 }
 
 class FakeProtection {
@@ -89,12 +91,12 @@ class FakeSheet {
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   setFrozenRows(count) { this.frozenRows = count }
   setFrozenColumns(count) { this.frozenColumns = count }
+  // 列の幅はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑥）。ここでは見ない。
+  getColumnWidth() { return 100 }
+  setColumnWidth() {}
   getMaxRows() { return this.maxRows }
   getMaxColumns() { return this.maxColumns }
   insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
-  // 列の幅は、新しいスプレッドシートの既定の 100 ピクセルである
-  getColumnWidth(column) { return (this.widths ??= new Map()).get(column) ?? 100 }
-  setColumnWidth(column, width) { (this.widths ??= new Map()).set(column, width); return this }
   getProtections() { return [...this.protections] }
   protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
   getFormUrl() { return this.formUrl }
@@ -172,7 +174,7 @@ const books = {}
 const createdForms = []
 
 const context = vm.createContext({
-  SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' }, flush() {} },
+  SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' }, BorderStyle: { SOLID_THICK: 'solid-thick' }, flush() {} },
   FormApp: {
     DestinationType: { SPREADSHEET: 'SPREADSHEET' },
     create(title) { const form = new FakeForm(title, books); createdForms.push(form); return form },

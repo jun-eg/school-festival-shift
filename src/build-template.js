@@ -28,8 +28,8 @@ function buildTemplateInto(spreadsheet) {
     }
     widenTo(sheet, layout, log)
     putHeaders(sheet, layout, log)
-    putWidths(sheet, layout)
     putInitialRows(sheet, layout, log)
+    shapeColumns(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
     sheet.setFrozenColumns(layout.frozenColumns || 0)
     spreadsheet.setActiveSheet(sheet)
@@ -83,21 +83,6 @@ function putHeaders(sheet, layout, log) {
 }
 
 /**
- * 区画の widthTimes に名前のある列を、区画の 1 列目の何倍かの幅にする（→ sheet-layout.js ／ issue #246）。
- * 1 列目を基準にするのは、2 回走らせても幅が倍々に伸びないためである。
- */
-function putWidths(sheet, layout) {
-  layout.sections.forEach((section) => {
-    const times = section.widthTimes || {}
-    const base = sheet.getColumnWidth(section.startColumn)
-    Object.keys(times).forEach((columnName) => {
-      const column = section.startColumn + section.columns.indexOf(columnName)
-      sheet.setColumnWidth(column, base * times[columnName])
-    })
-  })
-}
-
-/**
  * 区画ごとに、列名の下へ初期値を置く（→ sheet-layout.js の initialRows ／ issue #240）。
  *
  * 置くのは、区画の入力欄（列名の下から最下行まで・区画の幅）が空のときだけである。
@@ -115,6 +100,30 @@ function putInitialRows(sheet, layout, log) {
 
     sheet.getRange(firstInputRow, section.startColumn, section.initialRows.length, width).setValues(section.initialRows)
     log.push(`「${layout.name}」の「${section.heading}」に初期値を ${section.initialRows.length} 行置いた`)
+  })
+}
+
+/**
+ * 区画ごとに、広く取る列（wideColumns）の幅を置き、境の線（dividerAfter）を見出しから最下行まで引く（→ issue #245）。
+ * 幅は物差しの列（広げない列のうち一番右 → sheet-layout.js の widthBaseColumn。マス目なら時刻の列、検証結果なら「あと何人」）の何倍かで決める
+ * — 物差しの列を担当者が広げていれば、それに合わせて広がる。広げる列そのものは物差しにしない（作り直すたびに倍々に伸びる → issue #246）。
+ * 線は生成のたびに引き直される（→ shell.js の paintGrids）。ここで引くのは、まだ生成していないテンプレートにも出すためである。
+ */
+function shapeColumns(sheet, layout, log) {
+  layout.sections.forEach((section) => {
+    const wide = section.wideColumns || {}
+    Object.keys(wide).forEach((name) => {
+      const column = section.startColumn + section.columns.indexOf(name)
+      const width = sheet.getColumnWidth(widthBaseColumn(section)) * wide[name]
+      if (sheet.getColumnWidth(column) === width) return
+      sheet.setColumnWidth(column, width)
+      log.push(`「${layout.name}」の「${name}」を ${width} px に広げた`)
+    })
+
+    const divider = dividerColumn(section)
+    if (divider === null) return
+    sheet.getRange(1, divider, sheet.getMaxRows(), 1)
+      .setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
   })
 }
 

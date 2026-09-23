@@ -3,14 +3,15 @@
 //
 //   使い方: node src/build-template.test.mjs
 //
-// 見るものは 6 つある。
+// 見るものは 7 つある。
 //   ① 5 枚が構成の並びででき、最初からある空のシートが消える
 //   ② 8 枚に保護がかかる。割り当ての 4 枚は「持ち主だけ」、ほかの 4 枚は「警告のみ」で、
 //      条件入力だけは区画の入力欄が保護の外にある（→ issue #234）
 //   ③ 2 回走らせても形が変わらない（足りないものだけ足す）
 //   ④ 見出しが構成と違うときは、上書きせずに名指しで止まる（黙って直さない）
 //   ⑤ 条件入力の区画ごとに、列名の下へ初期値が置かれる。入力欄に中身がある区画には置かない（→ issue #240）
-//   ⑥ 検証結果の候補の列は、ほかの列の 5 倍の幅になる。候補の列が無い前の形のシートには、見出しを足して止まらない（→ issue #246）
+//   ⑥ 割り当ての 4 枚で、友達欄が時刻の列 3 つ分の幅になり、友達欄の右に太い線が引かれる（→ issue #245）
+//   ⑦ 検証結果の候補の列は、ほかの列の 5 倍の幅になる。候補の列が無い前の形のシートには、見出しを足して止まらない（→ issue #246）
 //
 // 本物のスプレッドシートで保護が効くか・コピーでスクリプトが渡るか・
 // コピーした先で「持ち主だけ」が誰に効くかは分からない（→ issue #136・real-device-log.md の項目 22）。
@@ -56,6 +57,11 @@ class FakeRange {
     this.positions().forEach((key) => this.sheet.notes.set(key, note))
     return this
   }
+  /** 見るのは右の線だけである（→ issue #245）。 */
+  setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
+    if (right === true) this.positions().forEach((key) => this.sheet.rightBorders.set(key, `${color} ${style}`))
+    return this
+  }
 }
 
 // 本物と同じく、かけた直後は共有された編集者も編集者に入っていて、ドメインにも開いている。
@@ -86,7 +92,7 @@ class FakeSheet {
   // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
   constructor(name) {
     Object.assign(this, {
-      name, cells: new Map(), bold: new Map(), notes: new Map(), protections: [],
+      name, cells: new Map(), bold: new Map(), notes: new Map(), rightBorders: new Map(), columnWidths: new Map(), protections: [],
       frozenRows: 0, frozenColumns: 0, maxRows: 1000, maxColumns: 26,
     })
   }
@@ -94,12 +100,12 @@ class FakeSheet {
   getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
   setFrozenRows(count) { this.frozenRows = count }
   setFrozenColumns(count) { this.frozenColumns = count }
+  // 100 px は、新しいスプレッドシートの列の既定の幅である
+  getColumnWidth(column) { return this.columnWidths.get(column) ?? 100 }
+  setColumnWidth(column, width) { this.columnWidths.set(column, width) }
   getMaxRows() { return this.maxRows }
   getMaxColumns() { return this.maxColumns }
   insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
-  // 列の幅は、新しいスプレッドシートの既定の 100 ピクセルである
-  getColumnWidth(column) { return (this.widths ??= new Map()).get(column) ?? 100 }
-  setColumnWidth(column, width) { (this.widths ??= new Map()).set(column, width); return this }
   getProtections() { return [...this.protections] }
   protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
   getLastRow() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[0])), 0) }
@@ -125,7 +131,7 @@ class FakeSpreadsheet {
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({
-  SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' } },
+  SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' }, BorderStyle: { SOLID_THICK: 'solid-thick' } },
   console: { log() {} },
 })
 for (const name of ['sheet-layout.js', 'build-template.js']) {
@@ -133,8 +139,8 @@ for (const name of ['sheet-layout.js', 'build-template.js']) {
 }
 // const は文脈のプロパティにならないので、式で取り出す（function は文脈に出る）
 const { buildTemplateInto } = context
-const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels } = vm.runInContext(
-  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels })',
+const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine } = vm.runInContext(
+  '({ sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, sectionRightEdge, sectionWidth, dayLabels, dividerLine })',
   context,
 )
 
@@ -207,14 +213,31 @@ check(
   ]),
 )
 
-const shapeAfterFirstRun = JSON.stringify(book.getSheets().map((s) => [s.getName(), [...s.cells], s.frozenRows, s.protections.length]))
+check(
+  '⑥ 割り当ての 4 枚は友達欄（3 列目）が時刻の列 3 つ分、検証結果は候補（10 列目）が 5 列分の幅になった — ほかの列は既定の幅のまま',
+  book.getSheets().map((s) => [s.getName(), [...s.columnWidths]]),
+  sheetLayout.map((c) => [c.name, dayLabels.includes(c.name) ? [[3, 300]] : c.name === '検証結果' ? [[10, 500]] : []]),
+)
+
+check(
+  '⑥ 割り当ての 4 枚だけ、友達欄の右に太い線が見出しから最下行まで引かれた — ほかの列には引かれない',
+  book.getSheets().map((s) => [
+    s.getName(),
+    s.rightBorders.size,
+    [...s.rightBorders].every(([key, line]) => key.split(',')[1] === '3' && line === `${dividerLine.color} solid-thick`),
+  ]),
+  sheetLayout.map((c) => [c.name, dayLabels.includes(c.name) ? 1000 : 0, true]),
+)
+
+const shapeOf = (target) => JSON.stringify(target.getSheets().map((s) => [s.getName(), [...s.cells], s.frozenRows, s.protections.length, [...s.columnWidths], [...s.rightBorders]]))
+const shapeAfterFirstRun = shapeOf(book)
 const secondRunLog = buildTemplateInto(book)
-const shapeAfterSecondRun = JSON.stringify(book.getSheets().map((s) => [s.getName(), [...s.cells], s.frozenRows, s.protections.length]))
+const shapeAfterSecondRun = shapeOf(book)
 
 check('③ 2 回目を走らせても形が変わらない', shapeAfterSecondRun, shapeAfterFirstRun)
 check(
   '③ 2 回目は何も作らない（記録に「作った」が出ない）',
-  secondRunLog.filter((line) => line.includes('作った') || line.includes('置いた')),
+  secondRunLog.filter((line) => line.includes('作った') || line.includes('置いた') || line.includes('広げた')),
   [],
 )
 
@@ -283,7 +306,7 @@ const widthsOf = (target) => {
 }
 
 check(
-  '⑥ 検証結果の候補は J 列で、ほかの列の 5 倍の幅になる（2 回目を走らせても倍々に伸びない）',
+  '⑦ 検証結果の候補は J 列で、ほかの列の 5 倍の幅になる（2 回目を走らせても倍々に伸びない）',
   [candidateColumn, widthsOf(book)],
   [10, checkLayout.sections[0].columns.map((name) => (name === '候補' ? 500 : 100))],
 )
@@ -300,7 +323,7 @@ try {
 }
 
 check(
-  '⑥ 候補の列が無い前の形の検証結果には、止まらずに見出しを足す（中身のある見出しは構成と同じなので）',
+  '⑦ 候補の列が無い前の形の検証結果には、止まらずに見出しを足す（中身のある見出しは構成と同じなので）',
   [olderStopped, olderBook.getSheetByName('検証結果').getRange(1, 1, 1, candidateColumn).getValues()[0]],
   [null, checkLayout.sections[0].columns],
 )

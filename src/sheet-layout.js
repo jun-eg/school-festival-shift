@@ -83,10 +83,21 @@ function gridSheet(dayIndex) {
         columns: ['学籍番号', '氏名', '一緒に組みたいお友達'],
         // 右は時刻の列で、名前を持たない。当てるのは見出しの時刻である（→ assignment-grid.js）。
         slotColumns: maxSlotsPerDay,
+        // 友達欄は長くなりうるので、時刻の列 3 つ分の幅を取る（→ issue #245）。
+        wideColumns: { '一緒に組みたいお友達': 3 },
+        // 友達欄と時刻の列の境に、固定の線（氏名と友達欄の境）と同じく目立つ線を引く（→ dividerLine ／ issue #245）。
+        dividerAfter: '一緒に組みたいお友達',
       },
     ],
   }
 }
+
+/**
+ * 区画の dividerAfter の列の右に引く線（→ issue #245）。固定の線に似せた、太い灰色である。
+ * style は SpreadsheetApp.BorderStyle の名前で持つ（ここは SpreadsheetApp を掴まない）。
+ * 生成と数え直しは塗り直すたびに書式を消すので、線もそのたびに引き直す（→ shell.js の paintGrids）。
+ */
+const dividerLine = { color: '#b7b7b7', style: 'SOLID_THICK' }
 
 const sheetLayout = [
   {
@@ -217,8 +228,8 @@ const sheetLayout = [
           + '生成し直したときに残せなかった手直しは、食い違った固定として先頭に並ぶ（→ 5-3）。'
           + '候補は、その行の 30 分枠を希望に含む人全員の氏名である — 置いてあるか、ほかの条件に合うかは見ていない（→ issue #246）',
         columns: ['種別', '日', '開始', '終了', '役割', '学籍番号', '氏名', '内容', 'あと何人', '候補'],
-        // 候補は名前が何人も並ぶので、ほかの列の 5 倍の幅を取る（→ issue #246）。
-        widthTimes: { '候補': 5 },
+        // 候補は名前が何人も並ぶので、ほかの列（あと何人）の 5 倍の幅を取る（→ issue #246 ／ widthBaseColumn）。
+        wideColumns: { '候補': 5 },
       },
     ],
   },
@@ -270,6 +281,24 @@ function sectionRightEdge(layout) {
   return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + sectionWidth(section) - 1), 0)
 }
 
+/** 区画の dividerAfter が何列目か（1 始まり）。線を引かない区画は null である。 */
+function dividerColumn(section) {
+  if (!section.dividerAfter) return null
+  return section.startColumn + section.columns.indexOf(section.dividerAfter)
+}
+
+/**
+ * 広く取る列（wideColumns）の幅の物差しにする列（1 始まり）— 区画の中で、広げない列のうち一番右である。
+ * マス目なら時刻の列、検証結果なら「あと何人」になる。右端の列そのものを広げる区画で右端を物差しにすると、
+ * テンプレートを作り直すたびに幅が倍々に伸びる（→ issue #246）。
+ */
+function widthBaseColumn(section) {
+  const wide = section.wideColumns || {}
+  let column = section.startColumn + sectionWidth(section) - 1
+  while (column > section.startColumn && wide[section.columns[column - section.startColumn]] !== undefined) column -= 1
+  return column
+}
+
 /** 生成が返す行の形。シートの列名で、マス目に載る「割り当て」だけは assignmentColumns である。 */
 function outputColumns(name) {
   if (name === assignmentName) return assignmentColumns
@@ -294,6 +323,7 @@ function gridLayouts(of) {
 if (typeof module !== 'undefined') {
   module.exports = {
     sheetLayout, checkKind, candidateSeparator, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
+    dividerLine, dividerColumn, widthBaseColumn,
     dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }
