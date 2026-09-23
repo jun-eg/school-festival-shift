@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url)
 
 const {
   sheetLayout, checkKind, sectionWidth,
-  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts,
+  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts, dividerColumn,
 } = require('./sheet-layout.js')
 
 /** 名前でシート 1 枚の区画を引く（並びの番号だと、並びが動いたとき別の枚を見る）。 */
@@ -208,6 +208,18 @@ check(
   '左の 2 列を固定するのはマス目の 4 枚だけである（右へ送っても誰の行かが読める）',
   sheetLayout.filter((s) => s.frozenColumns).map((s) => [s.name, s.frozenColumns]),
   dayLabels.map((name) => [name, 2]),
+)
+
+check(
+  '友達欄の幅と右の線を持つのはマス目の 4 枚だけで、どちらも名前のある列を指している（→ issue #245）',
+  sheetLayout
+    .filter((s) => s.sections.some((k) => k.wideColumns || k.dividerAfter))
+    .map((s) => s.sections.map((k) => [
+      Object.keys(k.wideColumns).every((name) => k.columns.includes(name)),
+      k.columns.includes(k.dividerAfter),
+      dividerColumn(k),
+    ])),
+  dayLabels.map(() => [[true, true, 3]]),
 )
 
 // ---- 結果 ------------------------------------------------------------------

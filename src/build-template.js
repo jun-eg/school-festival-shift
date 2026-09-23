@@ -29,6 +29,7 @@ function buildTemplateInto(spreadsheet) {
     widenTo(sheet, layout, log)
     putHeaders(sheet, layout, log)
     putInitialRows(sheet, layout, log)
+    shapeColumns(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
     sheet.setFrozenColumns(layout.frozenColumns || 0)
     spreadsheet.setActiveSheet(sheet)
@@ -99,6 +100,29 @@ function putInitialRows(sheet, layout, log) {
 
     sheet.getRange(firstInputRow, section.startColumn, section.initialRows.length, width).setValues(section.initialRows)
     log.push(`「${layout.name}」の「${section.heading}」に初期値を ${section.initialRows.length} 行置いた`)
+  })
+}
+
+/**
+ * 区画ごとに、広く取る列（wideColumns）の幅を置き、境の線（dividerAfter）を見出しから最下行まで引く（→ issue #245）。
+ * 幅は区画の右端の列（マス目なら時刻の列）の何倍かで決める — 物差しの列を担当者が広げていれば、それに合わせて広がる。
+ * 線は生成のたびに引き直される（→ shell.js の paintGrids）。ここで引くのは、まだ生成していないテンプレートにも出すためである。
+ */
+function shapeColumns(sheet, layout, log) {
+  layout.sections.forEach((section) => {
+    const wide = section.wideColumns || {}
+    Object.keys(wide).forEach((name) => {
+      const column = section.startColumn + section.columns.indexOf(name)
+      const width = sheet.getColumnWidth(section.startColumn + sectionWidth(section) - 1) * wide[name]
+      if (sheet.getColumnWidth(column) === width) return
+      sheet.setColumnWidth(column, width)
+      log.push(`「${layout.name}」の「${name}」を ${width} px に広げた`)
+    })
+
+    const divider = dividerColumn(section)
+    if (divider === null) return
+    sheet.getRange(1, divider, sheet.getMaxRows(), 1)
+      .setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
   })
 }
 
