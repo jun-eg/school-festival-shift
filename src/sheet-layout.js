@@ -83,10 +83,21 @@ function gridSheet(dayIndex) {
         columns: ['学籍番号', '氏名', '一緒に組みたいお友達'],
         // 右は時刻の列で、名前を持たない。当てるのは見出しの時刻である（→ assignment-grid.js）。
         slotColumns: maxSlotsPerDay,
+        // 友達欄は長くなりうるので、時刻の列 3 つ分の幅を取る（→ issue #245）。
+        wideColumns: { '一緒に組みたいお友達': 3 },
+        // 友達欄と時刻の列の境に、固定の線（氏名と友達欄の境）と同じく目立つ線を引く（→ dividerLine ／ issue #245）。
+        dividerAfter: '一緒に組みたいお友達',
       },
     ],
   }
 }
+
+/**
+ * 区画の dividerAfter の列の右に引く線（→ issue #245）。固定の線に似せた、太い灰色である。
+ * style は SpreadsheetApp.BorderStyle の名前で持つ（ここは SpreadsheetApp を掴まない）。
+ * 生成と数え直しは塗り直すたびに書式を消すので、線もそのたびに引き直す（→ shell.js の paintGrids）。
+ */
+const dividerLine = { color: '#b7b7b7', style: 'SOLID_THICK' }
 
 const sheetLayout = [
   {
@@ -264,6 +275,12 @@ function sectionRightEdge(layout) {
   return layout.sections.reduce((rightEdge, section) => Math.max(rightEdge, section.startColumn + sectionWidth(section) - 1), 0)
 }
 
+/** 区画の dividerAfter が何列目か（1 始まり）。線を引かない区画は null である。 */
+function dividerColumn(section) {
+  if (!section.dividerAfter) return null
+  return section.startColumn + section.columns.indexOf(section.dividerAfter)
+}
+
 /** 生成が返す行の形。シートの列名で、マス目に載る「割り当て」だけは assignmentColumns である。 */
 function outputColumns(name) {
   if (name === assignmentName) return assignmentColumns
@@ -288,6 +305,7 @@ function gridLayouts(of) {
 if (typeof module !== 'undefined') {
   module.exports = {
     sheetLayout, checkKind, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
+    dividerLine, dividerColumn,
     dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }

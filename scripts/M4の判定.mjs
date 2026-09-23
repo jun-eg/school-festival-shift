@@ -67,6 +67,7 @@ class 偽の範囲 {
   setHorizontalAlignment() { return this }
   clearFormat() { return this }
   setBackgrounds() { return this }
+  setBorder() { return this }
 }
 
 class 偽の保護 {
@@ -99,6 +100,9 @@ class 偽のシート {
   getRangeList() { return { setFontColor() { return this }, setFontWeight() { return this } } }
   setFrozenRows(数) { this.frozenRows = 数 }
   setFrozenColumns(数) { this.frozenColumns = 数 }
+  // 列の幅も値を動かさないので捨てる（→ issue #245）。
+  getColumnWidth() { return 100 }
+  setColumnWidth() {}
   insertColumnsAfter(後ろ, 数) { this.maxColumns = Math.max(this.maxColumns, 後ろ + 数) }
   getProtections() { return [...this.protections] }
   protect() { const p = new 偽の保護(this); this.protections.push(p); return p }
@@ -161,6 +165,7 @@ let 帳 = null
 const 文脈 = vm.createContext({
   SpreadsheetApp: {
     ProtectionType: { SHEET: 'SHEET' },
+    BorderStyle: { SOLID_THICK: 'SOLID_THICK' },
     flush() {},
     getActive() { return 帳 },
     getUi() { return 偽のUI },
