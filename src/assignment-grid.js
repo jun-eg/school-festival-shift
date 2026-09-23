@@ -388,6 +388,7 @@ function gridBackgrounds(dataRows, width) {
  * 検証結果の行の背景色（→ issue #220）。
  *
  *   違反の行 … 役割が何であっても（空でも）、行ぜんぶ赤
+ *     ただし準備も片付けも入っている規則 3 の違反は、行ぜんぶ水色（→ issue #258。意図的に入れる場合がある）
  *   それ以外 … 店の役割（準備・片付け以外）の行だけ、行ぜんぶ黄色（未充足と食い違った固定）
  *
  * 違反でない準備・片付けの行は塗らない — 何十行も並ぶので、塗ると店の役割の行が埋もれる。
@@ -395,6 +396,7 @@ function gridBackgrounds(dataRows, width) {
  */
 const checkRowHighlights = {
   violation: { name: '赤', color: '#ea9999' },
+  prepCleanupSurplus: { name: '水色', color: '#9fc5e8' },
   storeRole: { name: '黄', color: '#ffff00' },
 }
 
@@ -403,11 +405,16 @@ function checkResultBackgrounds(rows, width) {
   const columns = sheetColumns('検証結果')
   const kindColumn = columns.indexOf('種別')
   const roleColumn = columns.indexOf('役割')
+  const contentColumn = columns.indexOf('内容')
   const prepCleanup = prepCleanupRoles()
   return rows.map((row) => {
     const role = String(row[roleColumn] || '').trim()
     let color = null
-    if (row[kindColumn] === checkKind.violation) color = checkRowHighlights.violation.color
+    if (row[kindColumn] === checkKind.violation) {
+      color = isPrepCleanupSurplus(row[contentColumn])
+        ? checkRowHighlights.prepCleanupSurplus.color
+        : checkRowHighlights.violation.color
+    }
     else if (role !== '' && prepCleanup.indexOf(role) === -1) color = checkRowHighlights.storeRole.color
     const colors = []
     for (let column = 0; column < width; column++) colors.push(color)

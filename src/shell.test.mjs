@@ -198,7 +198,7 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-viola
 }
 const {
   readInputs, run, normalizeValue, checkRepresentation, sheetColumns, withNamesFromAnswers,
-  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote, distributionImagesOn,
+  sheetsToRead, sectionRightEdge, recountOnEdit, a1Notation, isFixedNote, distributionImagesOn, isPrepCleanupSurplus,
 } = context
 const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine } = vm.runInContext(
   '({ valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, violationMark, roleColors, fixedNote, dividerLine })',
@@ -982,11 +982,12 @@ function paintedRows(book) {
   return Object.keys(byRow).map((row) => [Number(row), byRow[row].length, [...new Set(byRow[row])]])
 }
 
-const { violation: { color: redOf }, storeRole: { color: yellowOf } } = vm.runInContext('checkRowHighlights', context)
+const { violation: { color: redOf }, storeRole: { color: yellowOf }, prepCleanupSurplus: { color: lightBlueOf } } = vm.runInContext('checkRowHighlights', context)
 const mixedViolations = [
   checkRow(checkKind.violation, '調理', '規則 5: 検便を通っていない'),
-  checkRow(checkKind.violation, '', '規則 3: 午前だけなのに準備に入っていない'),
+  checkRow(checkKind.violation, '', '準備・片付け: 午前だけ入っているので、準備だけにしてください（境目 12:00。今：準備なし／片付けなし）'),
   checkRow(checkKind.violation, '準備', '規則 1: 希望の時間の外に置いている'),
+  checkRow(checkKind.violation, '', '準備・片付け: 午後だけ入っているので、片付けだけにしてください（境目 12:00。今：準備あり／片付けあり）'),
 ]
 const mixedUnmet = [
   checkRow(checkKind.unmet, '準備', 'あと 3 人'),
@@ -998,14 +999,14 @@ runWithChecks(paintedBook, mixedViolations, mixedUnmet)
 const checkWidth = checkResultColumns.length
 
 check(
-  '⑪ 違反の行は役割に関係なく行ぜんぶ（9 列）赤、違反でない店の役割の行は行ぜんぶ黄色、ほかは塗らない（→ issue #220）',
+  '⑪ 違反の行は役割に関係なく行ぜんぶ（9 列）赤、準備も片付けも入っている規則 3 の違反だけ水色、違反でない店の役割の行は行ぜんぶ黄色、ほかは塗らない（→ issue #220・#258）',
   paintedRows(paintedBook),
-  [[2, checkWidth, [redOf]], [3, checkWidth, [redOf]], [4, checkWidth, [redOf]], [6, checkWidth, [yellowOf]]],
+  [[2, checkWidth, [redOf]], [3, checkWidth, [redOf]], [4, checkWidth, [redOf]], [5, checkWidth, [lightBlueOf]], [7, checkWidth, [yellowOf]]],
 )
 
 check(
   '⑪ 値は書いた行のとおりで、色を足しても 1 セルも変わらない',
-  paintedBook.getSheetByName('検証結果').getRange(2, 1, 7, checkWidth).getValues(),
+  paintedBook.getSheetByName('検証結果').getRange(2, 1, 8, checkWidth).getValues(),
   mixedViolations.concat(mixedUnmet).concat([checkResultColumns.map(() => '')]),
 )
 
@@ -1032,7 +1033,9 @@ check(
     true,
     recountChecks
       .map((row, i) => {
-        if (row[kindColumnIndex] === checkKind.violation) return [i + 2, [redOf]]
+        if (row[kindColumnIndex] === checkKind.violation) {
+          return [i + 2, [isPrepCleanupSurplus(row[checkResultColumns.indexOf('内容')]) ? lightBlueOf : redOf]]
+        }
         return ['準備', '片付け', ''].indexOf(row[roleColumnIndex]) === -1 ? [i + 2, [yellowOf]] : null
       })
       .filter((row) => row !== null),
