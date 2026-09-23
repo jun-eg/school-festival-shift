@@ -30,6 +30,7 @@ function buildTemplateInto(spreadsheet) {
     putHeaders(sheet, layout, log)
     putInitialRows(sheet, layout, log)
     putFormUrlBlock(sheet, layout, log)
+    putHandoverBlock(sheet, layout, log)
     shapeColumns(sheet, layout, log)
     sheet.setFrozenRows(layout.frozenRows)
     sheet.setFrozenColumns(layout.frozenColumns || 0)
@@ -126,6 +127,23 @@ function putFormUrlBlock(sheet, layout, log) {
 }
 
 /**
+ * 条件入力の 13 行目に、引き継ぎ書の所在を置く（→ sheet-layout.js の handoverBlock ／ issue #274）。
+ * 見出しは A:B、URL は C:E を結合し、A13:E13 をフォームの URL 欄と同じ太枠で囲う。
+ * URL は固定なので、見出しと一緒にここで置く。どちらも構成と違えば、上書きせずに止まる（→ replaceValues）。
+ */
+function putHandoverBlock(sheet, layout, log) {
+  if (layout.name !== handoverBlock.sheet) return
+  const block = handoverBlock
+
+  replaceValues(sheet, block.row, block.labelColumn, [block.label], layout.name, log)
+  replaceValues(sheet, block.row, block.urlColumn, [block.url], layout.name, log)
+  sheet.getRange(block.row, block.labelColumn, 1, block.labelWidth).merge().setFontWeight('bold')
+  sheet.getRange(block.row, block.urlColumn, 1, block.urlWidth).merge()
+  sheet.getRange(block.row, block.labelColumn, 1, block.urlColumn + block.urlWidth - block.labelColumn)
+    .setBorder(true, true, true, true, null, null, formUrlBorder.color, SpreadsheetApp.BorderStyle[formUrlBorder.style])
+}
+
+/**
  * 区画ごとに、広く取る列（wideColumns）の幅を置き、境の線（dividerAfter）を見出しから最下行まで引く（→ issue #245）。
  * 幅は物差しの列（広げない列のうち一番右 → sheet-layout.js の widthBaseColumn。マス目なら時刻の列、検証結果なら「あと何人」）の何倍かで決める
  * — 物差しの列を担当者が広げていれば、それに合わせて広がる。広げる列そのものは物差しにしない（作り直すたびに倍々に伸びる → issue #246）。
@@ -201,6 +219,7 @@ function applyProtection(sheet, layout, log) {
  * 保護の外に出す入力欄 — 区画ごとに、列名の行の下からシートの最下行（lastRow を持つ区画はそこ）まで、区画の幅だけである。
  * 見出し・列名・区画のあいだの列・右端より右は保護の内に残る（→ verify-structure.js が見る所である）。
  * フォームの URL 欄（→ formUrlBlock）も保護の内に残る。書くのはスクリプトだけである（→ issue #255）。
+ * 引き継ぎ書の所在（→ handoverBlock）も同じく保護の内に残る（→ issue #274）。
  * 最下行より下に行を足すと、足した行は保護の内になる（警告が出るだけで、書ける）。
  */
 function inputRanges(sheet, layout) {

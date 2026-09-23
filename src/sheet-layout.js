@@ -124,6 +124,23 @@ const formUrlBlock = {
 /** URL 欄の枠の線。style は SpreadsheetApp.BorderStyle の名前で持つ（→ dividerLine と同じ）。 */
 const formUrlBorder = { color: '#000000', style: 'SOLID_THICK' }
 
+/**
+ * 条件入力の 13 行目に置く、引き継ぎ書の所在（→ issue #274）。コピーした担当者が、ここからリポジトリに辿り着ける。
+ * 形はフォームの URL 欄（→ formUrlBlock）に揃える — 見出しは A:B、URL は C:E を結合し、A13:E13 を同じ太枠で囲う。
+ * URL は毎年変わらないので、テンプレートを作るときに見出しと一緒に置く。保護の内に残る（→ build-template.js の inputRanges）。
+ * 「日ごとの営業時刻」の lastRow より下なので、読まれない。
+ */
+const handoverBlock = {
+  sheet: '条件入力',
+  row: 13,
+  labelColumn: 1,
+  labelWidth: 2,
+  urlColumn: 3,
+  urlWidth: 3,
+  label: '引き継ぎ書所在:',
+  url: 'https://github.com/jun-eg/school-festival-shift',
+}
+
 const sheetLayout = [
   {
     name: '条件入力',
@@ -377,7 +394,7 @@ function gridLayouts(of) {
 if (typeof module !== 'undefined') {
   module.exports = {
     sheetLayout, checkKind, candidateSeparator, protectionKind, protectionNote, gridProtectionNote, inputProtectionNote, sectionWidth, sectionColumnsText, sectionRightEdge,
-    dividerLine, dividerColumn, widthBaseColumn, formUrlBlock, formUrlBorder, sectionLastRow,
+    dividerLine, dividerColumn, widthBaseColumn, formUrlBlock, formUrlBorder, handoverBlock, sectionLastRow,
     dayLabels, assignmentName, assignmentColumns, fixedName, fixedColumns, maxSlotsPerDay, outputColumns, assignmentSection, gridLayouts,
   }
 }
