@@ -160,22 +160,22 @@ function checkEveryNeedLands(needs, days) {
     const lands = days.some((day) => day.slots.some((slot) => needCovers(held.need, day, slot)))
     if (lands) return
     throw new Error(
-      `条件入力の「${sectionOf(held.source)}」の行（${describeNeed(held.need)}）が、30 分枠に 1 つも重ならない。`
-        + '日は「日ごとの営業時刻」にある日に、時間帯は営業時刻の中にすること',
+      `条件入力「${sectionOf(held.source)}」の行（${describeNeed(held.need)}）が、営業時刻のどの時間にも当たりません。`
+        + '日付と時間を確かめてください',
     )
   })
 }
 
 /** 需要 1 行を、担当者が条件入力の上で見つけられる形の文にする。 */
 function describeNeed(need) {
-  const when = need.start === '' ? '時間帯を空けた行（その日の調理帯）' : `${need.start}-${need.end}`
-  return `${need.date === '' ? '日を空けた行' : need.date} ／ ${when} ／ ${need.role} ／ ${need.count} 人`
+  const when = need.start === '' ? '開始・終了なし' : `${need.start}-${need.end}`
+  return `${need.date === '' ? '日なし' : need.date} ／ ${when} ／ ${need.role} ／ ${need.count} 人`
 }
 
 /** そのもとが、条件入力のどの区画から来たか（→ input-types.js の inputTypes）。 */
 function sectionOf(source) {
   const type = inputTypes.filter((candidate) => candidate.key === source.key)[0]
-  if (!type) throw new Error(`入力の型に「${source.key}」が無い（unmetSources と inputTypes が食い違っている）`)
+  if (!type) throw internalError(`入力の型に「${source.key}」が無い（unmetSources と inputTypes が食い違っている）`)
   return type.source
 }
 
@@ -189,7 +189,7 @@ function unmetRow(date, slot, role, required, have) {
     '役割': role,
     '学籍番号': '',
     '氏名': '',
-    '内容': `${required.sources.join(' ／ ')}: ${required.count} 人に対して ${have} 人しか置いていない`,
+    '内容': `${required.sources.join(' ／ ')}: ${required.count} 人必要なところ ${have} 人です`,
     'あと何人': required.count - have,
     '候補': '', // 希望から入れられる人は build が入れる（→ core.js の withCandidates）
   }

@@ -52,7 +52,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -190,7 +190,7 @@ check(
 
 check(
   '② 始端と終端が同じ区間も、区間にならないので止まる（`00:00-00:00` だけが特別扱いである）',
-  whyItStopped(() => slotsOf('10:00-10:00'))?.includes('終端'),
+  whyItStopped(() => slotsOf('10:00-10:00'))?.includes('終わりの時刻が始まりより前'),
   true,
 )
 
@@ -207,7 +207,7 @@ const samples = [
 /** その回答が、形が違うとして止まったか。区間として通ったあとの止まり方（終端 ≤ 始端）と分けて見る。 */
 function stoppedOnFormat(answer) {
   const why = whyItStopped(() => slotsOf(answer))
-  return why !== null && why.includes('HH:MM-HH:MM でない')
+  return why !== null && why.includes('のような時間帯になっていません')
 }
 
 check(
@@ -402,7 +402,7 @@ const dayCountDiffers = whyItStopped(() => expand([wishOf(['10:00-12:00'])], day
 
 check(
   '⑤ 回答の日数と営業時刻の行数が食い違えば、前から当てずに名指しして止まる（→ 4-1）',
-  [dayCountDiffers !== null, dayCountDiffers?.includes('1 日ぶん'), dayCountDiffers?.includes('2 行')],
+  [dayCountDiffers !== null, dayCountDiffers?.includes('1 日分'), dayCountDiffers?.includes('2 行')],
   [true, true, true],
 )
 

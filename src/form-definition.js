@@ -140,7 +140,7 @@ const formItems = [
  */
 function wishTimeDescription(item) {
   return [
-    `営業時間は ${item.businessHours} である。出られる時間帯を HH:MM-HH:MM で書く。`,
+    `営業時間は ${item.businessHours} です。出られる時間帯を「10:00-15:00」のように書いてください。`,
     ...wishTimeExamples.map((example) => `${example.label} ${example.value}`),
   ].join('\n')
 }
@@ -172,14 +172,14 @@ function checkDaysForForm(days) {
   const rows = (days || []).length
   if (rows === 0) {
     throw new Error(
-      '条件入力の「日ごとの営業時刻」が空である。'
-        + `先に ${labels.length} 日ぶん入れてから、もう一度「フォームを作る」を押す`,
+      '条件入力の「日ごとの営業時刻」が空です。'
+        + `先に ${labels.length} 日分入れてから、もう一度「フォームを作る」を押してください`,
     )
   }
   if (rows !== labels.length) {
     throw new Error(
-      `条件入力の「日ごとの営業時刻」が ${rows} 行である。`
-        + `${labels.length} 行（上から ${labels.join(' / ')}）にする`,
+      `条件入力の「日ごとの営業時刻」が ${rows} 行です。`
+        + `${labels.length} 行（上から ${labels.join('・')}）にしてください`,
     )
   }
 }

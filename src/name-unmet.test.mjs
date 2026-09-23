@@ -43,7 +43,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -325,7 +325,7 @@ check(
       '日ごとの営業時刻': dates.map((date) => [date, '08:00', '17:00', '17:00', '17:00', '17:00']),
       '役割と必要人数': [['', '', '', '呼び込み', 1]],
     })),
-  }))?.includes('30 分枠に 1 つも重ならない'),
+  }))?.includes('どの時間にも当たりません'),
   true,
 )
 
@@ -333,7 +333,7 @@ check(
   '④ 日ごとの営業時刻に無い日の需要は、名指しして止まる（黙って落とさない）',
   whyItStopped(() => unmetOf([], {
     conditions: takeConditions(conditionRows({ '役割と必要人数': [['2025-11-05', '', '', '調理', 2]] })),
-  }))?.includes('30 分枠に 1 つも重ならない'),
+  }))?.includes('どの時間にも当たりません'),
   true,
 )
 

@@ -23,7 +23,7 @@
     </style>
   </head>
   <body>
-    <p>委員会から来た<strong>調理名簿の画像</strong>を選ぶ。フォームの中にそのまま貼られる。</p>
+    <p>委員会から届いた<strong>調理名簿の画像</strong>を選んでください。フォームにそのまま貼られます。</p>
     <p><input type="file" id="picked" accept="image/*" /></p>
     <p><button id="run">フォームを作る</button></p>
     <p id="state" class="note"></p>
@@ -40,17 +40,17 @@
       button.addEventListener('click', function () {
         var file = document.getElementById('picked').files[0]
         if (!file) {
-          say('画像が選ばれていない。', true)
+          say('画像を選んでください。', true)
           return
         }
 
         button.disabled = true
-        say('読んでいる…')
+        say('画像を読み込み中…')
 
         var reader = new FileReader()
         reader.onerror = function () {
           button.disabled = false
-          say('画像が読めなかった。', true)
+          say('画像を読み込めませんでした。別の画像で試してください。', true)
         }
         reader.onload = function () {
           // data:image/png;base64,xxxx の後ろだけを渡す。
@@ -60,7 +60,7 @@
             .withSuccessHandler(done)
             .withFailureHandler(function (error) {
               button.disabled = false
-              say('止まった: ' + error.message, true)
+              say('フォームを作成できませんでした：' + error.message, true)
             })
             .createFormFromPicker({
               base64: base64,

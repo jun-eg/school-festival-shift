@@ -214,7 +214,7 @@ function whyItStopped(run) {
     run()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -329,8 +329,8 @@ check(
 check(
   '② 画像が選ばれていなければ、フォームを 1 つも作らずに名指しで止まる',
   [
-    whyItStopped(() => rosterImageFrom(null))?.includes('名簿の画像が選ばれていない'),
-    whyItStopped(() => rosterImageFrom({ mimeType: 'image/png' }))?.includes('名簿の画像が選ばれていない'),
+    whyItStopped(() => rosterImageFrom(null))?.includes('調理名簿の画像を選んでください'),
+    whyItStopped(() => rosterImageFrom({ mimeType: 'image/png' }))?.includes('調理名簿の画像を選んでください'),
   ],
   [true, true],
 )
@@ -398,7 +398,7 @@ const secondRun = whyItStopped(() => buildFormOn(book, rosterImage))
 
 check(
   '⑤ 2 回目は、すでに紐付いていることを名指しして止まる',
-  [secondRun?.includes('すでにフォームが紐付いている'), secondRun?.includes('作り直さない')],
+  [secondRun?.includes('もうフォームがあります'), secondRun?.includes('テンプレートをコピーし直してください')],
   [true, true],
 )
 
@@ -414,7 +414,7 @@ const stoppedOnAnswers = whyItStopped(() => buildFormOn(bookWithAnswers, rosterI
 
 check(
   '⑤ 回答シートに中身があるときは、消さずに名指しして止まる',
-  [stoppedOnAnswers?.includes('1 行の中身がある'), stoppedOnAnswers?.includes('黙って直さない')],
+  [stoppedOnAnswers?.includes('すでに 1 行ある'), stoppedOnAnswers?.includes('フォームを作れません')],
   [true, true],
 )
 
@@ -429,7 +429,7 @@ bookWithoutAnswerSheet.deleteSheet(bookWithoutAnswerSheet.getSheetByName('回答
 
 check(
   '⑤ 「回答」が無いときは、シートの名前を出して止まる',
-  whyItStopped(() => buildFormOn(bookWithoutAnswerSheet, rosterImage))?.includes('シート「回答」が無い'),
+  whyItStopped(() => buildFormOn(bookWithoutAnswerSheet, rosterImage))?.includes('シート「回答」が見つかりません'),
   true,
 )
 
@@ -461,7 +461,7 @@ check(
   [
     stoppedOnHeader?.includes('いま置いた設問の題と違う'),
     stoppedOnHeader?.includes('名前'),
-    stoppedOnHeader?.includes('黙って直さない'),
+    stoppedOnHeader?.includes('繋がずに止まる'),
   ],
   [true, true, true],
 )
@@ -484,10 +484,10 @@ check(
     item.helpText.split('\n')[0],
   ]),
   [
-    ['11月1日(準備日)', '営業時間は 8:00-21:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
-    ['11月2日(学祭1日目)', '営業時間は 8:00-20:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
-    ['11月3日(学祭2日目)', '営業時間は 8:00-20:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
-    ['11月4日(片付け)', '営業時間は 8:00-15:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
+    ['11月1日(準備日)', '営業時間は 8:00-21:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
+    ['11月2日(学祭1日目)', '営業時間は 8:00-20:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
+    ['11月3日(学祭2日目)', '営業時間は 8:00-20:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
+    ['11月4日(片付け)', '営業時間は 8:00-15:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
   ],
 )
 
@@ -509,10 +509,10 @@ check(
     item.helpText.split('\n')[0],
   ]),
   [
-    ['10月29日(準備日)', '営業時間は 9:00-22:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
-    ['10月30日(学祭1日目)', '営業時間は 9:30-19:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
-    ['10月31日(学祭2日目)', '営業時間は 9:30-19:30 である。出られる時間帯を HH:MM-HH:MM で書く。'],
-    ['11月1日(片付け)', '営業時間は 10:00-16:00 である。出られる時間帯を HH:MM-HH:MM で書く。'],
+    ['10月29日(準備日)', '営業時間は 9:00-22:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
+    ['10月30日(学祭1日目)', '営業時間は 9:30-19:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
+    ['10月31日(学祭2日目)', '営業時間は 9:30-19:30 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
+    ['11月1日(片付け)', '営業時間は 10:00-16:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
   ],
 )
 
@@ -543,7 +543,7 @@ const onEmpty = stoppedOn('no-hours', [])
 
 check(
   '⑥ 「日ごとの営業時刻」が空のまま押されたら、名指しして止まる（→ 2 の止まる箇所 9）',
-  [onEmpty.stopped?.includes('「日ごとの営業時刻」が空である'), onEmpty.stopped?.includes('4 日ぶん入れて')],
+  [onEmpty.stopped?.includes('「日ごとの営業時刻」が空です'), onEmpty.stopped?.includes('4 日分入れて')],
   [true, true],
 )
 
@@ -551,7 +551,7 @@ const onThreeRows = stoppedOn('three-days', lastYearRows.slice(0, 3))
 
 check(
   '⑥ 4 行でなければ、何行あるかとラベル 4 つを名指しして止まる',
-  [onThreeRows.stopped?.includes('3 行である'), onThreeRows.stopped?.includes('準備日 / 学祭1日目 / 学祭2日目 / 片付け')],
+  [onThreeRows.stopped?.includes('3 行です'), onThreeRows.stopped?.includes('準備日・学祭1日目・学祭2日目・片付け')],
   [true, true],
 )
 
@@ -564,7 +564,7 @@ const onReversed = stoppedOn('reversed', [
 
 check(
   '⑥ 5 時刻が早い順でなければ、行と時刻を名指しして止まる（黙って並べ替えない → 5-1 の #1）',
-  [onReversed.stopped?.includes('時刻が早い順でない'), onReversed.stopped?.includes('「準備開始」が 15:00')],
+  [onReversed.stopped?.includes('左から早い順に書いてください'), onReversed.stopped?.includes('「準備開始」が 15:00')],
   [true, true],
 )
 

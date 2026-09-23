@@ -370,14 +370,14 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
 const stoppedOnEmpty = whyItStopped(() => formItemsFor([]))
 check(
   '⑦ 「日ごとの営業時刻」が空なら、区画を名指しして止まる（→ 2 の止まる箇所 9）',
-  [stoppedOnEmpty?.includes('「日ごとの営業時刻」が空である'), stoppedOnEmpty?.includes('4 日ぶん入れて')],
+  [stoppedOnEmpty?.includes('「日ごとの営業時刻」が空です'), stoppedOnEmpty?.includes('4 日分入れて')],
   [true, true],
 )
 
@@ -385,7 +385,7 @@ check(
   '⑦ 4 行でなければ、何行あるかを名指しして止まる（3 行でも 5 行でも）',
   [thisYear.slice(0, 3), thisYear.concat(thisYear[0])].map((days) => {
     const stopped = whyItStopped(() => formItemsFor(days))
-    return [stopped?.includes(`${days.length} 行である`), stopped?.includes('準備日 / 学祭1日目 / 学祭2日目 / 片付け')]
+    return [stopped?.includes(`${days.length} 行です`), stopped?.includes('準備日・学祭1日目・学祭2日目・片付け')]
   }),
   [[true, true], [true, true]],
 )

@@ -58,10 +58,10 @@ function takeIn(rows) {
 
     // ② タイムスタンプで畳む ／ ③ 採るのは後から来た行
     if (coming.at === kept[studentId].at) {
+      // どちらを採るか決まらないので止まる。
       throw new Error(
-        `${whereIs(source, rowIndex)}の学籍番号「${studentId}」が、`
-          + `${whereIs(source, kept[studentId].rowIndex)}と同じ${timestampColumn}「${coming.at}」である。`
-          + 'どちらを採るか決まらないので止まる',
+        `学籍番号「${studentId}」の回答が、同じ時刻（${coming.at}）に 2 つあります`
+          + `（${whereIs(source, kept[studentId].rowIndex)}と ${sheetRowOf(source, rowIndex)} 行目）。どちらかの行を消してください`,
       )
     }
     if (takesOver(coming.at, kept[studentId].at)) kept[studentId] = coming
@@ -79,9 +79,10 @@ function takesOver(coming, keeping) {
 function readTimestamp(source, columns, row, rowIndex) {
   const cell = cellOf(source, columns, row, rowIndex, timestampColumn)
   if (!timestampPattern.test(cell.value)) {
+    // 同じ人の行を畳むのに使うので、直してから通す。
     throw new Error(
-      `${cell.where}が YYYY-MM-DD HH:MM:SS でない。いま: ${showBlankValue(cell.value)}。`
-        + '同じ人の行を畳むのに使うので、直してから通す',
+      `${whereIs(source, rowIndex)}のタイムスタンプが日時になっていません（今: ${showBlankValue(cell.value)}）。`
+        + '直してから、もう一度押してください',
     )
   }
   return cell.value

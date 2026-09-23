@@ -16,7 +16,7 @@ function gridNamedColumns() {
 /** 割り当ての行から 1 つ取る（列の並びは assignmentColumns）。 */
 function assignmentAt(row, columnName) {
   const index = assignmentColumns.indexOf(columnName)
-  if (index === -1) throw new Error(`割り当ての列に「${columnName}」が無い`)
+  if (index === -1) throw internalError(`割り当ての列に「${columnName}」が無い`)
   return row[index]
 }
 
@@ -56,7 +56,7 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
     const index = slotIndex[gridSlotKey(start, end)]
 
     if (index === undefined) {
-      throw new Error(
+      throw internalError(
         `割り当ての ${rowIndex + 1} 行目の ${day.date} ${start}-${end} が、その日の枠に無い`,
       )
     }
@@ -65,7 +65,7 @@ function toAssignmentGrid(assignments, day, nameOf, alsoStudentIds, friendsOf) {
       order.push(studentId)
     }
     if (people[studentId][index] !== '') {
-      throw new Error(
+      throw internalError(
         `${day.date} ${start}-${end} の「${studentId}」に、`
           + `「${people[studentId][index]}」と「${role}」の 2 つが入っている（1 セルに入るのは役割 1 つである）`,
       )
@@ -101,10 +101,7 @@ function fromAssignmentGrid(header, dataRows, day, label) {
   const rows = []
   if (!day) {
     if (dataRows.some((row) => row.some((cell) => String(cell) !== ''))) {
-      throw new Error(
-        `シート「${label}」に中身があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。`
-          + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す`,
-      )
+      throw new Error(missingDayText(label))
     }
     return rows
   }
@@ -121,25 +118,16 @@ function fromAssignmentGrid(header, dataRows, day, label) {
     }
     if (filled.length === 0) return
 
-    if (studentId === '') {
-      throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である`,
-      )
-    }
-    if (!studentIdPattern.test(studentId)) {
-      throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う（10 桁の英数字）`,
-      )
-    }
+    if (studentId === '') throw new Error(emptyStudentIdText(label, rowIndex))
+    if (!studentIdPattern.test(studentId)) throw new Error(badStudentIdText(label, rowIndex, studentId))
 
     filled.forEach((cell) => {
       const headerTime = String(header[cell.column] || '')
       const slot = slotOf[headerTime]
       if (!slot) {
         throw new Error(
-          `シート「${label}」の ${rowIndex + 2} 行目 ${cell.column + 1} 列目に「${cell.role}」が入っているが、`
-            + `見出しの「${headerTime === '' ? '（空）' : headerTime}」が、いまの ${day.date} の枠に無い。`
-            + '営業時刻を動かしたのなら、メニューの「生成」を押す（手直しの印の付いたセルは残る）',
+          `シート「${label}」の ${cell.column + 1} 列目の時刻「${headerTime === '' ? '（空）' : headerTime}」が、今の営業時刻に合いません。`
+            + '営業時刻を変えたときは、メニューの「生成」を押してください（修正済みのセルは残ります）',
         )
       }
       rows.push(buildAssignmentRow(day.date, slot, cell.role, studentId))
@@ -147,6 +135,24 @@ function fromAssignmentGrid(header, dataRows, day, label) {
   })
 
   return rows
+}
+
+/**
+ * 日ごとのシートに当たる行が、条件入力の「日ごとの営業時刻」に無いときの文。
+ * セルを書き換えたときにも出るので、「押す」とは言わない。
+ */
+function missingDayText(label) {
+  return `条件入力の「日ごとの営業時刻」を ${gridLayouts(assignmentName).length} 日分入れてください（${label} の日の行がありません）`
+}
+
+/** 役割の入った行の学籍番号が空のときの文。rowIndex は見出しの下から数える。 */
+function emptyStudentIdText(label, rowIndex) {
+  return `シート「${label}」の ${rowIndex + 2} 行目に役割が入っていますが、学籍番号が空です`
+}
+
+/** 学籍番号の形が違うときの文。 */
+function badStudentIdText(label, rowIndex, studentId) {
+  return `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」は、10 桁の英数字で書いてください`
 }
 
 /** 割り当ての 1 行を、列の並びのとおりに組む（氏名は空）。 */
@@ -173,7 +179,7 @@ function isFixedNote(note) {
  * （同じ食い違いを生成のたびに名指しし直さない）。書き換えれば印に置き換わる。
  */
 function conflictNote(role, detail) {
-  return `残せなかった手直し「${role}」— ${detail}`
+  return `この修正（${role === '' ? '空欄' : role}）は反映できませんでした：${detail}`
 }
 
 /**
@@ -281,22 +287,9 @@ function fixedFromAssignmentGrid(header, dataRows, notes, day, label) {
       const role = String(row[column] || '').trim()
       // 誰の行でもない空のセルの印は読まない
       if (studentId === '' && role === '') continue
-      if (!day) {
-        throw new Error(
-          `シート「${label}」に手直しの印があるが、条件入力の「日ごとの営業時刻」にその日の行が無い。`
-            + `${gridLayouts(assignmentName).length} 行そろえてから、もう一度押す`,
-        )
-      }
-      if (studentId === '') {
-        throw new Error(
-          `シート「${label}」の ${rowIndex + 2} 行目に役割が入っているが、学籍番号が空である`,
-        )
-      }
-      if (!studentIdPattern.test(studentId)) {
-        throw new Error(
-          `シート「${label}」の ${rowIndex + 2} 行目の学籍番号「${studentId}」が形式と違う（10 桁の英数字）`,
-        )
-      }
+      if (!day) throw new Error(missingDayText(label))
+      if (studentId === '') throw new Error(emptyStudentIdText(label, rowIndex))
+      if (!studentIdPattern.test(studentId)) throw new Error(badStudentIdText(label, rowIndex, studentId))
       const values = { '日': day.date, '開始': String(header[column] || ''), '役割': role, '学籍番号': studentId }
       rows.push(fixedColumns.map((columnName) => values[columnName]))
     }

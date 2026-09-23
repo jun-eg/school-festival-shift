@@ -218,7 +218,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -603,7 +603,7 @@ check(
   '⑦ マス目を 1 セル書き換えると、規則 1 の違反が検証結果に出る（人が数えない → 5 の #8・#13 の ①）',
   recountBook.getSheetByName('検証結果').getRange(2, 1, 200, 9).getValues().filter((row) => row[0] === checkKind.violation),
   [
-    [checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '高木琴音', '規則 1: 希望の時間の外に置いている', ''],
+    [checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '高木琴音', '希望時間外: 希望していない時間に入っています', ''],
   ],
 )
 
@@ -661,7 +661,7 @@ check(
 
 check(
   '⑦ 担当者に見せる一言に、違反の件数と色の在処が入っている',
-  [said.text.includes('違反 1 件'), said.text.includes('マス目の色'), said.seconds],
+  [said.text.includes('違反 1 件'), said.text.includes('赤い太字'), said.seconds],
   [true, true, 5],
 )
 
@@ -693,8 +693,8 @@ const straySaid = recountOnEdit({ source: strayBook, range: strayBook.getSheetBy
 check(
   '⑦ 載らない書き換えは、止まった理由を名指しの一言で返し、検証結果も指標も書き換えない',
   [
-    straySaid.text.startsWith('数え直せなかった'),
-    straySaid.text.includes('シート「片付け」の 2 行目 11 列目に「調理」'),
+    straySaid.text.startsWith('集計し直せませんでした'),
+    straySaid.text.includes('シート「片付け」の 11 列目の時刻'),
     bookSnapshot(strayBook) === strayBefore,
   ],
   [true, true, true],
@@ -787,8 +787,8 @@ check(
   ],
   [
     [
-      [checkKind.fixConflict, '2025-11-02', '10:00', '調理', '高木琴音', '規則 5: 調理の枠（調理）だが、調理担当ですか？ が いいえ である'],
-      [checkKind.fixConflict, '2025-11-03', '07:00', '会計', '高木琴音', 'いまの 2025-11-03 の枠に「07:00」が無い（条件入力の「日ごとの営業時刻」が動いた）'],
+      [checkKind.fixConflict, '2025-11-02', '10:00', '調理', '高木琴音', '調理担当ではない人が調理に入っています'],
+      [checkKind.fixConflict, '2025-11-03', '07:00', '会計', '高木琴音', '営業時刻が変わったため、2025-11-03 の 07:00 の列がなくなりました'],
     ],
     0,
   ],
@@ -805,8 +805,8 @@ check(
     + 'いまの枠に無いものは学籍番号のセルに出る（見出しは 08:00 から敷き直されるので、10:00 は 8 列目である）',
   [
     conflictBook.getSheetByName(dayLabels[1]).getRange(2, 1, 1, 4).getValues()[0],
-    notesOf(conflictBook, dayLabels[1]).map(([key, note]) => [key, note.startsWith('残せなかった手直し「調理」— 規則 5')]),
-    notesOf(conflictBook, dayLabels[2]).map(([key, note]) => [key, note.startsWith('残せなかった手直し「会計」— いまの 2025-11-03 の枠')]),
+    notesOf(conflictBook, dayLabels[1]).map(([key, note]) => [key, note.startsWith('この修正（調理）は反映できませんでした：調理担当ではない人')]),
+    notesOf(conflictBook, dayLabels[2]).map(([key, note]) => [key, note.startsWith('この修正（会計）は反映できませんでした：営業時刻が変わったため')]),
   ],
   [['EED2349987', '高木琴音', '太郎君、同期', ''], [['2,8', true]], [['2,1', true]]],
 )
@@ -874,7 +874,7 @@ editWithoutEvent(burstBook, dayLabels[0], 2, 9, '') // 2 手目 — 10:30 の �
 const burstSaid = edit(burstBook, dayLabels[0], 2, 8, '') // 1 手目 — 10:00 の 会計 を空に。onEdit はこれ 1 回だけ
 check(
   '⑩ onEdit が 1 回しか走らなくても、続けて書き換えた 2 セルとも印が付く',
-  [notesOf(burstBook, dayLabels[0]), burstSaid.text.startsWith('数え直した')],
+  [notesOf(burstBook, dayLabels[0]), burstSaid.text.startsWith('集計し直しました')],
   [[['2,8', fixedNote], ['2,9', fixedNote]], true],
 )
 
@@ -944,7 +944,7 @@ editWithoutEvent(brokenSeenBook, dayLabels[0], 2, 9, '')
 check(
   '⑩ 控えが読めなくても止まらない（取りこぼしを拾わないだけで、数え直しは走り、控えは置き直される）',
   [
-    edit(brokenSeenBook, dayLabels[0], 2, 8, '').text.startsWith('数え直した'),
+    edit(brokenSeenBook, dayLabels[0], 2, 8, '').text.startsWith('集計し直しました'),
     notesOf(brokenSeenBook, dayLabels[0]),
     JSON.parse(brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value).rows !== undefined,
   ],
@@ -1077,7 +1077,7 @@ bookMissingASheet.sheets = bookMissingASheet.sheets.filter((s) => s.getName() !=
 
 check(
   'シートが 1 枚でも無ければ、名指しして止まる（黙って作らない）',
-  whyItStopped(() => readInputs(bookMissingASheet))?.includes('シート「回答」が無い'),
+  whyItStopped(() => readInputs(bookMissingASheet))?.includes('シート「回答」が見つかりません'),
   true,
 )
 
@@ -1103,7 +1103,7 @@ const whyTheBreakageStoppedIt = whyItStopped(() => run(brokenBook, {
 check(
   '⑥ 構造が崩れていれば、段が全部そろっていても走らずに名指しで止まる',
   [
-    whyTheBreakageStoppedIt?.includes('生成を走らせない'),
+    whyTheBreakageStoppedIt?.includes('処理できません'),
     whyTheBreakageStoppedIt?.includes('「検証結果」の 1 行目 1 列目'),
   ],
   [true, true],

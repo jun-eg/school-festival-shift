@@ -52,7 +52,7 @@ function whyItStopped(work) {
     work()
     return null
   } catch (error) {
-    return error.message
+    return error.detail || error.message
   }
 }
 
@@ -245,7 +245,7 @@ check(
     [['', '', ''].concat(day.slots.map((slot) => (slot.start === '10:00' ? '調理' : '')))],
     day,
     dayLabels[1],
-  ))?.includes('学籍番号が空である'),
+  ))?.includes('学籍番号が空です'),
   true,
 )
 
@@ -256,7 +256,7 @@ check(
     [['あ', '', ''].concat(day.slots.map((slot) => (slot.start === '10:00' ? '調理' : '')))],
     day,
     dayLabels[1],
-  ))?.includes('形式と違う'),
+  ))?.includes('10 桁の英数字で書いてください'),
   true,
 )
 
@@ -268,7 +268,7 @@ check(
     [['EED2402549', '高木琴音', '', '調理']],
     day,
     dayLabels[1],
-  ))?.includes('いまの 2025-11-02 の枠に無い'),
+  ))?.includes('今の営業時刻に合いません'),
   true,
 )
 
@@ -279,7 +279,7 @@ check(
     [['EED2402549', '高木琴音', '', '準備']],
     undefined,
     dayLabels[3],
-  ))?.includes('その日の行が無い'),
+  ))?.includes('の日の行がありません'),
   true,
 )
 
@@ -392,7 +392,7 @@ check(
 check(
   '⑧ 誰の行か決まらない印は、fromAssignmentGrid と同じに名指しして止まる',
   whyItStopped(() => fixedFromAssignmentGrid(grid.header, [['', '', '', '調理']], [['', '', '', fixedNote]], day, dayLabels[2]))
-    ?.includes('学籍番号が空である'),
+    ?.includes('学籍番号が空です'),
   true,
 )
 

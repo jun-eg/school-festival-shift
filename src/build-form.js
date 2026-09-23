@@ -19,7 +19,7 @@ function openRosterPicker() {
   const dialog = HtmlService.createHtmlOutputFromFile('form-picker')
     .setWidth(460)
     .setHeight(300)
-  SpreadsheetApp.getUi().showModalDialog(dialog, '名簿の画像を選ぶ')
+  SpreadsheetApp.getUi().showModalDialog(dialog, '調理名簿の画像を選択')
 }
 
 /**
@@ -35,7 +35,7 @@ function createFormFromPicker(picked) {
 /** 画面から渡ってきた画像を Blob に直す。選ばれていなければ名指しして止まる。 */
 function rosterImageFrom(picked) {
   if (!picked || !picked.base64) {
-    throw new Error('名簿の画像が選ばれていない。画像を選んでから押す')
+    throw new Error('調理名簿の画像を選んでください')
   }
   return Utilities.newBlob(
     Utilities.base64Decode(picked.base64),
@@ -55,20 +55,19 @@ function buildFormOn(spreadsheet, rosterImage) {
   const templateSheet = spreadsheet.getSheetByName(layout.name)
 
   if (!templateSheet) {
-    throw new Error(
-      `シート「${layout.name}」が無い。テンプレートを組み立て直す`,
-    )
+    throw new Error(sheetNotFoundText(layout.name)) // → shell.js
   }
   if (templateSheet.getFormUrl()) {
+    // 作り直さない。
     throw new Error(
-      `シート「${layout.name}」にはすでにフォームが紐付いている（${templateSheet.getFormUrl()}）。`
-        + '作り直さない。作り直すなら、テンプレートをコピーし直すところから',
+      `このファイルにはもうフォームがあります（${templateSheet.getFormUrl()}）。`
+        + '作り直すときは、テンプレートをコピーし直してください',
     )
   }
   if (templateSheet.getLastRow() > 1) {
+    // 回答を消さない（黙って直さない）。
     throw new Error(
-      `シート「${layout.name}」に ${templateSheet.getLastRow() - 1} 行の中身がある。`
-        + '回答を消さない（黙って直さない）。中身を見てから決める',
+      `「${layout.name}」シートにすでに ${templateSheet.getLastRow() - 1} 行あるため、フォームを作れません`,
     )
   }
 
@@ -93,7 +92,7 @@ function buildFormOn(spreadsheet, rosterImage) {
     .getSheets()
     .filter((sheet) => sheetIdsBefore.indexOf(sheet.getSheetId()) === -1)
   if (created.length !== 1) {
-    throw new Error(
+    throw internalError(
       `フォームが作った回答シートが ${created.length} 枚ある（1 枚のはず）。`
         + `いまあるシート: ${spreadsheet.getSheets().map((sheet) => sheet.getName()).join(' / ')}`,
     )
@@ -112,7 +111,7 @@ function readBusinessHours(spreadsheet) {
   const layout = findLayout('条件入力')
   const section = layout.sections.filter((one) => one.heading === businessHoursSectionName)[0]
   if (!section) {
-    throw new Error(`構成の「${layout.name}」に「${businessHoursSectionName}」の区画が無い`)
+    throw internalError(`構成の「${layout.name}」に「${businessHoursSectionName}」の区画が無い`)
   }
   const sheet = findSheet(spreadsheet, layout.name)
   return toDays(readSection(sheet, layout, section), businessHoursSectionName)
@@ -130,13 +129,13 @@ function answerHeaderOf(layout, items) {
   )
 
   if (header.length !== sectionWidth(section)) {
-    throw new Error(
+    throw internalError(
       `設問が ${header.length - 1} つで、構成の「${layout.name}」の ${sectionWidth(section) - 1} 列と数が違う`,
     )
   }
   const named = header.slice(0, section.columns.length)
   if (named.join('\t') !== section.columns.join('\t')) {
-    throw new Error(
+    throw internalError(
       `構成の「${layout.name}」の列名と、設問の題が食い違っている。`
         + `構成: ${section.columns.join(' / ')} ／ 設問: ${named.join(' / ')}`,
     )
@@ -172,7 +171,7 @@ function addFormItems(form, items, rosterImage, log) {
       form.addImageItem().setTitle(item.title).setImage(rosterImage)
       return
     }
-    throw new Error(`形式「${item.kind}」の作り方を決めていない`)
+    throw internalError(`形式「${item.kind}」の作り方を決めていない`)
   })
 
   const questions = items.filter((item) => item.kind !== formItemKind.image)
@@ -206,7 +205,7 @@ function linkAnswerSheet(spreadsheet, templateSheet, responseSheet, layout, expe
     .map((cell) => String(cell))
 
   if (header.join('\t') !== expectedHeader.join('\t')) {
-    throw new Error(
+    throw internalError(
       'フォームが作った回答シートの見出しが、いま置いた設問の題と違う。'
         + `いま: ${header.join(' / ')} ／ 置いた題: ${expectedHeader.join(' / ')}。`
         + '繋がずに止まる（黙って直さない）',
@@ -226,7 +225,7 @@ function linkAnswerSheet(spreadsheet, templateSheet, responseSheet, layout, expe
 function answerSheetLayout() {
   const layout = sheetLayout.filter((one) => one.name === answerSheetName)[0]
   if (!layout) {
-    throw new Error(`構成に「${answerSheetName}」が無い`)
+    throw internalError(`構成に「${answerSheetName}」が無い`)
   }
   return layout
 }
