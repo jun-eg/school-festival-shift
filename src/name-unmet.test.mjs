@@ -4,7 +4,7 @@
 //   使い方: node src/name-unmet.test.mjs
 //
 // 見るものは 5 つある。
-//   ① 数えるもとは 2 つで、重なる枠すべてに効く。時間帯を空けた行はその日の調理帯に効く（→ 5-1 の #2）
+//   ① 数えるもとは 2 つで、重なる枠すべてに効く。時間帯を空けた行はその役割の帯に効く（→ 5-1 の #2）。条件入力の初期値の需要は 0 枠に書いていない（→ issue #279）
 //   ② 必要人数と指定枠の不足が、どちらも名指しで出る（→ issue #142）
 //   ③ 名指しされていない未充足が 0 件で、あと何人を出す
 //   ④ 数えられない需要は、名指しして止まる
@@ -174,6 +174,30 @@ check(
     })),
   }).filter((row) => row[columns.indexOf('日')] === dates[1]),
   [],
+)
+
+// 条件入力の初期値（→ sheet-layout.js の initialRows）。役割名だけ替えて帯を替え忘れると、その行は 0 枠に効く。
+// 違反にも未充足にもならないので、ここで見ないと 1 日ぶんの需要が黙って消える（→ issue #279）。
+const initialRowsOf = (heading) => vm.runInContext(`conditionSection(${JSON.stringify(heading)}).initialRows`, context)
+const initialDays = context.toDays(initialRowsOf('日ごとの営業時刻'), '日ごとの営業時刻')
+
+check(
+  '① 条件入力の初期値の「役割と必要人数」は、どの行も 1 枠以上に効く（0 枠の帯に書いていない → issue #279）',
+  context.toNeeds(initialRowsOf('役割と必要人数'), '役割と必要人数')
+    .filter((need) => initialDays.every((day) => day.slots.every((slot) => !context.needCovers(need, day, slot))))
+    .map((need) => `${need.date} ${need.role}`),
+  [],
+)
+
+check(
+  '① 条件入力の初期値の片付け日（4 日目）は、片付けの需要が立ち、準備の需要は立たない（→ issue #279）',
+  ['準備', '片付け'].map((role) => initialDays[3].slots.filter((slot) => context.requiredAt(
+    context.toNeeds(initialRowsOf('役割と必要人数'), '役割と必要人数').map((need) => ({ need: need, source: { label: '' } })),
+    initialDays[3],
+    slot,
+    role,
+  ).count > 0).length),
+  [0, initialDays[3].slots.length],
 )
 
 // ---- ② 必要人数と指定枠の不足が、どちらも名指しで出る -----------------------
