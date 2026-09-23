@@ -3,7 +3,7 @@
 //
 //   使い方: node src/shell.test.mjs
 //
-// 見るものは 11 ある。
+// 見るものは 12 ある。
 //   ① 値の表現が揃う（Date・真偽値・空白・空のセル）
 //   ② 読んだ入力が、そのままコアの入口を通る
 //   ③ 見出しの行を読まず、横に並んだ区画を区画ごとに切って読む
@@ -15,6 +15,7 @@
 //   ⑨ 配る画像はいまのマス目のとおりに組まれ、1 セルも書き換えない（→ issue #157）
 //   ⑩ onEdit が落ちた書き換えにも、次の数え直しか生成で印が付く（→ issue #226）
 //   ⑪ 検証結果の違反の行が赤、店の役割の行が黄色に、値を変えずに塗られる（→ issue #220）
+//   ⑫ マス目の氏名が回答の氏名のプルダウンになり、選ぶと空の学籍番号が埋まる（同姓同名は埋めずに知らせる → issue #271）
 //
 // 崩れの名指しのしかたは src/verify-structure.test.mjs が見る。
 // 本物で Date がどう返るかはここでは分からない（→ src/real-device-log.md）。
@@ -29,7 +30,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // ---- 偽のスプレッドシート ---------------------------------------------------
 // 殻と構造の検証が使う SpreadsheetApp の口だけを持つ。
 
-const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0 }
+const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0, validations: 0 }
 
 /** A1 の書き方を 1 始まりの行と列に戻す（RangeList の偽のため）。 */
 function fromA1(a1) {
@@ -92,6 +93,14 @@ class FakeRange {
     }))
     return this
   }
+  /** 入力規則（プルダウン）を置く。値を運ばないので往復には数えず、別に数える（→ ⑫）。 */
+  setDataValidation(rule) {
+    roundTrips.validations += 1
+    for (let r = this.row; r < this.row + this.rowCount; r++) {
+      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.validations.set(`${r},${c}`, rule)
+    }
+    return this
+  }
   getSheet() { return this.sheet }
   getRow() { return this.row }
   getColumn() { return this.column }
@@ -135,7 +144,7 @@ class FakeRange {
 class FakeSheet {
   constructor(name, minColumns = 26) {
     Object.assign(this, {
-      name, cells: new Map(), notes: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), rightBorders: new Map(), minColumns,
+      name, cells: new Map(), notes: new Map(), validations: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), rightBorders: new Map(), minColumns,
     })
   }
   getName() { return this.name }
@@ -191,8 +200,23 @@ class FakeSpreadsheet {
 
 // ---- 読み込む ---------------------------------------------------------------
 
-// 殻が名前で引く罫線の種類だけを置く（→ paintGrids）。
-const context = vm.createContext({ SpreadsheetApp: { BorderStyle: { SOLID_THICK: 'solid-thick' } } })
+// 殻が名前で引く罫線の種類（→ paintGrids）と、入力規則を組む口（→ putNameDropdowns）だけを置く。
+// 入力規則は、組んだときに渡された値をそのまま持つ素の値にする（どの範囲を候補にしたかを見るため）。
+function newDataValidation() {
+  const rule = {}
+  const builder = {
+    requireValueInRange(range, showDropdown) {
+      rule.candidates = { sheet: range.getSheet().getName(), row: range.getRow(), column: range.getColumn(), rows: range.getLastRow() - range.getRow() + 1, columns: range.getLastColumn() - range.getColumn() + 1 }
+      rule.showDropdown = showDropdown
+      return builder
+    },
+    setAllowInvalid(allowInvalid) { rule.allowInvalid = allowInvalid; return builder },
+    setHelpText(helpText) { rule.helpText = helpText; return builder },
+    build() { return rule },
+  }
+  return builder
+}
+const context = vm.createContext({ SpreadsheetApp: { BorderStyle: { SOLID_THICK: 'solid-thick' }, newDataValidation } })
 for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-violations.js', 'name-unmet.js', 'fairness-metrics.js', 'take-in.js', 'expand.js', 'generate.js', 'assignment-grid.js', 'distribution-image.js', 'shell.js', 'verify-structure.js']) {
   vm.runInContext(fs.readFileSync(path.join(here, name), 'utf8'), context, { filename: name })
 }
@@ -1130,6 +1154,120 @@ check(
   '⑥ 止まったとき、セルが 1 つも変わっていない（黙って直した箇所が 0 である）',
   JSON.stringify(brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])),
   brokenBookCopy,
+)
+
+// ---- ⑫ 氏名のプルダウンと、学籍番号の自動入力（→ issue #271） --------------
+// 回答には、高木琴音（filledBook）に加えて、森田咲良（出し直しで 2 行・学籍番号の大文字小文字が違う）と、
+// 同姓同名の佐藤花（学籍番号が 2 つ）がいる。
+
+function dropdownBook() {
+  const book = filledBook()
+  const answers = book.getSheetByName('回答')
+  const wishes = ['8:00-21:00', '8:00-20:00', '8:00-22:00', '8:00-15:00']
+  ;[
+    [new Date(2025, 8, 23, 17, 0, 0), 'ECK2626643', '森田咲良', '2年生', 'いいえ', ''],
+    [new Date(2025, 8, 23, 18, 0, 0), 'ESA0000001', '佐藤花', '1年生', 'いいえ', ''],
+    [new Date(2025, 8, 23, 19, 0, 0), 'ESA0000002', '佐藤花', '2年生', 'いいえ', ''],
+    [new Date(2025, 8, 24, 9, 0, 0), 'eck2626643', ' 森田咲良 ', '2年生', 'いいえ', ''],
+  ].forEach((row, i) => row.concat(wishes).forEach((value, j) => answers.put(3 + i, 1 + j, value)))
+  return book
+}
+
+/** そのシートの、入力規則が付いたセルを [行, 列] で並べずに数える。 */
+function validationsOf(book, label) {
+  return [...book.getSheetByName(label).validations.entries()]
+}
+
+const dropdownRun = dropdownBook()
+run(dropdownRun, {})
+check(
+  '⑫ 生成すると、日ごとの 4 枚の氏名の列（2 列目）に、見出しの下から下の端まで同じプルダウンが付く',
+  dayLabels.map((label) => {
+    const found = validationsOf(dropdownRun, label)
+    const sheet = dropdownRun.getSheetByName(label)
+    return [found.length === sheet.getMaxRows() - 1, found.every(([key]) => key.split(',')[1] === '2' && Number(key.split(',')[0]) >= 2)]
+  }),
+  dayLabels.map(() => [true, true]),
+)
+
+check(
+  '⑫ プルダウンの候補は「回答」の氏名の列（3 列目）の見出しの下ぜんぶで、候補の外は打てない',
+  (() => {
+    const rule = validationsOf(dropdownRun, dayLabels[0])[0][1]
+    return [rule.candidates, rule.showDropdown, rule.allowInvalid, rule.helpText.includes('学籍番号が自動で入ります')]
+  })(),
+  [{ sheet: '回答', row: 2, column: 3, rows: 999, columns: 1 }, true, false, true],
+)
+
+check(
+  '⑫ 生成を通さず、マス目を書き換えて数え直したときにもプルダウンが付く',
+  (() => {
+    const book = dropdownBook()
+    edit(book, dayLabels[0], 2, 6, '準備')
+    return dayLabels.map((label) => validationsOf(book, label).length > 0)
+  })(),
+  dayLabels.map(() => true),
+)
+
+const uniqueBook = dropdownBook()
+const uniqueSaid = edit(uniqueBook, dayLabels[1], 2, 2, '森田咲良')
+check(
+  '⑫ 学籍番号が空の行で氏名を選ぶと、回答から学籍番号が大文字で入る（出し直しの 2 行は 1 人に数える）',
+  [uniqueBook.getSheetByName(dayLabels[1]).cells.get('2,1'), uniqueSaid.text.startsWith('集計し直しました'), uniqueSaid.seconds],
+  ['ECK2626643', true, 5],
+)
+
+const sameNameBook = dropdownBook()
+const sameNameSaid = edit(sameNameBook, dayLabels[1], 2, 2, '佐藤花')
+check(
+  '⑫ 同じ氏名で学籍番号が異なる人が複数いれば、学籍番号を入れずに、その旨を一言で知らせる',
+  [
+    sameNameBook.getSheetByName(dayLabels[1]).cells.get('2,1') ?? '',
+    sameNameSaid.text.startsWith('同じ氏名で異なる学籍番号の人が複数いたため、学籍番号を自動入力できませんでした（氏名「佐藤花」）'),
+    sameNameSaid.text.includes('／集計し直しました'),
+    sameNameSaid.seconds,
+  ],
+  ['', true, true, 15],
+)
+
+const notFoundSaid = edit(dropdownBook(), dayLabels[1], 2, 2, '山田太郎')
+check(
+  '⑫ 回答に同じ氏名が無ければ（プルダウンの外から貼られたとき）、学籍番号を入れずに知らせる',
+  notFoundSaid.text.startsWith('「回答」シートに同じ氏名が無いため、学籍番号を自動入力できませんでした（氏名「山田太郎」）'),
+  true,
+)
+
+const ownedBook = dropdownBook()
+edit(ownedBook, dayLabels[0], 2, 2, '森田咲良')
+check(
+  '⑫ 学籍番号がもう入っている行では、氏名を選び直しても学籍番号を上書きしない（行の持ち主を黙って替えない）',
+  ownedBook.getSheetByName(dayLabels[0]).cells.get('2,1'),
+  'EED2349987',
+)
+
+// 役割を先に書いた（学籍番号が空なので数え直しは止まっていた）行で、後から氏名を選ぶ。
+const roleFirstBook = dropdownBook()
+roleFirstBook.getSheetByName(dayLabels[0]).put(3, 5, '準備')
+const roleFirstSaid = edit(roleFirstBook, dayLabels[0], 3, 2, '森田咲良')
+check(
+  '⑫ 役割を先に書いた行でも、氏名を選べば学籍番号が入って数え直せ、その役割に手直しの印が付く',
+  [
+    roleFirstBook.getSheetByName(dayLabels[0]).cells.get('3,1'),
+    roleFirstSaid.text.startsWith('集計し直しました'),
+    roleFirstBook.getSheetByName(dayLabels[0]).notes.get('3,5'),
+  ],
+  ['ECK2626643', true, fixedNote],
+)
+
+check(
+  '⑫ 氏名の列にかからない書き換えでは、学籍番号を埋めに行かない（回答を読まない）',
+  (() => {
+    const book = dropdownBook()
+    book.getSheetByName(dayLabels[0]).put(3, 2, '森田咲良')
+    edit(book, dayLabels[0], 2, 6, '準備')
+    return book.getSheetByName(dayLabels[0]).cells.get('3,1') ?? ''
+  })(),
+  '',
 )
 
 // ---- 結果 ------------------------------------------------------------------

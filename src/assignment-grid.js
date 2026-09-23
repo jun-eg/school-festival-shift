@@ -494,6 +494,33 @@ function friendsFromAnswers(rows) {
   return latestAnswerOf(rows, '一緒に組みたいお友達', true)
 }
 
+/**
+ * 回答の行から (氏名 → 学籍番号の並び) を作る（マス目に手で人を足すとき、学籍番号を埋めるため → issue #271）。
+ * 氏名は表記の完全一致で引く（両端の空白だけ落とす）。同じ人の出し直し（同じ氏名・同じ学籍番号）は 1 つに数える。
+ * 並びが 2 つ以上なら同姓同名で、どちらの行かは決まらない — 選ぶのは担当者である。
+ * 後から来た行に限らない。氏名のプルダウンの候補は回答の氏名の列そのもの（→ shell.js の putNameDropdowns）なので、
+ * 前の回答の表記を選んでも引けるようにする。
+ */
+function studentIdsFromAnswers(rows) {
+  const columns = answerSection().columns
+  const studentIdColumn = columns.indexOf('学籍番号')
+  const nameColumn = columns.indexOf('氏名')
+  const studentIds = {}
+
+  rows.forEach((row) => {
+    const studentId = String(row[studentIdColumn] || '').trim().toUpperCase()
+    const name = String(row[nameColumn] || '').trim()
+    if (studentId === '' || name === '') return
+    if (!Object.prototype.hasOwnProperty.call(studentIds, name)) studentIds[name] = []
+    if (studentIds[name].indexOf(studentId) === -1) studentIds[name].push(studentId)
+  })
+
+  return function (name) {
+    const key = String(name).trim()
+    return Object.prototype.hasOwnProperty.call(studentIds, key) ? studentIds[key].slice() : []
+  }
+}
+
 /** 回答の 1 列を、学籍番号ごとに後から来た行で引く。keepBlank でなければ、空の値は前の行を上書きしない。 */
 function latestAnswerOf(rows, columnName, keepBlank) {
   const columns = answerSection().columns
@@ -516,6 +543,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     gridNamedColumns, assignmentAt, toAssignmentGrid, fromAssignmentGrid, buildAssignmentRow,
     fixedNote, isFixedNote, conflictNote, seenGrid, missedEdits, fixedFromAssignmentGrid, gridNotes, roleColors, roleColorOf, gridBackgrounds, checkRowHighlights, checkResultBackgrounds, violationCells, namesFromAnswers,
-    friendsFromAnswers,
+    friendsFromAnswers, studentIdsFromAnswers,
   }
 }

@@ -164,7 +164,45 @@ function writeOutputs(spreadsheet, output, context, gridsAsTheyAre) {
   })
 
   paintGrids(spreadsheet, grids, output['検証結果'], toGrid.days)
+  putNameDropdowns(spreadsheet, grids)
   return grids
+}
+
+/** 氏名のプルダウンの説明（セルを選ぶと出る）。候補の元と、選ぶと何が起きるかを言う（→ issue #271）。 */
+const nameDropdownHelp = '「回答」シートの氏名から選びます。学籍番号が空の行で選ぶと、学籍番号が自動で入ります。'
+
+/**
+ * マス目の氏名の列を、回答の氏名のプルダウンにする（→ issue #271）。候補はシフト希望を出した全員である。
+ *
+ * 候補は回答の氏名の列を範囲で指すので、後から回答が増えても候補に入る。ただし範囲の下の端は付けた時点の
+ * getMaxRows なので、塗り直すたびに付け直す（塗り直しの clearFormat で消えるかどうかにも頼らない）。
+ * 候補に無い氏名は打てない — 学籍番号を引くのは表記の完全一致だからである（→ fillStudentIds）。
+ * 回答に氏名が無い人は、学籍番号を手で入れれば今までどおり足せる（氏名は空のまま）。
+ */
+function putNameDropdowns(spreadsheet, grids) {
+  if (grids.length === 0) return
+  const answerLayout = findLayout('回答')
+  const answers = findSheet(spreadsheet, answerLayout.name)
+  const answerHeaderRows = headerRowCount(answerLayout)
+  const answerNameColumn = answerLayout.sections[0].startColumn + answerLayout.sections[0].columns.indexOf('氏名')
+  const candidates = answers.getRange(
+    answerHeaderRows + 1, answerNameColumn, Math.max(answers.getMaxRows() - answerHeaderRows, 1), 1,
+  )
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(candidates, true)
+    .setAllowInvalid(false)
+    .setHelpText(nameDropdownHelp)
+    .build()
+
+  grids.forEach((one) => {
+    const layout = one.layout
+    const sheet = findSheet(spreadsheet, layout.name)
+    const headerRows = headerRowCount(layout)
+    const maxRows = sheet.getMaxRows()
+    if (maxRows <= headerRows) return
+    const nameColumn = layout.sections[0].startColumn + layout.sections[0].columns.indexOf('氏名')
+    sheet.getRange(headerRows + 1, nameColumn, maxRows - headerRows, 1).setDataValidation(rule)
+  })
 }
 
 /** 違反した所の印（→ issue #155）。背景は役割の色に使っているので、文字を赤い太字にする。 */
@@ -368,6 +406,16 @@ function recountOnEdit(event) {
   const edited = event.range.getSheet().getName()
   if (!gridLayouts(assignmentName).some((layout) => layout.name === edited)) return null
 
+  // 学籍番号を埋めるのは数え直しより先である。空のままだと、役割の入った行で数え直しが止まる。
+  let filled = { ambiguous: [], notFound: [] }
+  try {
+    filled = fillStudentIds(event.source, event.range)
+  } catch (error) {
+    filled = { ambiguous: [], notFound: [], failed: error.message }
+  }
+  const fillText = studentIdFillText(filled)
+  const withFillText = (said) => (fillText === '' ? said : { text: `${fillText}／${said.text}`, seconds: Math.max(said.seconds, 15) })
+
   try {
     markFixedCells(event.range)
     const output = recountSpreadsheet(event.source)
@@ -375,17 +423,84 @@ function recountOnEdit(event) {
     const violations = kinds.filter((kind) => kind === checkKind.violation).length
     const unmet = kinds.filter((kind) => kind === checkKind.unmet).length
     // 違反のセルの印は色ではなく赤い太字である（→ paintGrids）。
-    return {
+    return withFillText({
       text: `集計し直しました：違反 ${violations} 件／人数不足 ${unmet} 件`
         + (violations === 0 ? '' : '（違反のセルは赤い太字です）'),
       seconds: 5,
-    }
+    })
   } catch (error) {
-    return {
+    return withFillText({
       text: `集計し直せませんでした（検証結果・指標は前のままです）：${error.message}`,
       seconds: 30,
-    }
+    })
   }
+}
+
+/**
+ * 氏名を選んだ行の、空の学籍番号を回答から埋める（→ issue #271）。返すのは埋められなかった氏名である。
+ *   ambiguous … 同じ氏名で学籍番号が異なる人が複数いた（同姓同名。どちらかは担当者が決める）
+ *   notFound  … 回答に同じ氏名が無かった（プルダウンの外から貼られたときだけ起きる）
+ *
+ * 見るのは書き換えた範囲が氏名の列にかかっている行だけで、学籍番号がもう入っている行は上書きしない
+ * — 行の持ち主を黙って替えない。
+ * スクリプトの書き込みでは onEdit が走らないので、埋めた行には学籍番号を書き換えたときと同じ印を付ける（→ markFixedCells）。
+ */
+function fillStudentIds(spreadsheet, range) {
+  const result = { ambiguous: [], notFound: [] }
+  const sheet = range.getSheet()
+  const layout = gridLayouts(assignmentName).filter((one) => one.name === sheet.getName())[0]
+  if (!layout) return result
+  const section = layout.sections[0]
+  const studentIdColumn = section.startColumn + section.columns.indexOf('学籍番号')
+  const nameColumn = section.startColumn + section.columns.indexOf('氏名')
+  const top = Math.max(range.getRow(), headerRowCount(layout) + 1)
+  const bottom = range.getLastRow()
+  if (bottom < top || range.getColumn() > nameColumn || range.getLastColumn() < nameColumn) return result
+
+  const studentIds = sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).getValues()
+  const names = sheet.getRange(top, nameColumn, bottom - top + 1, 1).getValues()
+  const waiting = names
+    .map((row, index) => ({ index: index, name: normalizeValue(row[0]) }))
+    .filter((one) => one.name !== '' && normalizeValue(studentIds[one.index][0]) === '')
+  if (waiting.length === 0) return result
+
+  const answerLayout = findLayout('回答')
+  const studentIdsOf = studentIdsFromAnswers(
+    readSection(findSheet(spreadsheet, answerLayout.name), answerLayout, answerLayout.sections[0]),
+  )
+  const filledRows = []
+  waiting.forEach((one) => {
+    const found = studentIdsOf(one.name)
+    if (found.length === 1) {
+      studentIds[one.index][0] = found[0]
+      filledRows.push(top + one.index)
+      return
+    }
+    const list = found.length === 0 ? result.notFound : result.ambiguous
+    if (list.indexOf(one.name) === -1) list.push(one.name)
+  })
+  if (filledRows.length === 0) return result
+
+  sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).setValues(studentIds)
+  filledRows.forEach((row) => markFixedCells(sheet.getRange(row, studentIdColumn)))
+  return result
+}
+
+/** 学籍番号を埋められなかったときに担当者に見せる一言（→ issue #271）。埋められたか、何もしなかったときは空である。 */
+function studentIdFillText(filled) {
+  const quoted = (names) => names.map((name) => `「${name}」`).join('・')
+  const texts = []
+  if (filled.ambiguous.length > 0) {
+    texts.push(
+      `同じ氏名で異なる学籍番号の人が複数いたため、学籍番号を自動入力できませんでした（氏名${quoted(filled.ambiguous)}）。`
+        + '「回答」シートで確かめて、学籍番号を手で入れてください',
+    )
+  }
+  if (filled.notFound.length > 0) {
+    texts.push(`「回答」シートに同じ氏名が無いため、学籍番号を自動入力できませんでした（氏名${quoted(filled.notFound)}）`)
+  }
+  if (filled.failed) texts.push(`学籍番号を自動入力できませんでした：${filled.failed}`)
+  return texts.join('／')
 }
 
 /**
@@ -568,6 +683,7 @@ if (typeof module !== 'undefined') {
     valueRepresentation, sheetsToRead, headerRowCount, readInputs, readInputsAndGrids, readSection, readGrid,
     putGridsIntoInputs, writeOutputs, withNamesFromAnswers, writeGrids, violationMark, paintGrids, paintCheckResults,
     a1Notation, run, runOnActiveSpreadsheet, recountSpreadsheet, distributionImagesOn, recountOnEdit, markFixedCells, gridContext,
+    nameDropdownHelp, putNameDropdowns, fillStudentIds, studentIdFillText,
     normalizeValue, formatDateTime, findLayout, findSheet,
   }
 }
