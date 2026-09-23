@@ -2,16 +2,6 @@
 
 # 学祭シフトの引き継ぎ手順
 
-**ここにあるのは、今年シフトを作る担当者が、自分のドライブに今年のファイルを用意するまでの手順である。**
-**前提知識は要らない。** 上から順に読めばよい。
-
-> **ひな形である**（→ [#261](https://github.com/jun-eg/school-festival-shift/issues/261)）。
-> 見出しと各節の役割だけを置いた。**手順の文面は [#260](https://github.com/jun-eg/school-festival-shift/issues/260) の残りの項目で埋める。**
-
-## 本線 — `/copy` リンクからコピーする
-
-**ふつうはこちらを使う。** 下の 3 つを、この順で踏む。
-
 ### 1. テンプレートファイルをコピーする
 
 **[こちら](https://docs.google.com/spreadsheets/d/1WcbUczLpBnBjQbhmIAGGQUYgsnuphu5Ih2ga9_8zaNs/copy) から Google スプレッドシートをコピーします。**
