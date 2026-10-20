@@ -9,7 +9,7 @@ ADR の雛形。docs/ADR/<対象>/<立場>-<連番>-<slug>.md にコピーして
 - **Status**: 有効
   > 後続の ADR に上書きされたら `取り消し（ADR <立場>-NNNN が上書き）` に書き換え、その ADR へリンクする
 - **Date**: <YYYY-MM-DD>
-- **対象**: <ファイル> — <節・番号。例: docs/journey/入る側.md — ACTION 4・6 / 改善機会 5・7>
+- **対象**: <ファイル> — <節・番号。例: docs/journey/参加者側.md — ACTION 4・6 / 改善機会 5・7>
 - **出典**: <一次情報の在処。docs/interviews/... / issue #NN>
 
 ## それまでの結論

@@ -5,7 +5,7 @@ permissions.deny は前置一致なので `git push origin foo --force` のよ�
 フラグが後ろへ回った形と、`gh api ... -f body=@file` のように
 フラグがサブコマンド引数の後ろに来る形を拾えない。そこをここで止める。
 
-判断の背景は .claude/README.md、経緯は issue #73。
+判断の背景は .claude/README.md、経緯は https://github.com/jun-eg/school-festival-shift/issues/73 。
 """
 
 import json
@@ -25,17 +25,17 @@ GH_RAW_FIELD = re.compile(r"^(-f|--raw-field)$")
 GH_RAW_FIELD_INLINE = re.compile(r"^-f[A-Za-z_][A-Za-z0-9_.\[\]]*=@")
 
 MSG_FORCE = (
-    "force-push は禁止（issue #73）。レビュー済みコミットが消えるとレビューコメントが行を見失う。"
+    "force-push は禁止。レビュー済みコミットが消えるとレビューコメントが行を見失う。"
     "main を取り込むなら `git merge origin/main`。"
 )
 MSG_REBASE = (
-    "push 済みかどうかを判定できないので rebase は一律で止めている（issue #73）。"
+    "push 済みかどうかを判定できないので rebase は一律で止めている。"
     "main の取り込みは `git merge origin/main`。"
 )
-MSG_AMEND = "push 済みコミットの書き換えを避けるため `git commit --amend` は止めている（issue #73）。新しいコミットを積む。"
-MSG_RESET = "`git reset --hard` は作業を消すので止めている（issue #73）。`git restore` / `git revert` を使う。"
+MSG_AMEND = "push 済みコミットの書き換えを避けるため `git commit --amend` は止めている。新しいコミットを積む。"
+MSG_RESET = "`git reset --hard` は作業を消すので止めている。`git restore` / `git revert` を使う。"
 MSG_GH_RAW = (
-    "`gh` の `-f` / `--raw-field` はファイルを読まず `@...` をそのまま文字列として送る（issue #73 で実際に事故った）。"
+    "`gh` の `-f` / `--raw-field` はファイルを読まず `@...` をそのまま文字列として送る（実際に事故った）。"
     "`-F body=@file` か `gh issue/pr ... --body-file file` を使う。"
 )
 
