@@ -400,9 +400,13 @@ const formsBeforeSecondRun = createdForms.length
 const secondRun = whyItStopped(() => buildFormOn(book, rosterImage))
 
 check(
-  '⑤ 2 回目は、すでに紐付いていることを名指しして止まる',
-  [secondRun?.includes('もうフォームがあります'), secondRun?.includes('テンプレートをコピーし直してください')],
-  [true, true],
+  '⑤ 2 回目は、すでに紐付いていることを名指しし、「来年用に空にする」へ向けて止まる（テンプレートには向けない → #263）',
+  [
+    secondRun?.includes('もうフォームがあります'),
+    secondRun?.includes('「シフト」→「来年用に空にする」を押してから'),
+    secondRun?.includes('テンプレート'),
+  ],
+  [true, true, false],
 )
 
 check(
@@ -416,9 +420,13 @@ bookWithAnswers.getSheetByName('回答').getRange(2, 1, 1, 2).setValues([['2025/
 const stoppedOnAnswers = whyItStopped(() => buildFormOn(bookWithAnswers, rosterImage))
 
 check(
-  '⑤ 回答シートに中身があるときは、消さずに名指しして止まる',
-  [stoppedOnAnswers?.includes('すでに 1 行ある'), stoppedOnAnswers?.includes('フォームを作れません')],
-  [true, true],
+  '⑤ 回答シートに中身があるときは、消さずに名指しし、「来年用に空にする」へ向けて止まる（→ #263）',
+  [
+    stoppedOnAnswers?.includes('すでに 1 行ある'),
+    stoppedOnAnswers?.includes('フォームを作れません'),
+    stoppedOnAnswers?.includes('「シフト」→「来年用に空にする」を押してから'),
+  ],
+  [true, true, true],
 )
 
 check(
