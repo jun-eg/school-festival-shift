@@ -3,6 +3,7 @@
 **ここにあるのは、作業の事故を「実行される前に」止める仕掛けである。** 読んで守る文章ではない。
 **成果物の書き方の規約は混ぜない。** それは [`docs/agent/ADR/README.md`](../docs/agent/ADR/README.md) と [`skills/`](skills/) が持つ。
 **人が読む要約・issue・PR 本文の書き方は [`docs/README.md`](../docs/README.md) が持つ。**
+**commit の直前に回る柵は [`.githooks/pre-commit`](../.githooks/pre-commit) が持つ**（何を止めるかはその中の 2 行を読む。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
 
 何を止めているかは [`settings.json`](settings.json) と
 [`hooks/guard-bash.py`](hooks/guard-bash.py) の拒否メッセージを読む（**ここには写さない。二重に持つと片方が古くなる**）。

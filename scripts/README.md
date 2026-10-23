@@ -306,11 +306,24 @@ node scripts/前回のシフト表.mjs
 node scripts/リンクの検査.mjs
 ```
 
-**データではなく、repo の Markdown を見る手である。** 全 `.md` の `[..](path)` と `<img src="path">` の相対パスが、
+**データではなく、repo の Markdown を見る手である。** 全 `.md` のリンク記法と `<img>` の `src` にある相対パスが、
 実在するファイルに解決するかを見る。`http(s)://` と `mailto:` とページ内の `#` と、` ``` ` の中の例文と、
 `<立場>.md` のような雛形の穴は見ない。**何も書き換えない。読むだけである。**
 全件解決なら終了コード 0、1 つでも外れたら **ファイル名・行・リンク先を並べて 1 で落ちる。**
 起こした経緯は [issue #313](https://github.com/jun-eg/school-festival-shift/issues/313)（`docs/` を `docs/agent/` へ動かし、約 400 箇所が一度に動いた）。
+
+## 要約の検査
+
+```
+node scripts/要約の検査.mjs            # 作業ツリーの原本と比べる（pre-commit）
+node scripts/要約の検査.mjs --head     # HEAD の原本と比べる（CI）
+node scripts/要約の検査.mjs --stamp docs/design-doc.md   # 見直した要約のハッシュを刻み直す
+```
+
+**これもデータではなく、repo の文書を見る手である。** `docs/` 直下の要約の先頭にある `source-hash` と、原本（`docs/agent/`）の
+`git hash-object`（フォルダはツリーハッシュ）を比べ、**違えば要約の名前を挙げて 1 で落ちる。**
+要約の長さの上限（成果物 40 行・ADR 1 本 10 行）も同時に見る。**規約の原本と止まったときの直し方は [`docs/README.md`](../docs/README.md)。**
+`--stamp` 以外は何も書き換えない。起こした経緯は [issue #316](https://github.com/jun-eg/school-festival-shift/issues/316)。
 
 ## いつ走らせるか
 
@@ -319,7 +332,8 @@ node scripts/リンクの検査.mjs
 
 | 手 | 走らせる PR |
 | --- | --- |
-| **リンクの検査** | **`.md` を足した・動かした・消した PR**（**ファイルが動けば、そこを指すリンクも動く**） |
+| **リンクの検査** | **`.md` を足した・動かした・消した PR**（**ファイルが動けば、そこを指すリンクも動く**）。**pre-commit と CI でも回る** |
+| **要約の検査** | **`docs/agent/` を触った PR**（**原本が動けば、要約も見直す**）。**pre-commit と CI でも回る** |
 | **前回の 5 時刻の算出** | [`data/`](../data/) の確定シフトを触った PR（**行が動けば 5 時刻も動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **7 の「前回の 5 時刻の置き方」・4-2** を触った PR。**M2 の判定と生成の所要時間の実測は、走らせると中でこれを通る** |
 | **件数の検算** | [`data/`](../data/) を触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **4-5・7** か [`data/前回の確定シフト.md`](../data/前回の確定シフト.md) の**件数を触った PR** |
 | **M1 ① の判定** | [`data/`](../data/) の確定シフトを触った PR ／ **[`src/input-types.js`](../src/input-types.js)・[`src/sheet-layout.js`](../src/sheet-layout.js) を触った PR**（**型が動いたら、前回の記録が乗るかも動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **5-1・7** を触った PR |

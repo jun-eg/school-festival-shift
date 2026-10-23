@@ -45,7 +45,7 @@
 - 太字を使わない。記号（◎ ○ △）と (n/m) を書かない。根拠の強さは原本が持つ
 - 抜き出しではなく要約。原本の文を切り貼りしない
 - 原本へのリンクを 1 つ置く。それ以外のリンクは、読む人が次に開く先として要るものだけ
-- 1 文 1 つのこと。見出しは 3 つまで
+- 1 文 1 つのこと。節は下の順に置き、増やさない
 
 ### 成果物の要約に書く順
 
@@ -72,3 +72,33 @@ Status が「取り消し」の ADR は、上書きした ADR の段落に 1 行
 
 何に困って・何をして・どう確かめたか、の 3 つを本文に書く。困りごとを issue へのリンクだけにしない。
 issue 上段の写しでよい。雛形は [`.github/pull_request_template.md`](../.github/pull_request_template.md)。
+
+## 古さの check
+
+要約の先頭には、原本の在処とハッシュを刻む。commit のハッシュではなくファイルのハッシュなので、無関係な commit では古くならない。
+
+```
+---
+source: agent/design-doc.md
+source-hash: <git hash-object の値。ADR はフォルダなのでツリーハッシュ>
+---
+```
+
+[`scripts/要約の検査.mjs`](../scripts/要約の検査.mjs) が原本の今のハッシュと比べ、違えば要約の名前を挙げて落ちる。長さの上限も同時に見る。
+pre-commit（[`.githooks/pre-commit`](../.githooks/pre-commit)。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）は作業ツリーの原本と、
+GitHub Actions（[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)）は HEAD の原本と比べる。
+
+拾うのは「原本を直して要約を見直していない」だけである。ハッシュを刻み直したのに中身が追いついていないかは、人が読む側で気づく。
+typo の修正でも止まるが、「見直した」と宣言する 1 手なので許容する。
+
+### 止まったときの直し方
+
+1. 原本の差分（`git diff` か PR の差分）と、古い要約を読む
+2. 要約を書き直す（上の規約に従う）。読み直して変える所が無ければ、そのまま 3 へ
+3. 刻み直す。要約を名指しする
+
+   ```
+   node scripts/要約の検査.mjs --stamp docs/design-doc.md
+   ```
+
+4. 原本と要約を同じ commit に入れる。再生成は当面 Claude がセッションでやり、hook が忘れを止める
