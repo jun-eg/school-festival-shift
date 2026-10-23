@@ -1,7 +1,9 @@
 /**
  * 担当者がコピーしたファイルを開いたときに出るメニュー。
  *
- * 項目は docs/tech-requirements.md 2 の操作 3・7・9 と同じ名前で、新しい操作を増やさない。
+ * 項目の上 3 つは docs/tech-requirements.md 2 の操作 3・7・9 と同じ名前で、担当者の操作を増やさない。
+ * 4 つ目の「来年用に空にする」は、引き継ぎの予備で前年の担当者が 1 回だけ押す（→ clear-for-next-year.js ／ ADR tech-requirements-0018）。
+ * 本線（README の /copy リンク）では押さないので、2 の一覧は増えない。
  * 手直しはスプレッドシートそのもので行い、数え直しはセルを書き換えれば走る（→ onEdit）。
  * label は担当者に見える表示名、functionName は Apps Script が名前で呼ぶ関数である。
  */
@@ -12,11 +14,16 @@ const menuItems = [
   { label: 'フォームを作る', functionName: 'createForm' },
   { label: '生成', functionName: 'runGeneration' },
   { label: '画像を書き出す', functionName: 'exportImages' },
+  // 回答を消す項目なので、区切り線の下に離して置く（押し間違えても、押す前に確認が出る）。
+  { label: '来年用に空にする', functionName: 'clearForNextYear', separatorBefore: true },
 ]
 
 function onOpen() {
   const menu = SpreadsheetApp.getUi().createMenu(menuName)
-  menuItems.forEach((item) => menu.addItem(item.label, item.functionName))
+  menuItems.forEach((item) => {
+    if (item.separatorBefore) menu.addSeparator()
+    menu.addItem(item.label, item.functionName)
+  })
   menu.addToUi()
 }
 

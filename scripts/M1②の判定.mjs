@@ -181,6 +181,7 @@ const 偽のUI = {
     画面.メニュー.push({ 名前, 項目 })
     const 組み立て = {
       addItem(表示名, 関数名) { 項目.push({ 表示名, 関数名 }); return 組み立て },
+      addSeparator() { return 組み立て },
       addToUi() { return 組み立て },
     }
     return 組み立て

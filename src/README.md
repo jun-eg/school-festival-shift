@@ -24,6 +24,7 @@
 | [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
 | [`build-template.js`](build-template.js) | 定義どおりにシートを作り、見出しと条件入力の初期値を置き、8 枚に保護をかける（**かけ方は 2 つ** → 下の「保護のかけ方は 2 つである」） | **殻** |
 | [`build-form.js`](build-form.js) | **定義から本番のフォームを作り、回答先をこのスプレッドシート自身に向ける**（→ 6 の #6・下の「フォームは定義から作る」） | **殻** |
+| [`clear-for-next-year.js`](clear-for-next-year.js) | **使い終わったファイルのコピーを、来年に渡せる形に戻す**（引き継ぎの予備 → [ADR tech-requirements-0018](../docs/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。**フォームとの紐付けを外し、回答・割り当て 4 枚・検証結果・指標・フォームの URL を消す。条件入力の値は残す** | **殻** |
 | [`form-picker.html`](form-picker.html) | **名簿の画像を選ぶダイアログ 1 枚。**外から読み込むファイルは 0 個である | **殻** |
 | [`distribution-image.js`](distribution-image.js) | **マス目 1 枚から、配る画像 1 枚の中身を組む**（→ 5 の #9。表と、塗る図形の位置まで）。**名前の列は氏名だけで、学籍番号を描かない。**1 枠も入っていない行を落とす | **コア** |
 | [`export-images.html`](export-images.html) | **配る画像を書き出すダイアログ 1 枚。**コアが組んだ図形を `<canvas>` に塗って PNG にするだけである（→ 6 の #5）。外から読み込むファイルは 0 個である | **殻** |
@@ -499,6 +500,12 @@
 **「画像を書き出す」の中身も入っている**（→ 下の「配る画像は、日ごとに 4 枚である」）。**押すと書き出すダイアログが開く。**
 **3 項目とも中身が入ったので、「まだ作っていない」と言う項目は残っていない。**
 
+**4 つ目の「来年用に空にする」だけは、2 の一覧の操作ではない**（→ [ADR tech-requirements-0018](../docs/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。
+**引き継ぎの予備で、前年の担当者が自分のファイルのコピーの上で 1 回だけ押す。****本線（ルートの [`README.md`](../README.md) の `/copy` リンク）では押さないので、担当者の操作は増えていない。**
+**回答を消す項目なので、区切り線の下に離して置き、押すと「コピーで押していますか？」の確認が出る。**
+**押すと、フォームとの紐付けを外し、回答・割り当て 4 枚・検証結果・指標・条件入力の 9〜10 行目を消す。条件入力の値は残し、来年の初期値になる**（→ [`clear-for-next-year.js`](clear-for-next-year.js)）。
+**コピーで複製されたフォームは消さない** — 消すにはドライブのスコープが要る（→ 下の「書かないもの」）。**押した後の画面が、そのフォームの URL を出し、ゴミ箱に移すよう名指しする。**
+
 **`buildTemplate` はメニューに出していない。**
 **走らせるのはテンプレートを用意する側で、担当者ではない**（2 の一覧に無い操作を増やさないため）。
 
@@ -619,12 +626,12 @@
 | 要求するスコープ | 何を許すか | 何がこれを要求しているか |
 | --- | --- | --- |
 | `https://www.googleapis.com/auth/spreadsheets.currentonly` | **このスクリプトが入っているスプレッドシート 1 つだけ**の参照・編集 | **`SpreadsheetApp.getActive()`**（[`shell.js`](shell.js) の 1 行 ／ [`build-template.js`](build-template.js) ／ [`build-form.js`](build-form.js) ／ [`menu.js`](menu.js) の `toast`）と、**その先で触るシート・範囲・保護の全部**（`Protection` の全メソッドもこの対で足りる） |
-| `https://www.googleapis.com/auth/forms` | **フォームの作成と編集** | **`FormApp.create`** と、そこに置く設問・正規表現・画像アイテム、**`setDestination`**（→ [`build-form.js`](build-form.js)・[#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。**`forms.currentonly` では足りない** — あちらは**フォームにバインドしたスクリプト用**で、**こちらはスプレッドシート側からフォームを新しく作る** |
+| `https://www.googleapis.com/auth/forms` | **フォームの作成と編集** | **`FormApp.create`** と、そこに置く設問・正規表現・画像アイテム、**`setDestination`**（→ [`build-form.js`](build-form.js)・[#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。**「来年用に空にする」の `FormApp.openByUrl` ／ `removeDestination` もこれで足りる** — 開くのは**このファイルの「回答」に紐付いたフォーム 1 つだけ**である（→ [`clear-for-next-year.js`](clear-for-next-year.js)）。**`forms.currentonly` では足りない** — あちらは**フォームにバインドしたスクリプト用**で、**こちらはスプレッドシート側からフォームを新しく作る** |
 | `https://www.googleapis.com/auth/script.container.ui` | **このファイルの上にダイアログを出すこと** | **`showModalDialog`**（名簿の画像を選ぶ 1 枚 → [`build-form.js`](build-form.js)）。**メニューを出すだけなら要らなかった** — **`getUi` ／ `createMenu` ／ `addToUi` ／ `toast` は 1 スコープのときに実機を通っている**（→ [`real-device-log.md`](real-device-log.md) の「`oauthScopes` を書いた後に出た画面」）。**画像の書き出し（[#157](https://github.com/jun-eg/school-festival-shift/issues/157)）もこのスコープで足りる** |
 
 **`.currentonly` の付かない `https://www.googleapis.com/auth/spreadsheets` を要求しない。**
 **付かない側は「すべてのスプレッドシート」で、担当者のドライブにある全部のファイルが対象になる。**
-**このスクリプトは `openById` も `openByUrl` も呼ばない** — **掴むのは `getActive()` だけで、
+**このスクリプトは `SpreadsheetApp` の `openById` も `openByUrl` も呼ばない** — **掴むのは `getActive()` だけで、
 自分が入っているファイルの外へ 1 度も出ない**（→ 2「個人情報が通る経路」）。
 
 **自動判定に任せるとこうならない。** Google 自身が「Apps Script はコードを走査して必要なスコープを自動で決めるが、
@@ -642,7 +649,7 @@
 | 要求していないもの | なぜ要らないか |
 | --- | --- |
 | `.../auth/spreadsheets`（すべてのスプレッドシート） | **上のとおり。**掴むのは `getActive()` だけである |
-| `.../auth/drive` ／ `.../auth/drive.file` | **ドライブを探さない・消さない。****テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1）。**フォームを作るのは `FormApp` の側で足りる**（ドライブから**選ばせない** — 名簿の画像は担当者の端末から直接受け取る → [`form-picker.html`](form-picker.html)） |
+| `.../auth/drive` ／ `.../auth/drive.file` | **ドライブを探さない・消さない。****「来年用に空にする」も、コピーで複製されたフォームをゴミ箱に移さない**（担当者の手でやる → [ADR tech-requirements-0018](../docs/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。**テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1）。**フォームを作るのは `FormApp` の側で足りる**（ドライブから**選ばせない** — 名簿の画像は担当者の端末から直接受け取る → [`form-picker.html`](form-picker.html)） |
 | `.../auth/forms.currentonly` | **フォームにバインドしたスクリプト用である。**こちらはスプレッドシート側から**フォームを新しく作る**ので足りない（→ 上の表） |
 | `.../auth/script.external_request` | **外部に 1 度も出ない**（→ 2「個人情報が通る経路」・[#157](https://github.com/jun-eg/school-festival-shift/issues/157) の「外部から読み込むファイルが 0 個」） |
 | `.../auth/script.scriptapp`（トリガー） | **`onOpen` も `onEdit` も単純トリガーで承認が要らない。****インストール型のトリガーを 1 つも作らない** |
@@ -659,7 +666,7 @@
 | --- | --- |
 | 1 | [`appsscript.json`](appsscript.json) の `oauthScopes` |
 | 2 | **初回承認の画面。****撮り直して連番を足す**（→ [`real-device-log.md`](real-device-log.md) の「確認に使うファイルの規約」） |
-| 3 | **[#159](https://github.com/jun-eg/school-festival-shift/issues/159) の手順書に貼ってある画像** |
+| 3 | **ルートの [`README.md`](../README.md)（引き継ぎ手順書）に貼ってある画像** |
 
 **足すことが分かっていた 2 つ**（`FormApp` と `showModalDialog`）**は、[#144](https://github.com/jun-eg/school-festival-shift/issues/144) で入った。**
 **[#157](https://github.com/jun-eg/school-festival-shift/issues/157)（画像の書き出し）はダイアログ 1 枚なので、足すスコープは無い。**
@@ -689,11 +696,12 @@
 
 1. Google ドライブで**スプレッドシートを 1 つ**作り、**名前を付ける**
 2. **拡張機能 → Apps Script** を開く
-3. `src/` の **`.js` 17 本**（`*.test.mjs` を除いた全部）を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
+3. `src/` の **`.js` 18 本**（`*.test.mjs` を除いた全部）を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
    `sheet-layout` ／ `input-types` ／ `core` ／ `take-in` ／ `expand` ／ `generate` ／ `count-violations` ／ `name-unmet` ／
    `fairness-metrics` ／ `assignment-grid` ／ `form-definition` ／ `shell` ／ `verify-structure` ／ `build-template` ／
-   `build-form` ／ `menu` ／ `distribution-image`。
-   **この 17 本で実機に貼って走らせてある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」）。
+   `build-form` ／ `menu` ／ `distribution-image` ／ `clear-for-next-year`。
+   **`clear-for-next-year` を除く 17 本で実機に貼って走らせてある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」）。
+   **18 本目はまだ実機で見ていない**（→ [`real-device-log.md`](real-device-log.md) の項目 24）。
    **[`form-picker.html`](form-picker.html) と [`export-images.html`](export-images.html) の 2 枚も貼る** — エディタの**「＋」→「HTML」**で
    `form-picker` ／ `export-images` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）。
    **1 つ貼り忘れれば、走らせたときに名指しで止まる**（→「コアと殻の境目」の最後）。
@@ -716,10 +724,13 @@
    → [#145](https://github.com/jun-eg/school-festival-shift/issues/145) ／ 6-1 の #1）。
    **確かめたら、そのフォームと回答シートは配る形に残さない** — **テンプレートに入っているのは条件入力の初期値だけである**
    （→ 上の「割り当ては 4 枚のマス目である」の最後）。**もう 1 回コピーし直すところからやる**
-10. そのファイルを**コピーして配る形**にする。**渡す相手には閲覧者で共有する** —
-   **担当者はそれをコピーして使う。****コピーでスクリプトが渡ることは実機で確かめた**
+10. そのファイルを**配る形**にする。**共有を「リンクを知っている全員が閲覧可」にし、URL の末尾を `/copy` にしたリンクを、
+   ルートの [`README.md`](../README.md) の「1. テンプレートファイルをコピーする」に置く** —
+   **担当者はそのリンクを開いて「コピーを作成」を 1 回押す**（→ [ADR tech-requirements-0018](../docs/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。
+   **コピーでスクリプトが渡ることは実機で確かめた**
    （2026-09-21 → [`real-device-log.md`](real-device-log.md) の「コピーで何が渡ったか」。
-   [#136](https://github.com/jun-eg/school-festival-shift/issues/136) ／ 6-1 の #3）
+   [#136](https://github.com/jun-eg/school-festival-shift/issues/136) ／ 6-1 の #3）。
+   **作った後にコードを直したら、テンプレートのスクリプトを差し替える**（→ ルートの [`CONTRIBUTING.md`](../CONTRIBUTING.md)）
 
 ### clasp を本筋にしない
 
@@ -766,6 +777,7 @@ node src/verify-structure.test.mjs
 node src/build-template.test.mjs
 node src/build-form.test.mjs
 node src/distribution-image.test.mjs
+node src/clear-for-next-year.test.mjs
 ```
 
 **依存はゼロである**（Node の標準だけを使う）。**何も書き換えない。**
@@ -789,8 +801,9 @@ node src/distribution-image.test.mjs
 | [`build-template.test.mjs`](build-template.test.mjs) | **偽のスプレッドシートの上で組み立てを走らせる。**8 枚できるか（**「回答」に置くのは構成が名前で持つ 6 列だけである** — 後ろ 4 列は題が決まってから埋まる）／**保護が 8 枚にかかり、割り当ての 4 枚は持ち主だけ・ほかは警告のみで、条件入力だけ区画の入力欄が外れているか**／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか**／**条件入力の区画に初期値が置かれ、中身のある区画には置かないか**／**割り当ての 4 枚だけ、友達欄が時刻の列 3 つ分の幅になり、右に太い線が見出しから最下行まで引かれるか**（→ #245）／**検証結果の候補の列が「あと何人」の 5 倍の幅になり、作り直しても倍々に伸びず、候補の列が無い前の形のシートには止まらずに見出しを足すか**（→ #246）／**条件入力の 9〜10 行目に URL 欄（見出し・空の URL 欄・結合・太枠）が置かれ、保護の内に残り、URL が入った後に走らせ直しても消さないか**（→ #255） | 24 |
 | [`build-form.test.mjs`](build-form.test.mjs) | **偽のフォームと偽のスプレッドシートの上でフォームを作る。**定義の順に置かれるか（必須・選択肢・正規表現・文言ごと）／**選んだ画像が画像アイテムに入るか**／**回答先がこのスプレッドシート自身に向くか**／**フォームが作った回答シートが構成の「回答」になるか**（見出し・位置・保護・8 枚のまま）／**2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まるか**／**題と営業時間が条件入力の「日ごとの営業時刻」から出るか**（前回の値で 4 の表、今年の値で今年のもの）**・空／4 行でない／早い順でない ときにフォームを 1 つも作らずに止まるか**／**配る用・編集用の URL が条件入力の C9 ／ C10 に入り、URL 欄があっても「日ごとの営業時刻」は 8 行目までしか読まないか**（→ #255） | 37 |
 | [`distribution-image.test.mjs`](distribution-image.test.mjs) | **前回の配布物 ◎ と同じ形か**（1 日 1 枚・ファイル名と表題に日・見出しは名前の 1 列と時刻だけ）**／マス目の（人・枠・役割）が画像と 1 つも違わないか**（→ M4）**／学籍番号も友達欄も 1 文字も描かないか／1 枠も入っていない行と 1 人も入っていない日を黙って落とさないか・背景は役割の色か／図形がはみ出さず、同じ入力から同じ図形が出るか／描けないもの（氏名が空・4 枚とも空・日付が無い）で名指しして止まるか／ダイアログが外から読み込むものが 0 個か** | 30 |
+| [`clear-for-next-year.test.mjs`](clear-for-next-year.test.mjs) | **偽のフォームと偽のスプレッドシートの上で、1 年使い終わったファイルを空にする。****フォームとの紐付けが外れ、回答の行と今年の題が消えるか**／**割り当て 4 枚・検証結果・指標がテンプレートの形に戻るか**（値・時刻の見出し・手直しの印・色・氏名のプルダウン・前に見たマス目の控え）／**条件入力は 9〜10 行目の URL だけが空き、ほかのセルが 1 つも動かないか**／**空にしたファイルで「フォームを作る」がもう一度通るか**／**フォームが開けなければ何も消さずに名指しして止まり、紐付いていなければ止まらないか** | 24 |
 
-**この 16 本で分かるのは、手元で回る範囲だけである。**
+**この 17 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
 [`real-device-log.md`](real-device-log.md) が持つ。ここに二重に書かない。**
 
