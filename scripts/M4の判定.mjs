@@ -152,7 +152,7 @@ class 偽のスプレッドシート {
 
 const 偽のUI = {
   createMenu() {
-    const 組み立て = { addItem() { return 組み立て }, addToUi() { return 組み立て } }
+    const 組み立て = { addItem() { return 組み立て }, addSeparator() { return 組み立て }, addToUi() { return 組み立て } }
     return 組み立て
   },
   showModalDialog(中身, 題) { 画面.ダイアログ.push({ 題, ファイル: 中身.ファイル }) },
