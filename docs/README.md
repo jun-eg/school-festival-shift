@@ -13,7 +13,7 @@
 | [`hmw.md`](hmw.md) | どの改善機会を採り、どの問いからどのソリューションを選んだか | [`agent/hmw.md`](agent/hmw.md) |
 | [`design-doc.md`](design-doc.md) | 何を作るか。7 セクションの結論と、まだ決まっていないこと | [`agent/design-doc.md`](agent/design-doc.md) |
 | [`tech-requirements.md`](tech-requirements.md) | どう作るか。実行形態・業務の規則・完了の測り方 | [`agent/tech-requirements.md`](agent/tech-requirements.md) |
-| [`ADR.md`](ADR.md) | 判定がどう動いたか。ADR 1 本につき 10 行で、対象ごとに | [`agent/ADR/`](agent/ADR/) |
+| [`ADR/`](ADR/) | 判定がどう動いたか。原本と同じ `<対象>/<同名>.md` に、1 本 10 行で | [`agent/ADR/`](agent/ADR/) |
 
 要約を置かないものもある。
 
@@ -35,8 +35,9 @@
 | 要約 | 上限 |
 | --- | --- |
 | 成果物 1 本（journey・hmw・design-doc・tech-requirements） | 40 行 |
-| ADR 1 本の段落（[`ADR.md`](ADR.md) の中） | 10 行 |
+| ADR 1 本（[`ADR/`](ADR/) の 1 ファイル） | 10 行 |
 | issue 本文の上段 | 20 行 |
+| PR 本文（checkbox と `Closes` を含む） | 40 行 |
 
 先頭の `---` で囲んだ数行（原本の在処とハッシュ）は数えない。
 
@@ -59,8 +60,8 @@ tech-requirements は「実行形態・規則・完了の測り方」が中身�
 
 ### ADR の要約に書く順
 
-1 行目に何が崩れたか（ADR の見出しの言い直し）、続きに今どうなっているか（「新しい結論」の要約）、最後に原本へのリンクを 1 つ。
-Status が「取り消し」の ADR は、上書きした ADR の段落に 1 行で畳む。
+原本 1 本につき要約 1 本で、ファイル名は原本と同じ。1 行目に何が崩れたか（ADR の見出しの言い直し）、続きに今どうなっているか（「新しい結論」の要約）、最後に原本へのリンクを 1 つ。
+Status が「取り消し」の ADR も 1 本置き、何が取り消されて何が生きているか、上書きした ADR はどれかを書く。
 
 ### issue 本文
 
@@ -71,7 +72,8 @@ Status が「取り消し」の ADR は、上書きした ADR の段落に 1 行
 ### PR 本文
 
 何に困って・何をして・どう確かめたか、の 3 つを本文に書く。困りごとを issue へのリンクだけにしない。
-issue 上段の写しでよい。雛形は [`.github/pull_request_template.md`](../.github/pull_request_template.md)。
+issue 上段の写しでよい。40 行まで。収まらない分は PR コメントか原本（commit message・docs）に置く。
+雛形は [`.github/pull_request_template.md`](../.github/pull_request_template.md)。
 
 ## 古さの check
 

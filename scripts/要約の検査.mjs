@@ -7,6 +7,7 @@
 //   source-hash: <git hash-object の値>   ← フォルダならツリーハッシュ
 //   ---
 // 原本の今のハッシュと比べ、違えば要約の名前を挙げて落ちる。
+// ADR は原本 1 本につき要約 1 本（docs/ADR/<対象>/<同名>.md）なので、要約の無い原本も挙げる。
 // 拾うのは「原本を直して要約を見直していない」だけで、中身が追いついているかは人が読む側で見る。
 //
 // 使い方
@@ -28,7 +29,7 @@ const 根 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const 要約の置き場 = path.join(根, 'docs')
 const 原本の置き場 = path.join(根, 'docs', 'agent')
 const 見ないもの = new Set(['README.md'])
-const 上限 = { 成果物: 40, ADRの段落: 10 }
+const 上限 = { 成果物: 40, ADR1本: 10 }
 
 const 引数 = process.argv.slice(2)
 const HEADで見る = 引数.includes('--head')
@@ -82,27 +83,31 @@ function 原本のハッシュ(相対) {
 
 /** 長さの上限を見る。外れた理由を返す（無ければ空）。 */
 function 長さを見る(要約, 本体) {
-  const 外れ = []
-  const 名前 = path.basename(要約)
-  if (名前 === 'ADR.md') {
-    // 1 本の ADR は空行で区切った 1 段落。`で始まる段落だけを数える
-    let 段落 = []
-    const 閉じる = () => {
-      if (段落.length > 上限.ADRの段落 && /^`/.test(段落[0])) 外れ.push(`${段落[0].slice(0, 30)}… が ${段落.length} 行（上限 ${上限.ADRの段落}）`)
-      段落 = []
+  const ADRの要約か = path.relative(要約の置き場, 要約).startsWith('ADR' + path.sep)
+  const 線 = ADRの要約か ? 上限.ADR1本 : 上限.成果物
+  const 行数 = 本体.filter((行, i, 全部) => !(i === 0 && 行 === '') && !(i === 全部.length - 1 && 行 === '')).length
+  return 行数 > 線 ? [`${行数} 行（上限 ${線}）`] : []
+}
+
+/** ADR は原本 1 本につき要約 1 本。要約が無い原本を返す。 */
+function 要約の無いADR() {
+  const 原本 = path.join(原本の置き場, 'ADR')
+  const 無い = []
+  for (const 対象 of fs.readdirSync(原本, { withFileTypes: true })) {
+    if (!対象.isDirectory()) continue
+    for (const 名前 of fs.readdirSync(path.join(原本, 対象.name))) {
+      if (!名前.endsWith('.md')) continue
+      const 要約 = path.join(要約の置き場, 'ADR', 対象.name, 名前)
+      if (!fs.existsSync(要約)) 無い.push(`docs/ADR/${対象.name}/${名前}`)
     }
-    for (const 行 of 本体) (行.trim() === '' ? 閉じる() : 段落.push(行))
-    閉じる()
-  } else {
-    const 行数 = 本体.filter((行, i, 全部) => !(i === 0 && 行 === '') && !(i === 全部.length - 1 && 行 === '')).length
-    if (行数 > 上限.成果物) 外れ.push(`${行数} 行（上限 ${上限.成果物}）`)
   }
-  return 外れ
+  return 無い
 }
 
 const 外れ = []
 let 見た = 0
 const 対象 = 名指し.length > 0 ? 名指し : 要約を集める(要約の置き場)
+if (名指し.length === 0 && !刻み直す) for (const 一つ of 要約の無いADR()) 外れ.push(`${一つ}: 原本はあるが要約が無い`)
 for (const 要約 of 対象) {
   const 名前 = path.relative(根, 要約)
   const 本文 = fs.readFileSync(要約, 'utf8')
