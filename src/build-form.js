@@ -11,6 +11,12 @@
 /** 回答先を向ける先のシート（構成は sheet-layout.js）。 */
 const answerSheetName = '回答'
 
+/**
+ * 止まったときに添える、次の一手（→ issue #263）。前年のファイルのコピー（引き継ぎの予備）で押した人に、空にする口を名指しする。
+ * その人にはテンプレートが無いので、「テンプレートをコピーし直す」には向けない（→ clear-for-next-year.js ／ ADR tech-requirements-0018）。
+ */
+const clearFirstText = '前年のファイルをコピーしたものなら、メニュー「シフト」→「来年用に空にする」を押してから、もう一度「フォームを作る」を押してください'
+
 /** 設問の題の日付と、説明文の営業時間の出どころ。 */
 const businessHoursSectionName = '日ごとの営業時刻'
 
@@ -60,14 +66,13 @@ function buildFormOn(spreadsheet, rosterImage) {
   if (templateSheet.getFormUrl()) {
     // 作り直さない。
     throw new Error(
-      `このファイルにはもうフォームがあります（${templateSheet.getFormUrl()}）。`
-        + '作り直すときは、テンプレートをコピーし直してください',
+      `このファイルにはもうフォームがあります（${templateSheet.getFormUrl()}）。` + clearFirstText,
     )
   }
   if (templateSheet.getLastRow() > 1) {
     // 回答を消さない（黙って直さない）。
     throw new Error(
-      `「${layout.name}」シートにすでに ${templateSheet.getLastRow() - 1} 行あるため、フォームを作れません`,
+      `「${layout.name}」シートにすでに ${templateSheet.getLastRow() - 1} 行あるため、フォームを作れません。` + clearFirstText,
     )
   }
 

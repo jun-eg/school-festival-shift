@@ -347,6 +347,12 @@ check(
   sheetLayout.map((layout) => layout.name),
 )
 
+check(
+  '③ 8 枚とも保護が 1 つずつかかったままである（空にしても外さない → #263）',
+  book.getSheets().map((sheet) => [sheet.getName(), sheet.protections.length]),
+  sheetLayout.map((layout) => [layout.name, 1]),
+)
+
 // ---- ④ もう一度フォームを作れる --------------------------------------------
 
 const formsBefore = forms.length
