@@ -1,7 +1,7 @@
 # .claude — 事故を実行前に止める柵の置き場
 
 **ここにあるのは、作業の事故を「実行される前に」止める仕掛けである。** 読んで守る文章ではない。
-**成果物の書き方の規約は混ぜない。** それは [`docs/ADR/README.md`](../docs/ADR/README.md) と [`skills/`](skills/) が持つ。
+**成果物の書き方の規約は混ぜない。** それは [`docs/agent/ADR/README.md`](../docs/agent/ADR/README.md) と [`skills/`](skills/) が持つ。
 
 何を止めているかは [`settings.json`](settings.json) と
 [`hooks/guard-bash.py`](hooks/guard-bash.py) の拒否メッセージを読む（**ここには写さない。二重に持つと片方が古くなる**）。

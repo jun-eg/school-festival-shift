@@ -4,7 +4,7 @@
 //   使い方: node scripts/M2の判定.mjs
 //   宣言:   scripts/M2の宣言.json（合格の線と入力の置き方の原本）
 //
-// 数えるのは 2 つ（→ docs/tech-requirements.md 7 の M2）。
+// 数えるのは 2 つ（→ docs/agent/tech-requirements.md 7 の M2）。
 //   違反                   … 置いた人が条件を破っている件数。合格の線は 0 件
 //   名指しされていない未充足 … 案の側の不足のうち、検証結果に出ていない件数。合格の線は 0 件
 // 未充足そのものは 0 でなくてよい。
@@ -232,7 +232,7 @@ function 主処理() {
   console.log('')
   console.log('M2 の判定 — 前回の希望データのモックから案を 1 つ組み、違反と、名指しされていない未充足を数える')
   console.log('')
-  console.log('合格の線（原本は scripts/M2の宣言.json。出どころは docs/tech-requirements.md 7 の M2）')
+  console.log('合格の線（原本は scripts/M2の宣言.json。出どころは docs/agent/tech-requirements.md 7 の M2）')
   console.log(`  違反 ${宣言.合格の線.違反} 件 ／ 名指しされていない未充足 ${宣言.合格の線.名指しされていない未充足} 件`)
   console.log(`  未充足そのもの: ${宣言.合格の線.未充足そのもの}`)
   console.log(`  所要時間: ${宣言.合格の線.所要時間}`)
@@ -272,7 +272,7 @@ function 主処理() {
   console.log('       値の出どころ（どの行から出たか）は node scripts/前回の5時刻.mjs が出す')
 
   console.log('')
-  console.log('数えに入らないもの（入っていないことを隠さない → docs/tech-requirements.md 5-4 の但し書き）')
+  console.log('数えに入らないもの（入っていないことを隠さない → docs/agent/tech-requirements.md 5-4 の但し書き）')
   violationsNotCounted.forEach((一つ) => {
     console.log(`  ・${一つ.rule}（${一つ.what}）… 違反に数えていない`)
     console.log(`      ${一つ.why}`)
@@ -386,7 +386,7 @@ function 主処理() {
       + ` ／ 未充足 ${未充足の行.length} 件・あと ${あと何人の合計} 人（線を当てない）`
       + ` ／ 所要時間 ${秒で(一周.全体の秒)}`,
   )
-  console.log(`      規則 3 の ⑥（複数日で偏らせない）は数えに入っていない（→ docs/tech-requirements.md 5-4 の但し書き）`)
+  console.log(`      規則 3 の ⑥（複数日で偏らせない）は数えに入っていない（→ docs/agent/tech-requirements.md 5-4 の但し書き）`)
   console.log('')
 
   return 線を外した || 判定できない ? 1 : 0

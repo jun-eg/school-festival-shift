@@ -3,13 +3,13 @@
 > 課題を『私たちはどうすれば〜できるだろうか？』という問いに変換し、そこから解決策を決める。
 
 アイデア出しフレームワーク 3 ステップの **2 つ目**。手順は
-[`.claude/skills/hmw/SKILL.md`](../.claude/skills/hmw/SKILL.md) が持つ。
+[`.claude/skills/hmw/SKILL.md`](../../.claude/skills/hmw/SKILL.md) が持つ。
 
 ```
 ユーザージャーニーマップ  →  【HMW】  →  Design Doc
 ```
 
-- **入力**: [`docs/journey/入る側.md`](journey/入る側.md) と [`docs/journey/作る側.md`](journey/作る側.md)
+- **入力**: [`docs/agent/journey/入る側.md`](journey/入る側.md) と [`docs/agent/journey/作る側.md`](journey/作る側.md)
   の改善機会リスト **2 本を 1 つの候補プール**として見る（統合リストは作らない）
 - **出力**: このファイル — 採用するソリューション **1 つ** ＋ 採らなかった候補とその却下理由
 
@@ -18,7 +18,7 @@
 ## 凡例
 
 - 記号（◎ / ○ / △ /（記録））と (n/m) の数え方は
-  [`.claude/skills/user-journey-map/references/evidence.md`](../.claude/skills/user-journey-map/references/evidence.md) が持つ
+  [`.claude/skills/user-journey-map/references/evidence.md`](../../.claude/skills/user-journey-map/references/evidence.md) が持つ
 - 改善機会の番号は**マップごとに独立**しているので、**「入る側 N」「作る側 N」と立場を付けて**参照する
 
 ## 選んだ改善機会
@@ -27,7 +27,7 @@
 > 根拠: 3〜6 時間・3 日がかり・やり直し 20 回規模
 > 効く先: ACTION 8
 
-- **出典**: [`docs/journey/作る側.md`](journey/作る側.md) の「確定（◎）」節 — **ACTION 8「シフトを組む（割り当て）」**由来
+- **出典**: [`docs/agent/journey/作る側.md`](journey/作る側.md) の「確定（◎）」節 — **ACTION 8「シフトを組む（割り当て）」**由来
 - **選んだ理由**: 両マップ 68 本を並べたとき、**「どこまでやれば解けたことになるか」を証言から数字で決められる唯一の候補**だから。
   FEELING ADJECTIVE が「果てしない ◎ / 大変すぎる ◎」で振り切れている ACTION はここだけで、
   同じマップの「証言された『理想の状態』」に許容値が書かれている ◎（手作業 5〜15 分 ⇔ 現状 3〜6 時間）。
@@ -53,7 +53,7 @@
 
 ## 候補を出す前の足切り
 
-[`docs/journey/作る側.md`](journey/作る側.md) の一次情報で、**HMW に並べる前に潰した方向**。
+[`docs/agent/journey/作る側.md`](journey/作る側.md) の一次情報で、**HMW に並べる前に潰した方向**。
 
 | 出どころ | 落とした方向 |
 | --- | --- |
@@ -208,7 +208,7 @@ HMW は問いと候補の段階なので、設計まで降ろさない。
 
 ## 採らなかった候補と却下理由
 
-**消さずに残す。** [`docs/design-doc-template.md`](design-doc-template.md) の Alternatives Considered の入力になる。
+**消さずに残す。** [`docs/agent/design-doc-template.md`](design-doc-template.md) の Alternatives Considered の入力になる。
 
 | 候補 | 却下理由 |
 | --- | --- |
@@ -225,7 +225,7 @@ HMW は問いと候補の段階なので、設計まで降ろさない。
 ## 更新ログ
 
 **採用案が覆った・却下理由が変わったら、ここに 1 行足す。** 理由・経緯はここに書かず ADR 側に書く
-（置き場所・フォルダを作るタイミングを含め、規約は [`docs/ADR/README.md`](ADR/README.md)）。
+（置き場所・フォルダを作るタイミングを含め、規約は [`docs/agent/ADR/README.md`](ADR/README.md)）。
 
 | 日付 | 動いたもの | ADR |
 | --- | --- | --- |

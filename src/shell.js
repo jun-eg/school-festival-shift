@@ -1,5 +1,5 @@
 /**
- * 殻 — SpreadsheetApp に触る唯一の場所（docs/tech-requirements.md 6 の #8）。
+ * 殻 — SpreadsheetApp に触る唯一の場所（docs/agent/tech-requirements.md 6 の #8）。
  * シートを読んで表現を揃え、コア（core.js の build）を呼び、返った行を書く。
  * 割り当ては日ごとの 4 枚にマス目で載る。どの列が何時かはコアの側（assignment-grid.js）が決める。
  *

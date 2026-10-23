@@ -1,5 +1,5 @@
 /**
- * 取り込む側 — 回答の行を 1 人 1 件に畳む（docs/tech-requirements.md 3 の規則 2。issue #146）。
+ * 取り込む側 — 回答の行を 1 人 1 件に畳む（docs/agent/tech-requirements.md 3 の規則 2。issue #146）。
  * ここを通った希望（型 #6）だけが下流へ行く。行を型に直すのは input-types.js の toWish で、
  * ここが持つのは「どの 1 行を型にするか」だけである。
  *

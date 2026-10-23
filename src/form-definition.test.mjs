@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// フォームの定義（src/form-definition.js）を、docs/tech-requirements.md 4-1〜4-3 の表と突き合わせる。
+// フォームの定義（src/form-definition.js）を、docs/agent/tech-requirements.md 4-1〜4-3 の表と突き合わせる。
 //
 //   使い方: node src/form-definition.test.mjs
 //
@@ -79,7 +79,7 @@ function check(title, actual, expected) {
 
 // ---- ① 4-1 の表そのもの（写した相手） ---------------------------------------
 
-// docs/tech-requirements.md 4-1 の表を、上から順にそのまま置いたもの。
+// docs/agent/tech-requirements.md 4-1 の表を、上から順にそのまま置いたもの。
 // 突き合わせになるよう、form-definition.js の値を 1 つも読まずに文字列で持つ。
 const tableInRequirements = [
   { number: 1, title: '学籍番号', kind: '短文回答', required: true, detail: '^[A-Za-z0-9]{10}$' },

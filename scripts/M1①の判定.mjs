@@ -4,7 +4,7 @@
 //   使い方: node scripts/M1①の判定.mjs
 //   宣言:   scripts/M1①の宣言.json（合格の線と営業時刻の置き方の原本）
 //
-// 数えるのは「型に乗らなかった行」で、合格の線は 0 行（→ docs/tech-requirements.md 7 の M1 ①）。
+// 数えるのは「型に乗らなかった行」で、合格の線は 0 行（→ docs/agent/tech-requirements.md 7 の M1 ①）。
 // 型は src/input-types.js をそのまま走らせる（書き直した型に乗っても答えにならない）。
 // 前回の記録が規則を満たすかは見ない（違反を数えるのは src/count-violations.js で、入力は生成した案）。
 // 読むだけ。乗らなかった行が 1 行でもあれば終了コード 1。
@@ -185,7 +185,7 @@ function 主処理() {
   }
 
   console.log('')
-  console.log('日ごと（4 日とも通しで判定する → docs/tech-requirements.md 7）')
+  console.log('日ごと（4 日とも通しで判定する → docs/agent/tech-requirements.md 7）')
   for (const [日, 数え] of 日ごとの数え) {
     console.log(`  ${数え.乗らなかった === 0 ? 'OK ' : 'NG '}  [${日}] 行 ${数え.行} ／ 乗らなかった ${数え.乗らなかった}`)
   }

@@ -1,7 +1,7 @@
 <!--
-ADR の雛形。docs/ADR/<対象>/<立場>-<連番>-<slug>.md にコピーして使う。
+ADR の雛形。docs/agent/ADR/<対象>/<立場>-<連番>-<slug>.md にコピーして使う。
 > のガイド行は、埋めたら消す。
-規約（置き場所・ファイル名・連番・Status・参照の書き方）は docs/ADR/README.md にある。
+規約（置き場所・ファイル名・連番・Status・参照の書き方）は docs/agent/ADR/README.md にある。
 -->
 
 # ADR <立場>-<連番>: <何が動いたか。結論の言い直しではなく「何が崩れた／取り消された」と書く>
@@ -9,8 +9,8 @@ ADR の雛形。docs/ADR/<対象>/<立場>-<連番>-<slug>.md にコピーして
 - **Status**: 有効
   > 後続の ADR に上書きされたら `取り消し（ADR <立場>-NNNN が上書き）` に書き換え、その ADR へリンクする
 - **Date**: <YYYY-MM-DD>
-- **対象**: <ファイル> — <節・番号。例: docs/journey/入る側.md — ACTION 4・6 / 改善機会 5・7>
-- **出典**: <一次情報の在処。docs/interviews/... / issue #NN>
+- **対象**: <ファイル> — <節・番号。例: docs/agent/journey/入る側.md — ACTION 4・6 / 改善機会 5・7>
+- **出典**: <一次情報の在処。docs/agent/interviews/... / issue #NN>
 
 ## それまでの結論
 

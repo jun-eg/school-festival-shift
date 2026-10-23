@@ -1,5 +1,5 @@
 /**
- * 1 ファイルに並ぶシート 8 枚の構成（→ docs/tech-requirements.md 2・5-1・5-4）。
+ * 1 ファイルに並ぶシート 8 枚の構成（→ docs/agent/tech-requirements.md 2・5-1・5-4）。
  *
  * 割り当ては日ごとの 4 枚で、従来のシフト表の形（行が人、列が 30 分枠、セルが役割名 1 つ）である（→ issue #213）。
  * 定義だけを持ち、SpreadsheetApp を掴まない。持つ値は条件入力の初期値（→ initialRows）だけで、

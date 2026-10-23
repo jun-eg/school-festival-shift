@@ -1,5 +1,5 @@
 /**
- * 未充足を名指しする側（→ docs/tech-requirements.md 5-4 ／ issue #142）。
+ * 未充足を名指しする側（→ docs/agent/tech-requirements.md 5-4 ／ issue #142）。
  *
  * 人数が足りない枠を埋めずに残し、検証結果シートの行にする。合格の線は「名指しされていない未充足が 0 件」である。
  * 違反は数えない（→ count-violations.js）。混ぜると、足りない枠がそのまま違反になり、違反 0 の案が出ない。

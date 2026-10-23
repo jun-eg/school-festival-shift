@@ -4,7 +4,7 @@
 //   使い方: node scripts/M1②の判定.mjs
 //   宣言:   scripts/M1②の宣言.json（合格の線・経路・数えないものの原本）
 //
-// 数えるのは「変換の途中で人の手が入った箇所」で、合格の線は 0 箇所（→ docs/tech-requirements.md 7 の M1 ②）。
+// 数えるのは「変換の途中で人の手が入った箇所」で、合格の線は 0 箇所（→ docs/agent/tech-requirements.md 7 の M1 ②）。
 // メニューを押す操作と名簿の画像を選ぶ操作は入力なので数えない。
 // src/ の実装をそのまま走らせ、偽にするのは Google 側の器（FormApp ／ SpreadsheetApp ／ Utilities ／ HtmlService）だけ。
 // 本物の上で通るかは src/real-device-log.md の項目 10〜12 が持つ。

@@ -17,13 +17,13 @@
 > 2. **原本** — 記録から写した定義（設問の一覧・正規表現の実体・データの件数など）の置き場になる。**Design Doc に置くと冗長で、すぐ腐る**
 > 3. **判定** — 完了を「**誰が何を数えて決めるか**」まで降ろす
 >
-> 手順は [`.claude/skills/tech-requirements/SKILL.md`](../.claude/skills/tech-requirements/SKILL.md) が持つ。
+> 手順は [`.claude/skills/tech-requirements/SKILL.md`](../../.claude/skills/tech-requirements/SKILL.md) が持つ。
 > **何をどこに置くか（本文 ／ 逐語 ／ 記録の実体 ／ 判定が動いた記録 ／ 索引）の一覧は**
-> [`docs/ADR/README.md`](ADR/README.md) **が持つ。**
+> [`docs/agent/ADR/README.md`](ADR/README.md) **が持つ。**
 
 > **書き始める前に**
 >
-> **Design Doc の判断を、この文書の中で動かさない。** 動かすなら `docs/ADR/design-doc/` に ADR を 1 本起こし、
+> **Design Doc の判断を、この文書の中で動かさない。** 動かすなら `docs/agent/ADR/design-doc/` に ADR を 1 本起こし、
 > Design Doc 側の更新ログに 1 行足す。**この文書が Design Doc を上書きする形にしない。**
 >
 > **境界の判定は 1 問**（skill の「Design Doc との境界」）。
@@ -39,15 +39,15 @@
 
 ## 入力元（上流の何を受けたか）
 
-> **書く内容**: [`docs/design-doc.md`](design-doc.md) を 1 行ずつ仕分けた結果。
+> **書く内容**: [`docs/agent/design-doc.md`](design-doc.md) を 1 行ずつ仕分けた結果。
 > **仕分けをここに残す。** 残さないと、次に読む人が同じ仕分けをやり直す。
 >
 > - 上流の**スコープ内の項目を 1 つも取りこぼさない**。対応する要件が無い行が残っていないかを数える
-> - 上流から**実体を抜いたなら、抜く前に ADR を起こす**（規約は [`docs/ADR/README.md`](ADR/README.md)）
+> - 上流から**実体を抜いたなら、抜く前に ADR を起こす**（規約は [`docs/agent/ADR/README.md`](ADR/README.md)）
 > - **抜かずに両方に持たない。** どちらが原本か分からなくなる
 >
 > 記号（◎ / ○ / △ /（記録））と (n/m) の数え方は
-> [`.claude/skills/user-journey-map/references/evidence.md`](../.claude/skills/user-journey-map/references/evidence.md) が持つ。
+> [`.claude/skills/user-journey-map/references/evidence.md`](../../.claude/skills/user-journey-map/references/evidence.md) が持つ。
 > **この文書で新しく決めた選定には記号を付けない**（選定は観測ではない）。
 
 | 上流のどこ | 中身 | この文書のどこで受けるか |
@@ -256,11 +256,11 @@
 ## 更新ログ
 
 > **書く内容**: この文書の判定が動いたときの**索引**（選定が覆った・仕様が変わった・測り方が変わった・△ が増減した）。
-> 理由・経緯はここに書かず、ADR 側に書く（規約は [`docs/ADR/README.md`](ADR/README.md)）。
+> 理由・経緯はここに書かず、ADR 側に書く（規約は [`docs/agent/ADR/README.md`](ADR/README.md)）。
 >
 > - ADR が 0 本のうちは、**この見出しと空の表のまま**置いておく（節ごと消さない）
 > - 1 行は**日付・動いたもの・ADR へのリンクの 3 列だけ**
-> - **上流の判断が動いた場合は、こちらではなく `docs/ADR/design-doc/` と Design Doc の更新ログに足す。**
+> - **上流の判断が動いた場合は、こちらではなく `docs/agent/ADR/design-doc/` と Design Doc の更新ログに足す。**
 >   **1 つの判定を両方に二重に書かない。**
 
 | 日付 | 動いたもの | ADR |
