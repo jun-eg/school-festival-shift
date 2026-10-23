@@ -2,6 +2,11 @@
 
 **ここは入口である。** シフトを作る担当者の手順は [`README.md`](README.md) が持つ。
 
+## 何を作っているかは `docs/` の要約を読む
+
+**ジャーニーマップ・HMW・Design Doc・技術の要件定義・ADR の要約は、[`docs/README.md`](docs/README.md) の一覧から辿る。**
+**要約は原本（`docs/agent/`）から Claude が書いたもので、手で直さない。** 原本へは要約の先頭のリンクで 1 クリックで行ける。
+
 ## コードの中身は `src/README.md` を読む
 
 **スクリプトの構成・シートの定義・テンプレートの作り方・確かめ方は、[`src/README.md`](src/README.md) が持つ。**

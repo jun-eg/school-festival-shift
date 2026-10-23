@@ -2,7 +2,7 @@
 
 **ここにあるのは、作業を「始める前」に踏まないと、後から戻れなくなる手だけである。**
 **実行前に止める柵は [`.claude/README.md`](.claude/README.md)、成果物の書き方は [`docs/agent/ADR/README.md`](docs/agent/ADR/README.md) と
-[`.claude/skills/`](.claude/skills/) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
+[`.claude/skills/`](.claude/skills/)、人が読む要約・issue・PR 本文の書き方は [`docs/README.md`](docs/README.md) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
 
 ## 実装を始めるとき
 
@@ -21,7 +21,7 @@ git switch main && git pull
 
 - **名前は `<issue 番号>-<slug>`**（例: `170-claude-md`）。**ブランチ名は `worktree-` の付いた形になる**（`worktree-170-claude-md`）。
   **番号が入っていれば、PR からも merge コミットからも issue に戻れる**
-- **名前に `/` を入れない。** **ディレクトリが 1 段深くなり、ブランチ名では `+` に化ける**（`docs/agent/170-x` → `worktree-docs+170-x`）
+- **名前に `/` を入れない。** **ディレクトリが 1 段深くなり、ブランチ名では `+` に化ける**（`docs/170-x` → `worktree-docs+170-x`）
 - **切ったら `git log -1` で分岐元を見る。** 分岐元は**手元の `origin/main`**（設定 `worktree.baseRef` の既定値 `fresh`）なので、
   **1 を飛ばすと古いところから切れる**
 
