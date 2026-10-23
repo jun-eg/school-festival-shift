@@ -6,7 +6,7 @@
 //
 // 見るものは 3 つ。
 //   ① 数え直した値が期待値と一致するか
-//   ② その数字が本文（docs/tech-requirements.md ／ data/前回の確定シフト.md）に載っているか（解析はしない）
+//   ② その数字が本文（docs/agent/tech-requirements.md ／ data/前回の確定シフト.md）に載っているか（解析はしない）
 //   ③ 数え方の宣言を出力の頭に出す
 //
 // 読むだけ。不一致があれば終了コード 1。
@@ -223,7 +223,7 @@ function 希望データを数える() {
     最初の行で畳んだときの空欄: 最初で畳んだ.length - 記入の数(最初で畳んだ),
   }
 
-  // 参照の解決は大文字・小文字を無視する（→ docs/tech-requirements.md 7）。
+  // 参照の解決は大文字・小文字を無視する（→ docs/agent/tech-requirements.md 7）。
   const 提出者 = new Set([...種類].map((s) => s.toUpperCase()))
   const 参照を数える = (xs) => {
     let 参照 = 0, 解決 = 0

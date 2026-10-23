@@ -1,6 +1,6 @@
 ---
 name: tech-requirements
-description: Design Doc で確定した判断を「システムが何を達成する必要があるか」に翻訳し、実行形態・業務の規則・記録からの転記・仕様・検証・作業の順序を docs/tech-requirements.md 1 本にまとめる。Design Doc の次に来る工程。作るものは決まったが「何で・どう作るか」が決まっていないとき、実装に着手する前に要件と完了の判定方法を固めたいとき、Design Doc に設計（項目の実体・形式の実体・規則・件数）が溜まってきて置き場が要るとき、「技術の要件定義を書きたい」「Tech Doc を書きたい」と言われたとき、書いた要件定義書をレビューしてほしいと言われたとき、または /tech-requirements と明示されたときに使う。
+description: Design Doc で確定した判断を「システムが何を達成する必要があるか」に翻訳し、実行形態・業務の規則・記録からの転記・仕様・検証・作業の順序を docs/agent/tech-requirements.md 1 本にまとめる。Design Doc の次に来る工程。作るものは決まったが「何で・どう作るか」が決まっていないとき、実装に着手する前に要件と完了の判定方法を固めたいとき、Design Doc に設計（項目の実体・形式の実体・規則・件数）が溜まってきて置き場が要るとき、「技術の要件定義を書きたい」「Tech Doc を書きたい」と言われたとき、書いた要件定義書をレビューしてほしいと言われたとき、または /tech-requirements と明示されたときに使う。
 ---
 
 # 技術の要件定義（Tech Requirements）
@@ -13,10 +13,10 @@ description: Design Doc で確定した判断を「システムが何を達成�
 ユーザージャーニーマップ  →  HMW  →  Design Doc  →  【技術の要件定義】  →  実装
 ```
 
-- **入力**: `docs/design-doc.md`（**ステータスが Fixed のもの**。特に機能要件とマイルストーン）、
+- **入力**: `docs/agent/design-doc.md`（**ステータスが Fixed のもの**。特に機能要件とマイルストーン）、
   機能要件が名指ししている**一次記録**（記録・記録から出力したデータ・既存の設定の実体）
-- **出力**: `docs/tech-requirements.md` — **1 本**
-- **雛形**: `docs/tech-requirements-template.md` をコピーして書き始める
+- **出力**: `docs/agent/tech-requirements.md` — **1 本**
+- **雛形**: `docs/agent/tech-requirements-template.md` をコピーして書き始める
 
 入力の Design Doc が無い、または**ステータスが Draft のまま**なら、**ここから始めない**。先に `design-doc` skill を回して確定させる。
 Draft のまま技術に降りると、Design Doc 側の判断が動いたときに要件が丸ごと作り直しになる。
@@ -27,8 +27,8 @@ Draft のまま技術に降りると、Design Doc 側の判断が動いたとき
 | --- | --- |
 | [`.claude/skills/design-doc/SKILL.md`](../design-doc/SKILL.md) | **上流の 7 セクション。** この文書が何を受けるかは、そちらの節番号で指す |
 | [`.claude/skills/user-journey-map/references/evidence.md`](../user-journey-map/references/evidence.md) | **出典記号（◎ / ○ / △ /（記録））と (n/m) の数え方。** この文書に書き写さない |
-| [`docs/ADR/README.md`](../../../docs/ADR/README.md) | **器の一覧**（何をどこに置くか）と、**判定が動いた記録の置き場所と規約。** 本文には残さない |
-| [`docs/tech-requirements-template.md`](../../../docs/tech-requirements-template.md) | **節構成の原本。** 成果物はこれをコピーして起こす |
+| [`docs/agent/ADR/README.md`](../../../docs/agent/ADR/README.md) | **器の一覧**（何をどこに置くか）と、**判定が動いた記録の置き場所と規約。** 本文には残さない |
+| [`docs/agent/tech-requirements-template.md`](../../../docs/agent/tech-requirements-template.md) | **節構成の原本。** 成果物はこれをコピーして起こす |
 
 ## この文書は何を持つのか
 
@@ -197,13 +197,13 @@ Draft のまま技術に降りると、Design Doc 側の判断が動いたとき
 
 書き始める前に手元に置く。無いまま埋めにいかない。
 
-- `docs/design-doc.md` — **ステータスが Fixed であること**。機能要件（スコープ内・対象外・△）とマイルストーン
+- `docs/agent/design-doc.md` — **ステータスが Fixed であること**。機能要件（スコープ内・対象外・△）とマイルストーン
 - 機能要件が名指ししている**一次記録**。転記の元になる
 - 完了判定に使う**入力データ**が手元にあるか。無いなら、それ自体が △ である
 
 ### 2. 雛形をコピーする
 
-`docs/tech-requirements-template.md` を `docs/tech-requirements.md` にコピーし、
+`docs/agent/tech-requirements-template.md` を `docs/agent/tech-requirements.md` にコピーし、
 ガイドの引用ブロック（`>` で始まる部分）を読みながら埋める。埋めたガイドは消してよい。
 
 ### 3. 上流を 1 行ずつ仕分ける
@@ -212,7 +212,7 @@ Draft のまま技術に降りると、Design Doc 側の判断が動いたとき
 
 - **仕分けの結果を、この文書の「入力元」の表に残す。** 残さないと、次に読む人が同じ仕分けをやり直す
 - **上流のスコープ内の項目を、1 つも取りこぼさない。** 対応する要件が無い項目が残っていないかを数える
-- **上流から実体を抜くなら、抜く前に ADR を起こす**（規約は [`docs/ADR/README.md`](../../../docs/ADR/README.md)）。
+- **上流から実体を抜くなら、抜く前に ADR を起こす**（規約は [`docs/agent/ADR/README.md`](../../../docs/agent/ADR/README.md)）。
   先に抜くと、抜いた瞬間に情報が消える
 - **この文書から実体を抜くときも同じである**（記録の実体を記録の隣に出す場合 → 「記録からの転記」）
 - **抜かずに両方に持たない。** どちらが原本か分からなくなる
@@ -285,7 +285,7 @@ Draft のまま技術に降りると、Design Doc 側の判断が動いたとき
 
 ## 成果物のフォーマット
 
-**原本は [`docs/tech-requirements-template.md`](../../../docs/tech-requirements-template.md) 1 つ。**
+**原本は [`docs/agent/tech-requirements-template.md`](../../../docs/agent/tech-requirements-template.md) 1 つ。**
 **ここに雛形を書き写さない。**
 
 ```markdown
@@ -334,20 +334,20 @@ Draft のまま技術に降りると、Design Doc 側の判断が動いたとき
 
 **末尾の `## 更新ログ` は、この文書の判定が動いたときの索引**
 （選定が覆った・仕様が変わった・測り方が変わった・△ が増減した）。
-`docs/tech-requirements.md` を起こした時点では ADR が 0 本なので、**見出しと空の表だけ置く**。
+`docs/agent/tech-requirements.md` を起こした時点では ADR が 0 本なので、**見出しと空の表だけ置く**。
 判定が動いたら ADR を 1 本起こし、ここに **1 行（日付・動いたもの・ADR へのリンク）**足す。
 **ここに理由・経緯を書き始めたら、それは ADR に書くもの。**
 
-**上流の判断が動いた場合は、こちらではなく `docs/ADR/design-doc/` と Design Doc の更新ログに足す。**
+**上流の判断が動いた場合は、こちらではなく `docs/agent/ADR/design-doc/` と Design Doc の更新ログに足す。**
 **1 つの判定を両方に二重に書かない。**
 
-置き場所（`docs/ADR/tech-requirements/`）・フォルダを作るタイミング・ファイル名・連番・Status・参照の書き方は
-[`docs/ADR/README.md`](../../../docs/ADR/README.md)、雛形は [`docs/ADR/_template.md`](../../../docs/ADR/_template.md)。
+置き場所（`docs/agent/ADR/tech-requirements/`）・フォルダを作るタイミング・ファイル名・連番・Status・参照の書き方は
+[`docs/agent/ADR/README.md`](../../../docs/agent/ADR/README.md)、雛形は [`docs/agent/ADR/_template.md`](../../../docs/agent/ADR/_template.md)。
 **規約をここに書き写さない。**
 
 ## 完了チェック
 
-- [ ] 入力の `docs/design-doc.md` が **Fixed** で、上流を 1 行ずつ仕分けた結果が**入力元の表**に残っている
+- [ ] 入力の `docs/agent/design-doc.md` が **Fixed** で、上流を 1 行ずつ仕分けた結果が**入力元の表**に残っている
 - [ ] 上流のスコープ内の**全項目**に、対応する要件がある（**取りこぼした項目が無い**）
 - [ ] **実行形態と、動かす人に要求するもの**が決まっていて、上流の達成条件と「前提知識が振れる」記述に照らして書かれている
 - [ ] 業務の規則が**出どころ付き**で書かれている（**出どころの無い規則が 1 つも無い**）
@@ -367,10 +367,10 @@ Draft のまま技術に降りると、Design Doc 側の判断が動いたとき
 - [ ] △ が「**判断が決まっていない**（→ 上流）」と「**手段・値が決まっていない**（→ この文書）」で分かれている。
       **1 つも無いなら「現時点で △ は無い」と 1 行**ある
 - [ ] 上流の**対象外を広げていない**。この文書で足した対象外は**明記**されていて、**要件がそれに依存していない**
-- [ ] 上流の判断を動かしたなら、**`docs/ADR/design-doc/` の ADR と Design Doc 側の更新ログ 1 行**がある
+- [ ] 上流の判断を動かしたなら、**`docs/agent/ADR/design-doc/` の ADR と Design Doc 側の更新ログ 1 行**がある
 - [ ] 上流から実体を抜いたなら、**抜く前に ADR を起こしている**
 - [ ] 末尾に**更新ログ節**がある（ADR が 0 本なら、見出しと空の表のまま置く）
-- [ ] `docs/tech-requirements.md` **1 本**として出力されている（機能ごとに分けていない。
+- [ ] `docs/agent/tech-requirements.md` **1 本**として出力されている（機能ごとに分けていない。
       **実体を記録の隣に出していても 1 本である**）
 - [ ] **記録を 1 回引き直したときに、この文書に増えるのが在処と「変えないという判断」の行だけ**になっている
       （実体が記録の隣にあるとき。→ 2 の成長の不変量）

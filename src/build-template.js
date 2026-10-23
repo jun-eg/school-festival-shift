@@ -1,5 +1,5 @@
 /**
- * テンプレートを 1 つ作る（docs/tech-requirements.md 8 の 1）。
+ * テンプレートを 1 つ作る（docs/agent/tech-requirements.md 8 の 1）。
  *
  * 実装者が 1 回だけ走らせ、出来上がったスプレッドシートを担当者にコピーさせる。
  * 担当者のメニュー（menu.js）には出さない。

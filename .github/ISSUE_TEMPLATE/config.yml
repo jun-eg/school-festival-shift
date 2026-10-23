@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: issue と PR の本文の書き方
+    url: https://github.com/jun-eg/school-festival-shift/blob/main/docs/README.md
+    about: 上段は人が読む 20 行まで、下段は details に根拠を畳む。PR は「困っていたこと／やったこと／確かめたこと」

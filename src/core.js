@@ -1,5 +1,5 @@
 /**
- * コア — 配列を受けて配列を返す純粋な関数の置き場（docs/tech-requirements.md 6 の #8）。
+ * コア — 配列を受けて配列を返す純粋な関数の置き場（docs/agent/tech-requirements.md 6 の #8）。
  *
  * SpreadsheetApp を掴まない。掴むと、生成をブラウザ側に移す逃げ道（→ 6-1 の #2）が消える。
  * 読み書きと値の表現を揃えるのは shell.js で、ここには文字列と数値だけの行が来る（→ checkRepresentation）。

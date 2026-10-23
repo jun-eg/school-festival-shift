@@ -1,5 +1,5 @@
 /**
- * 入力の型 — docs/tech-requirements.md 5-1 の 7 種類（issue #140）。
+ * 入力の型 — docs/agent/tech-requirements.md 5-1 の 7 種類（issue #140）。
  *
  * 殻が読んだ行の配列を 7 種類の型に直す。ここを通った先には 7 種類の外の値が無い（→ 5 の #1）。
  * 来るのは殻が表現を揃えた行である（→ core.js の checkRepresentation）。
@@ -463,7 +463,7 @@ function readText(source, columns, row, rowIndex, column, blankAllowed) {
 
 /**
  * 学籍番号のセル。10 桁の英数字かを見て、大文字に揃えて返す（→ 3 の規則 2 の ①）。
- * 大文字・小文字に意味は無い（→ docs/interviews/02-作る側.md）。揃えるのはここ 1 箇所で、以降は素の等値で比べる。
+ * 大文字・小文字に意味は無い（→ docs/agent/interviews/02-作る側.md）。揃えるのはここ 1 箇所で、以降は素の等値で比べる。
  */
 function readStudentId(source, columns, row, rowIndex) {
   const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
