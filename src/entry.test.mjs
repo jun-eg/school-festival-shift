@@ -24,16 +24,27 @@ import { menuItems } from './shell/menu.js'
 
 const srcDir = path.dirname(fileURLToPath(import.meta.url))
 
-/** google.script.run の鎖の最後に呼ばれる、サーバー側の関数の名前（withSuccessHandler などは数えない）。 */
+/** google.script.run の鎖のうち、サーバー側の関数の名前（withSuccessHandler などは飛ばす）。ファイル内の google.script.run を全部見る。 */
 function calledFromHtml(script) {
   const handlers = ['withSuccessHandler', 'withFailureHandler', 'withUserObject']
   const called = []
-  const from = script.indexOf('google.script.run')
-  if (from === -1) return called
-  for (const match of script.slice(from).matchAll(/\)\s*\.(\w+)\(/g)) {
-    if (handlers.indexOf(match[1]) === -1) {
-      called.push(match[1])
-      break
+  for (const start of script.matchAll(/google\.script\.run\b/g)) {
+    let at = start.index + start[0].length
+    for (;;) {
+      const next = /^\s*\.(\w+)\s*\(/.exec(script.slice(at))
+      if (!next) break
+      if (handlers.indexOf(next[1]) === -1) {
+        called.push(next[1])
+        break
+      }
+      // ハンドラの引数（関数の本体を含む）を丸ごと飛ばす
+      let depth = 1
+      at += next[0].length
+      while (at < script.length && depth > 0) {
+        if (script[at] === '(') depth++
+        else if (script[at] === ')') depth--
+        at++
+      }
     }
   }
   return called
@@ -152,13 +163,15 @@ check(
   ],
 )
 check(
-  '⑤ HTML の呼び先を拾う: 成功・失敗のハンドラは数えず、鎖の最後の関数を返す。google.script.run が無ければ空である',
+  '⑤ HTML の呼び先を拾う: 成功・失敗のハンドラは数えず、鎖のサーバー側の関数を返す（ハンドラ無しでも、1 ファイルに 2 か所あっても）。google.script.run が無ければ空である',
   [
     calledFromHtml("google.script.run\n  .withSuccessHandler(show)\n  .withFailureHandler(function (e) { say(e.message) })\n  .someServerFunction({ a: 1 })"),
     calledFromHtml("google.script.run.withSuccessHandler(done).other()"),
     calledFromHtml('document.getElementById("x")'),
+    calledFromHtml('google.script.run.f(x)'),
+    calledFromHtml('google.script.run.withSuccessHandler(function (a) { b(a) }).first()\ngoogle.script.run.second({ k: 1 })'),
   ],
-  [['someServerFunction'], ['other'], []],
+  [['someServerFunction'], ['other'], [], ['f'], ['first', 'second']],
 )
 
 fs.rmSync(outdir, { recursive: true, force: true })

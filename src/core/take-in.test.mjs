@@ -346,7 +346,7 @@ check(
 )
 
 check(
-  '⑤ take-in.js を import し忘れると、ビルドが止まる（段「取り込む」は import した takeIn である）',
+  '⑤ 段「取り込む」は、import した takeIn である',
   builtInSteps()['取り込む'] === takeIn,
   true,
 )

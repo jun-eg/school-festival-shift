@@ -24,6 +24,8 @@ const gasGlobals = [
   'SpreadsheetApp', 'FormApp', 'HtmlService', 'DriveApp', 'Utilities', 'PropertiesService', 'CacheService',
   'ScriptApp', 'Session', 'LockService', 'UrlFetchApp', 'DocumentApp', 'SlidesApp', 'CardService', 'MailApp',
   'GmailApp', 'CalendarApp', 'ContentService', 'Logger', 'Browser', 'Charts', 'Maps', 'XmlService', 'Jdbc',
+  // globalThis.SpreadsheetApp の形で掴むのも止める（. の後ろの名前は見えないので、globalThis そのものを止める）。
+  'globalThis',
 ]
 
 /** file（src/ からの相対パス）の import のうち、src/core/ の外を指すもの。 */
@@ -104,6 +106,7 @@ check(
     gasGlobalsUsedIn('const form = FormApp.create(`${Utilities.formatDate(d)}`)'),
     gasGlobalsUsedIn("// SpreadsheetApp を掴まない\nconst text = 'SpreadsheetApp'\n/* FormApp */\nconst ok = typeof console\n"),
     gasGlobalsUsedIn('const x = sheet.SpreadsheetApp'),
+    gasGlobalsUsedIn('const ss = globalThis.SpreadsheetApp.getActive()'),
   ],
-  [['SpreadsheetApp'], ['FormApp', 'Utilities'], [], []],
+  [['SpreadsheetApp'], ['FormApp', 'Utilities'], [], [], ['globalThis']],
 )

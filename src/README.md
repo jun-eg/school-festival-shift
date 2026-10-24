@@ -224,9 +224,9 @@ HTML の `<script src>` は、ビルドが [`ui/`](ui/) の JS の中身に差�
 
 **他のファイルの値を、ファイルの最上位で使わない。** `import` は互いに循環している（`core.js` が段を `import` し、段が `core.js` の `sheetColumns` などを `import` する）ので、
 **最上位で使うと評価の順で壊れる。**`core.js` も `shell.js` も `verify-structure.js` も、[`sheet-layout.js`](core/sheet-layout.js) を見るのは関数の中だけにしてある。
-**`import` し忘れは、ビルドが名指しで止まる** — `builtInSteps` が返す段は [`take-in.js`](core/take-in.js) と [`expand.js`](core/expand.js) と
+**`import` の書き間違いは、ビルドか検査が止める** — `builtInSteps` が返す段は [`take-in.js`](core/take-in.js) と [`expand.js`](core/expand.js) と
 [`generate.js`](core/generate.js)（`固定を照らす` の `nameFixedConflicts` も）と [`count-violations.js`](core/count-violations.js) と [`name-unmet.js`](core/name-unmet.js) と [`fairness-metrics.js`](core/fairness-metrics.js) から `import` したものなので、
-**どれかが無ければ、段を「まだ作っていない」に混ぜる前に、`import` が解決せずにビルドも検査も落ちる。**（以前は `.gs` を手で貼ったので、貼り忘れを実行時に名指しして止めていた。）
+**`import` の行き先や名前を間違えればビルドが止まり、`import` の行そのものが無ければ `npm test` が `ReferenceError` で落ちる（ビルドは通る）。**段を「まだ作っていない」に混ぜて黙って進むことはない。（以前は `.gs` を手で貼ったので、貼り忘れを実行時に名指しして止めていた。）
 
 ### 取り込む側は、後から来た行を採る
 

@@ -755,7 +755,7 @@ check(
 )
 
 check(
-  '⑥ generate.js を import し忘れると、ビルドが止まる（段「生成する」は import した generate である → core.js の builtInSteps）',
+  '⑥ 段「生成する」は、import した generate である（→ core.js の builtInSteps）',
   builtInSteps()['生成する'] === generate,
   true,
 )

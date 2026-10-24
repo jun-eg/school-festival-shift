@@ -443,7 +443,7 @@ check(
 )
 
 check(
-  '⑥ expand.js を import し忘れると、ビルドが止まる（段「展開する」は import した expand である）',
+  '⑥ 段「展開する」は、import した expand である',
   builtInSteps()['展開する'] === expand,
   true,
 )
