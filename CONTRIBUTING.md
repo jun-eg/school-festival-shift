@@ -40,7 +40,7 @@ Apps Script に貼る物を作るのは `npm run build` で、`dist/` に出る�
 
 **手元の検査（`npm test`）と CI だけで回る。E2E（`npm run e2e`）は任意で、GCP プロジェクトも `clasp` のログインも要求しない。**
 **CI では回さず、`npm test` にも混ぜない。** やるなら、検証用のスプレッドシートで `buildTemplate` → モック投入 → 構造検証 → 生成 → 画像 → フォームを作る → 来年用に空にする、を実機で 1 本に回し、手元の検査と同じ結果になるかを見る（画面でしか分からないものは [`src/real-device-log.md`](src/real-device-log.md) が名指しで持つ）。
-**用意するもの・硬さ・止まる所は [`e2e/README.md`](e2e/README.md) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
+**用意するもの・硬さ・止まる所は [`e2e/README.md`](e2e/README.md) が、止まったときの症状と対処は [`docs/e2e-症状と対処.md`](docs/e2e-症状と対処.md) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
 **トークン・OAuth クライアントの JSON・`.env` は commit しない。** `.gitignore` が名指しし、pre-commit の `秘密の検査` が中身を止める。
 
 ## コードの中身は `src/README.md` を読む

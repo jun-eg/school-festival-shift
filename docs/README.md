@@ -13,6 +13,7 @@
 | [`hmw.md`](hmw.md) | どの改善機会を採り、どの問いからどのソリューションを選んだか | [`agent/hmw.md`](agent/hmw.md) |
 | [`design-doc.md`](design-doc.md) | 何を作るか。7 セクションの結論と、まだ決まっていないこと | [`agent/design-doc.md`](agent/design-doc.md) |
 | [`tech-requirements.md`](tech-requirements.md) | どう作るか。実行形態・業務の規則・完了の測り方 | [`agent/tech-requirements.md`](agent/tech-requirements.md) |
+| [`e2e-症状と対処.md`](e2e-症状と対処.md) | `npm run e2e` が実機で止まるときの症状・切り分け・対処（トークン切れ・GCP の結び付け・180 秒の二重実行） | [`agent/e2e-症状と対処.md`](agent/e2e-症状と対処.md) |
 | [`ADR/`](ADR/) | 判定がどう動いたか。原本と同じ `<対象>/<同名>.md` に、1 本 10 行で | [`agent/ADR/`](agent/ADR/) |
 
 要約を置かないものもある。
