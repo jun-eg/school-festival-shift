@@ -19,6 +19,10 @@ git config core.hooksPath .githooks
 （何を回すかは hook を読む。写さない）。**同じ検査が PR でも回る**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
 **止まったときの直し方は [`docs/README.md`](docs/README.md) の「古さの check」。**
 
+**同じ設定で `git push` の前に [`.githooks/pre-push`](.githooks/pre-push) も走る。** 検査ファイル・検査を弱める設定（`package.json` の test 系 script、`ci.yml` の test の step）に差分が無い push は、何も呼ばずに通る（1 秒未満）。
+差分があるときだけ `claude -p --agent test-diff-reviewer` が差分を読み、検査を消す・緩める変更に根拠（同じ push の実装の変更、issue の「決めたこと」）が無ければ止める。
+**`claude`（Claude Code）が PATH に要る。** 無ければ入れ方を出して止まる。**人が承知で抜けるのは `git push --no-verify` だけ**（Claude には [`guard-bash`](.claude/README.md) が打たせない）。CI では回さない。
+
 ## コードを回すには、3 手で足りる
 
 ```
