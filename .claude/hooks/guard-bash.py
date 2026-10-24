@@ -158,10 +158,14 @@ def pr_base(number, repo):
     return out.stdout.strip() or None
 
 
-def gh_subcommand(tokens):
-    """`gh -R o/r pr merge ...` のような前置きの repo 指定を飛ばして (サブコマンド列, repo) を返す。"""
+def strip_gh_repo(tokens):
+    """`-R x` / `--repo x` / `--repo=x` / `-Rx` をどの位置からでも抜き、(残りの tokens, repo) を返す。
+
+    gh は repo 指定を `gh -R x pr merge`・`gh pr -R x merge`・`gh pr merge -R x` のどこにでも置ける。
+    """
+    rest = []
     repo = None
-    i = 1
+    i = 0
     while i < len(tokens):
         token = tokens[i]
         if token in ("-R", "--repo"):
@@ -176,33 +180,32 @@ def gh_subcommand(tokens):
             repo = token[2:]
             i += 1
             continue
+        rest.append(token)
+        i += 1
+    return rest, repo
+
+
+def gh_subcommand(tokens):
+    """repo 指定を抜いたうえで、フラグでない語の 1 つ目と 2 つ目（`pr` `merge`）と、その後ろの引数と、repo を返す。"""
+    rest, repo = strip_gh_repo(tokens[1:])
+    words = []
+    for i, token in enumerate(rest):
         if token.startswith("-"):
-            i += 1
             continue
-        return tokens[i:], repo
-    return [], repo
+        words.append(token)
+        if len(words) == 2:
+            return words, rest[i + 1:], repo
+    return words, [], repo
 
 
 def check_gh_pr_merge(args, repo):
-    """`gh pr merge` の残り引数を見る。番号必須・rebase 禁止・base が守る branch なら止める。"""
+    """`gh pr merge` の残り引数を見る。番号必須・rebase 禁止・base が守る branch なら止める。repo 指定は抜いた後で渡される。"""
     number = None
     i = 0
     while i < len(args):
         arg = args[i]
-        if arg == "--rebase" or (GH_SHORT_BUNDLE.match(arg) and "r" in arg[1:]):
+        if arg == "--rebase" or arg.startswith("--rebase=") or (GH_SHORT_BUNDLE.match(arg) and "r" in arg[1:]):
             return MSG_MERGE_REBASE
-        if arg in ("-R", "--repo"):
-            repo = args[i + 1] if i + 1 < len(args) else None
-            i += 2
-            continue
-        if arg.startswith("--repo="):
-            repo = arg.split("=", 1)[1]
-            i += 1
-            continue
-        if arg.startswith("-R") and len(arg) > 2:
-            repo = arg[2:]
-            i += 1
-            continue
         if arg in GH_MERGE_TAKES_VALUE:
             i += 2
             continue
@@ -220,13 +223,13 @@ def check_gh_pr_merge(args, repo):
 
 
 def check_gh(tokens):
-    sub, repo = gh_subcommand(tokens)
-    if len(sub) >= 2 and sub[0] == "pr" and sub[1] == "merge":
-        reason = check_gh_pr_merge(sub[2:], repo)
+    words, args, repo = gh_subcommand(tokens)
+    if words[:2] == ["pr", "merge"]:
+        reason = check_gh_pr_merge(args, repo)
         if reason:
             return reason
-    if sub and sub[0] == "api":
-        if any(GH_API_MERGE.search(t) for t in sub[1:] if not t.startswith("-")):
+    if words[:1] == ["api"]:
+        if any(GH_API_MERGE.search(t) for t in tokens[1:] if not t.startswith("-")):
             return MSG_GH_API_MERGE
     for i, token in enumerate(tokens):
         if GH_RAW_FIELD.match(token):

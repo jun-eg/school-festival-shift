@@ -68,6 +68,10 @@ DENY = [
     "gh pr merge 34 -Rx/y --merge",
     "gh -R x/y pr merge 34 --merge",
     "gh pr merge 34 --merge --repo=x/y",
+    "gh pr -R o/r merge 12 --merge",
+    "gh pr --repo=o/r merge 12 --merge",
+    "gh pr -R x/y merge 34 --merge",
+    "gh pr merge 34 --rebase=true",
 ]
 
 # 通ってほしい形（止めすぎていないか）
@@ -83,6 +87,7 @@ ALLOW = [
     "gh pr merge -m 34",
     "gh pr merge 34 -md",
     "gh pr merge -Ro/r 34 --merge",
+    "gh pr -R o/r merge 34 --merge",
     "gh pr view 12 --json baseRefName",
     "gh api repos/o/r/pulls/12",
     "gh pr checks 34 --watch",
