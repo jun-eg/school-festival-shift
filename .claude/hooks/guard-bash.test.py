@@ -45,6 +45,17 @@ DENY = [
     "git push --force-with-lease=origin/main origin main",
     "cd /tmp && git push origin main --force",
     "echo hi; gh api x -f body=@f.md",
+    # pre-push を飛ばす道（issue #343）
+    "git push --no-verify",
+    "git push origin foo --no-verify",
+    "git push --no-verify -u origin foo",
+    "git push --no-ver origin foo",
+    "git -C /tmp/x push --no-verify origin foo",
+    "git -c core.hooksPath=/dev/null push origin foo",
+    "git -C /tmp/x -c core.hooksPath=/dev/null push origin foo",
+    "git --config-env=core.hooksPath=V push origin foo",
+    "git --config-env core.hooksPath=V push origin foo",
+    "cd /tmp && git push origin foo --no-verify",
     # main への push（issue #320）
     "git push origin main",
     "git push -u origin main",
@@ -81,6 +92,9 @@ ALLOW = [
     "git push --follow-tags origin foo",
     "git push -u origin worktree-320-x",
     "git push origin HEAD",
+    "git commit -m 'no-verify の話'",
+    "git push origin no-verify-branch",
+    "git -c core.hooksPath=.githooks commit -m x",
     "gh pr merge 34 --merge",
     "gh pr merge 34 --merge --repo o/r",
     "gh -R o/r pr merge 34 --merge",
@@ -146,6 +160,20 @@ for cmd in ALLOW:
     mark = "OK  " if d is None else "FAIL"
     if d is not None: fails.append(("should allow", cmd))
     print(f"{mark} allow | {cmd}")
+
+# settings.json の allow に npm scripts が入っていて、deny は残っている（確認ダイアログ無しで回せる形）
+SETTINGS = os.path.join(HERE, "..", "settings.json")
+with open(SETTINGS, encoding="utf-8") as f:
+    perms = json.load(f)["permissions"]
+for rule in ["Bash(npm test)", "Bash(npm run typecheck)", "Bash(npm run lint)", "Bash(npm run format)",
+             "Bash(npm run build)", "Bash(npm run e2e)", "Bash(npm run 判定)"]:
+    ok = rule in perms.get("allow", [])
+    if not ok: fails.append(("settings.json allow に無い", rule))
+    print(f"{'OK  ' if ok else 'FAIL'} allow-rule | {rule}")
+for rule in ["Bash(git push --force:*)", "Bash(git push --no-verify:*)", "Bash(git commit --amend:*)", "Bash(git reset --hard:*)"]:
+    ok = rule in perms.get("deny", [])
+    if not ok: fails.append(("settings.json deny から消えている", rule))
+    print(f"{'OK  ' if ok else 'FAIL'} deny-rule  | {rule}")
 
 print()
 print(f"{TARGET}: {len(DENY)+len(ALLOW)} cases, {len(fails)} failures")

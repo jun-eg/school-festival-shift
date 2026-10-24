@@ -3,10 +3,29 @@
 #
 # 有効にする: git config core.hooksPath .githooks（手順は CONTRIBUTING.md）
 # 止まったときの直し方は docs/README.md の「古さの check」。
-# lint・型・テスト（npm test）は issue #310 でここに足す。
+# 秘密の検査は、トークン・鍵・E2E の ID の混ざりを止める（→ e2e/README.md）。
+# 型・lint・テスト・ビルドは CI の job code と同じ順（issue #310）。E2E と npm run 判定（約 7 秒）は CI だけで回す。
+# npm test は pretest で型をもう一度回すので、型は上で 1 回だけ回し --ignore-scripts で重ねない。
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
+node scripts/秘密の検査.mjs
 node scripts/リンクの検査.mjs
 node scripts/要約の検査.mjs
+
+# hook は GIT_DIR・GIT_INDEX_FILE を子に渡す。npm test の中で git を呼ぶ検査（src/entry.test.ts は一時 repo を作る）が
+# この repo に commit・tag を書いてしまうので、npm を回す前に外す。
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX GIT_AUTHOR_DATE GIT_EDITOR
+
+npm run typecheck
+npm run lint
+npm test --ignore-scripts
+npm run build
+
+# 検査が本物の repo の core.bare を書き換えていたら（issue #354）、次の git が「must be run in a work tree」で止まる前に、ここで止める。
+if [ "$(git config --get core.bare)" = "true" ]; then
+  echo "pre-commit: core.bare が true になっている（検査の git が外から渡された GIT_DIR を引き継いだ跡）。" >&2
+  echo "直し方: git --git-dir=<メインの checkout>/.git config core.bare false（CONTRIBUTING.md「must be run in a work tree」）" >&2
+  exit 1
+fi

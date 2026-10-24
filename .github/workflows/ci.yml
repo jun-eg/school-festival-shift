@@ -1,5 +1,5 @@
 # CI — PR と main への push で、repo の文書の検査を回す。
-# 型・lint・テスト・ビルドの job は issue #305 でここに足す（node-version-file も #300 の .node-version が入ったら切り替える）。
+# job 名（name:）はブランチ保護の必須ステータスに名指しされる。変えるときは保護の設定も直す（issue #305）。
 name: ci
 
 on:
@@ -15,8 +15,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - name: 相対リンクが実在するファイルに解決するか
         run: node scripts/リンクの検査.mjs
       - name: 要約が原本（HEAD）より古くなっていないか
         run: node scripts/要約の検査.mjs --head
+
+  code:
+    name: code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: 型
+        run: npm run typecheck
+      - name: lint
+        run: npm run lint
+      - name: テスト
+        run: npm test
+      - name: ビルド
+        run: npm run build
+      - name: 判定（M1〜M4 の判定と検算。要件定義書 7 の数字）
+        run: npm run 判定
+
+  hooks:
+    name: hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: guard-bash の検査
+        run: python3 .claude/hooks/guard-bash.test.py

@@ -1,0 +1,27 @@
+{
+  "name": "school-festival-shift",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "lint": "biome check",
+    "format": "biome format --write",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/ui/tsconfig.json && tsc -p tsconfig.test.json",
+    "pretest": "npm run typecheck",
+    "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"e2e/**/*.test.mjs\"",
+    "判定": "node scripts/前回の5時刻.mjs && node scripts/件数の検算.mjs && node scripts/M1①の判定.mjs && node scripts/M1②の判定.mjs && node scripts/生成の所要時間.mjs && node scripts/M2の判定.mjs && node scripts/まとまりと散らし.mjs && node scripts/M4の判定.mjs && node scripts/前回のシフト表.mjs",
+    "e2e": "node e2e/run.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@google/clasp": "3.4.1",
+    "@types/google-apps-script": "^2.0.13",
+    "@types/google.script.client-side": "^0.1.5",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

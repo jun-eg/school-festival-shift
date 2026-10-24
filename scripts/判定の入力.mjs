@@ -4,8 +4,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { 営業時刻の行 } from './前回の5時刻.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
@@ -20,36 +19,57 @@ export function 読む(相対) {
 export const 宣言 = JSON.parse(読む('scripts/M2の宣言.json'))
 
 /**
- * 実装を読んだ文脈を作る（SpreadsheetApp は置かない）。
+ * 実装（宣言の「実装」の .ts）を import して、名前の入れ物を作る（SpreadsheetApp は置かない）。
  * 規則も数え方も書き直さない — 書き直した規則で 0 件になっても答えにならない。
+ * 取り出せるのは各ファイルが export している名前だけで、同じ名前が 2 つ以上のファイルにあれば止まる。
  */
-export function 実装の文脈() {
-  const 文脈 = vm.createContext({})
-  for (const 相対 of 宣言.入力.実装) {
-    vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-  }
-  return 文脈
+export async function 実装の文脈() {
+  return 読み込む(宣言.入力.実装)
 }
 
-/** 文脈から名前を取り出す。どの名前が要るかは使う側が決める。 */
+/** .ts のパス（リポジトリの根から）を import して、export を 1 つの入れ物に並べる。 */
+export async function 読み込む(相対たち) {
+  const 入れ物 = {}
+  for (const 相対 of 相対たち) {
+    const 中身 = await import(pathToFileURL(path.join(根, 相対)).href)
+    for (const [名前, 値] of Object.entries(中身)) {
+      if (名前 in 入れ物 && 入れ物[名前] !== 値) throw new Error(`export の名前が重なっている: ${名前}（${相対}）`)
+      入れ物[名前] = 値
+    }
+  }
+  return 入れ物
+}
+
+/** 入れ物から名前を取り出す。どの名前が要るかは使う側が決める。無ければ名指しして止まる。 */
 export function 取り出す(文脈, 名前) {
-  return vm.runInContext(`({ ${名前.join(', ')} })`, 文脈)
+  return Object.fromEntries(
+    名前.map((n) => {
+      if (!(n in 文脈)) throw new Error(`export が無い: ${n}（src/ の .ts のどれも export していない）`)
+      return [n, 文脈[n]]
+    }),
+  )
 }
 
 /** 引用符の中のコンマを割らないだけの CSV の読み。友達欄が引用符付きで入っている。 */
 export function CSVを読む(文) {
-  return 文.replace(/^﻿/, '').trim().split(/\r?\n/).map((行) => {
-    const セル = []
-    let 溜め = ''
-    let 引用符の中 = false
-    for (const 文字 of 行) {
-      if (文字 === '"') 引用符の中 = !引用符の中
-      else if (文字 === ',' && !引用符の中) { セル.push(溜め); 溜め = '' }
-      else 溜め += 文字
-    }
-    セル.push(溜め)
-    return セル
-  })
+  return 文
+    .replace(/^﻿/, '')
+    .trim()
+    .split(/\r?\n/)
+    .map((行) => {
+      const セル = []
+      let 溜め = ''
+      let 引用符の中 = false
+      for (const 文字 of 行) {
+        if (文字 === '"') 引用符の中 = !引用符の中
+        else if (文字 === ',' && !引用符の中) {
+          セル.push(溜め)
+          溜め = ''
+        } else 溜め += 文字
+      }
+      セル.push(溜め)
+      return セル
+    })
 }
 
 /**
@@ -76,7 +96,7 @@ export function 判定の入力(文脈) {
       try {
         expand([一人], 日ごと)
         return false
-      } catch (例外) {
+      } catch {
         return true
       }
     })
@@ -88,15 +108,15 @@ export function 判定の入力(文脈) {
 
   return {
     入力: {
-      '日ごとの営業時刻': 営業時刻の行(),
-      '役割と必要人数': 条件入力.役割と必要人数,
-      '調理責任者の学年': 条件入力.調理責任者の学年.map((学年) => [学年]),
-      '委員会の指定枠': 条件入力.委員会の指定枠,
+      日ごとの営業時刻: 営業時刻の行(),
+      役割と必要人数: 条件入力.役割と必要人数,
+      調理責任者の学年: 条件入力.調理責任者の学年.map((学年) => [学年]),
+      委員会の指定枠: 条件入力.委員会の指定枠,
       '準備・片付けのルール': 項目と値の行('準備・片付けのルール'),
-      '置き方のルール': 項目と値の行('置き方のルール'),
-      '回答': 組む回答,
-      '割り当て': [],
-      '手直し': [],
+      置き方のルール: 項目と値の行('置き方のルール'),
+      回答: 組む回答,
+      割り当て: [],
+      手直し: [],
     },
     回答の全行: 回答の全行,
     日ごと: 日ごと,

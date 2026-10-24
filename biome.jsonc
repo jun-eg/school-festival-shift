@@ -1,0 +1,56 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": ["src/**/*.ts", "src/**/*.js", "src/**/*.mjs", "scripts/**/*.js", "scripts/**/*.mjs", "e2e/**/*.mjs"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    // 広めに取り、Biome の組み直しで長い行が縦に伸びすぎないようにする（折り返しの位置は Biome が決める）
+    "lineWidth": 320
+  },
+  "javascript": {
+    "formatter": { "quoteStyle": "single", "semicolons": "asNeeded" }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        // import の並べ替えは書式でなく中身の差分になる。この issue の範囲外
+        "organizeImports": "off"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
+      },
+      "complexity": {
+        // 列見出し（日本語）を row['氏名'] と書く検査が多く、ドット記法に直す利点が無い
+        "useLiteralKeys": "off",
+        // 書き方の好みを強いる規則。書き直しは次の親（src/ の根本リファクタ）で決める
+        "useArrowFunction": "off",
+        "useOptionalChain": "off",
+        // 計測の包み関数が arguments で転送している。rest への書き直しは検査スクリプトの中身の変更になる
+        "noArguments": "off"
+      },
+      "style": {
+        // strict の型を通した後の ! で、検査の中に多い。外すと検査の読みが悪くなる
+        "noNonNullAssertion": "off",
+        // 書き方の好み。書き直しは次の親で決める
+        "useTemplate": "off"
+      },
+      "suspicious": {
+        // 偽の spreadsheet／form を型で縛らず any で受ける所が test/fakes と検査に残る。型付けは次の親で決める
+        "noExplicitAny": "off",
+        // row.hasOwnProperty ではなく Object.prototype.hasOwnProperty.call で呼んでおり、安全。Object.hasOwn への置換は次の親で決める
+        "noPrototypeBuiltins": "off",
+        // GAS の禁止語を探す検査が、テンプレート文字列に似た文字列を意図して持つ
+        "noTemplateCurlyInString": "off"
+      }
+    }
+  }
+}

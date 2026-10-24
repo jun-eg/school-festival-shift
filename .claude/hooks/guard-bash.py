@@ -43,6 +43,10 @@ MSG_FORCE = (
     "force-push は禁止（issue #73）。レビュー済みコミットが消えるとレビューコメントが行を見失う。"
     "main を取り込むなら `git merge origin/main`。"
 )
+MSG_NO_VERIFY = (
+    "`git push --no-verify` は止めている（issue #343）。pre-push の検査（検査を消す・緩める差分の判定）を飛ばす道は人だけが使う。"
+    "止まった根拠を読み、検査を直すか、根拠を commit・issue に足して打ち直す。"
+)
 MSG_REBASE = (
     "push 済みかどうかを判定できないので rebase は一律で止めている（issue #73）。"
     "main の取り込みは `git merge origin/main`。"
@@ -92,9 +96,42 @@ def program(tokens):
     return os.path.basename(tokens[0]) if tokens else ""
 
 
+def git_global_option_values(tokens):
+    """サブコマンドの手前の `-c k=v` と `--config-env k=v` の値（`core.hooksPath` で hook の置き場を差し替える抜け道を見るため）。
+
+    `-C dir` のように値を取るオプションは値ごと飛ばし、サブコマンドの手前まで読む（git_subcommand と同じ）。
+    """
+    takes_value = ("-C", "--git-dir", "--work-tree", "--namespace", "--exec-path")
+    values = []
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        if token in ("-c", "--config-env") and i + 1 < len(tokens):
+            values.append(tokens[i + 1])
+            i += 2
+            continue
+        if token.startswith("--config-env="):
+            values.append(token.split("=", 1)[1])
+            i += 1
+            continue
+        if token in takes_value:
+            i += 2
+            continue
+        if token.startswith("-"):
+            i += 1
+            continue
+        break
+    return values
+
+
+def is_no_verify(arg):
+    """`--no-verify` と、git が受ける一意な短縮（`--no-ver` など）。"""
+    return arg.startswith("--no-v") and "--no-verify".startswith(arg)
+
+
 def git_subcommand(tokens):
     """`git -C dir push ...` のような前置きオプションを飛ばして (サブコマンド, 残り) を返す。"""
-    takes_value = ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path")
+    takes_value = ("-C", "-c", "--config-env", "--git-dir", "--work-tree", "--namespace", "--exec-path")
     i = 1
     while i < len(tokens):
         token = tokens[i]
@@ -111,7 +148,11 @@ def git_subcommand(tokens):
 def check_git(tokens):
     sub, args = git_subcommand(tokens)
     if sub == "push":
+        if any(v.lower().startswith("core.hookspath") for v in git_global_option_values(tokens)):
+            return MSG_NO_VERIFY
         for arg in args:
+            if is_no_verify(arg):
+                return MSG_NO_VERIFY
             if FORCE_LONG.match(arg):
                 return MSG_FORCE
             if FORCE_SHORT.match(arg):

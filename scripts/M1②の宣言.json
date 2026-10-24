@@ -24,35 +24,29 @@
     "回答": "data/前回の希望データ-モック.csv",
     "回答をどう置くか": "フォームが作った回答シートに、見出しを除く 50 行をそのまま貼る（→ docs/agent/tech-requirements.md 7「判定のときは、このファイルを回答シートに貼って入力にする」）。列を並べ替えない・値を直さない — 直した時点で、それが人の手である。タイムスタンプは日時のセルとして置く（回答シートに貼れば日時になる → src/real-device-log.md の項目 8）。",
     "条件入力": {
-      "日ごとの営業時刻": {
-        "2025-11-01": ["08:00", "21:00"],
-        "2025-11-02": ["08:00", "20:00"],
-        "2025-11-03": ["08:00", "20:00"],
-        "2025-11-04": ["08:00", "15:00"]
-      },
-      "置き方": "始まりの 4 つ（準備開始／調理開始／調理終了／片付け開始）をその日の営業開始に、片付け終了を営業終了に置く（→ scripts/M1①の宣言.json と同じ置き方である）。",
-      "なぜ要るか": "設問の題の日付と説明文の営業時間が、ここから出る（→ docs/agent/tech-requirements.md 4-1・4-2・2 の一覧 3）。入れる操作は 2 の一覧 5 の入力で、変換の途中ではない（→ 数えないもの）。",
+      "置き方": "営業時刻は書き換えない。テンプレートを組み立てたときに入る初期値（前回の値 → src/core/sheet-layout.ts の initialRows ／ issue #240）のまま通す。以前は営業時刻の 4 行を営業開始 4 つ＋終了の形で上書きしていたが、初期値の役割の行（時間帯を空けた行）が調理帯・片付け帯に当たらず、生成の入口で止まって判定が落ちた。",
+      "なぜ要るか": "設問の題の日付と説明文の営業時間が、初期値から出る（→ docs/agent/tech-requirements.md 4-1・4-2・2 の一覧 3）。入れる操作は 2 の一覧 5 の入力で、変換の途中ではない（→ 数えないもの）。",
       "なぜ前回の値か": "前回の値を入れたのだから、出てくる設問の題は data/前回の希望データ-モック.csv の見出しと同じになる。同じにならなければ、貼るときに列を並べ替える手が要る（→ 経路の段 5）。"
     },
     "src": [
-      "src/sheet-layout.js",
-      "src/form-definition.js",
-      "src/input-types.js",
-      "src/core.js",
-      "src/take-in.js",
-      "src/expand.js",
-      "src/generate.js",
-      "src/count-violations.js",
-      "src/name-unmet.js",
-      "src/fairness-metrics.js",
-      "src/assignment-grid.js",
-      "src/shell.js",
-      "src/verify-structure.js",
-      "src/build-template.js",
-      "src/build-form.js",
-      "src/menu.js"
+      "src/core/sheet-layout.ts",
+      "src/core/form-definition.ts",
+      "src/core/input-types.ts",
+      "src/core/core.ts",
+      "src/core/take-in.ts",
+      "src/core/expand.ts",
+      "src/core/generate.ts",
+      "src/core/count-violations.ts",
+      "src/core/name-unmet.ts",
+      "src/core/fairness-metrics.ts",
+      "src/core/assignment-grid.ts",
+      "src/shell/shell.ts",
+      "src/shell/verify-structure.ts",
+      "src/shell/build-template.ts",
+      "src/shell/build-form.ts",
+      "src/shell/menu.ts"
     ],
-    "src をどう読むか": "1 つの文脈にそのまま読み込んで走らせる（Apps Script が .gs を 1 つずつ評価するのと同じ形である）。判定の側で書き直さない — 書き直したもので通っても、M1 ② の答えにならない。"
+    "src をどう読むか": "偽の器を globalThis に置いてから、.ts を import してそのまま走らせる。判定の側で書き直さない — 書き直したもので通っても、M1 ② の答えにならない。"
   },
 
   "偽で置き換えるもの": [
@@ -123,7 +117,7 @@
     {
       "番号": 8,
       "鍵": "回答シートを読む",
-      "何が起きるか": "殻が「回答」を範囲ごとに 1 回で読む（→ shell.js の readSection）。",
+      "何が起きるか": "殻が「回答」を範囲ごとに 1 回で読む（→ shell.ts の readSection）。",
       "誰の手か": "スクリプト",
       "人の手が入る形": "担当者が CSV に書き出す／別のシートに写す／要る行だけ選ぶ。",
       "確かめること": "貼った 50 行が 10 列のまま読めている（行も列も落ちていない）。"
@@ -131,7 +125,7 @@
     {
       "番号": 9,
       "鍵": "値の表現を揃える",
-      "何が起きるか": "セルの表現を揃えてコアに渡す（→ shell.js の normalizeValue・core.js の checkRepresentation）。",
+      "何が起きるか": "セルの表現を揃えてコアに渡す（→ shell.ts の normalizeValue・core.ts の checkRepresentation）。",
       "誰の手か": "スクリプト",
       "人の手が入る形": "揃わない値が来ると、コアの入口が名指しして止まる。担当者がセルの書式を直すことになる。",
       "確かめること": "日時のセルが YYYY-MM-DD HH:MM:SS になり、コアの入口を止まらずに通る。"
@@ -148,7 +142,7 @@
 
   "外に出す口": {
     "探す言葉": ["openById", "openByUrl", "DriveApp", "UrlFetchApp"],
-    "探し方": "注釈（/* */ と //）を落としてから探す。注釈に出てくる名前は呼び出しではない — src/build-form.js の「他人のファイルを openById で開かない」がそれである。",
+    "探し方": "注釈（/* */ と //）を落としてから探す。注釈に出てくる名前は呼び出しではない — src/shell/build-form.ts の「他人のファイルを openById で開かない」がそれである。",
     "なぜ探すか": "どれか 1 つでもあれば、回答が別のファイルを経由しうる。経由するなら、そこに担当者の手（書き出し・読み込み・共有）が挟まる余地がある（→ 経路の段 6・2 の「個人情報が通る経路」）。",
     "掴んでよいもの": "このスクリプトが入っているスプレッドシート（getActive）と、ここで作る 1 つのフォームだけである（→ src/README.md の「要求するのは 3 スコープである」）。"
   },
@@ -159,7 +153,7 @@
       "なぜ": "入力だからである（→ docs/agent/tech-requirements.md 7 の M1 ② ／ 2 の一覧 3）。"
     },
     {
-      "何": "条件入力に「日ごとの営業時刻」を入れる操作",
+      "何": "条件入力を書き換える操作（営業時刻は初期値のまま通すので、判定では起きない）",
       "なぜ": "2 の一覧 5 の入力であり、変換の途中ではない。フォームを作る前に来る（→ 2 の「番号は操作の順である」）。"
     },
     {
@@ -183,11 +177,11 @@
     },
     {
       "項目": "作られたフォームが 4 の表と一致するか（仕様 #2 の差分 0）",
-      "なぜ見ないか": "手元の検査が持つ（src/form-definition.test.mjs ／ src/build-form.test.mjs）。ここで数え直さない。"
+      "なぜ見ないか": "手元の検査が持つ（src/core/form-definition.test.ts ／ src/shell/build-form.test.ts）。ここで数え直さない。"
     },
     {
       "項目": "畳み方そのものが規則 2 どおりか",
-      "なぜ見ないか": "手元の検査が持つ（src/take-in.test.mjs）。ここが見るのは、畳むのに人の手が要るかだけである。"
+      "なぜ見ないか": "手元の検査が持つ（src/core/take-in.test.ts）。ここが見るのは、畳むのに人の手が要るかだけである。"
     }
   ],
 

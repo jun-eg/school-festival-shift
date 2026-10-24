@@ -4,15 +4,15 @@
 //   使い方: node scripts/生成の所要時間.mjs
 //   宣言:   scripts/生成の所要時間の宣言.json（上限の秒と入力の置き方の原本）
 //
-// 測るのは src/core.js の build を 1 周する秒で、合格の線は 360 秒（Apps Script の上限 6 分 → 6-1 の #2）。
+// 測るのは src/core/core.ts の build を 1 周する秒で、合格の線は 360 秒（Apps Script の上限 6 分 → 6-1 の #2）。
 // src/ をそのまま走らせる（書き直したコードが速くても、実機で走るコードの答えにならない）。
 // 見るのは時間だけで、案の中身は M2 の判定が見る。
 // 読むだけ。中央値が上限を越えたら終了コード 1。
 
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 読み込む, 取り出す } from './判定の入力.mjs'
 import { 営業時刻の行, 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
@@ -22,34 +22,34 @@ const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 const 宣言 = JSON.parse(読む('scripts/生成の所要時間の宣言.json'))
 
 // ---- 実装を読む ------------------------------------------------------------
-// SpreadsheetApp は置かない（置かずに通ることは src/core.test.mjs が見ている）。
+// SpreadsheetApp は置かない（置かずに通ることは src/core/core.test.ts が見ている）。
 
-const 文脈 = vm.createContext({})
-for (const 相対 of 宣言.入力.実装) {
-  vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-}
-const { build, builtInSteps, takeIn, expand, toDays, formatDateTime, coreSteps } = vm.runInContext(
-  '({ build, builtInSteps, takeIn, expand, toDays, formatDateTime, coreSteps })',
-  文脈,
-)
+const 文脈 = await 読み込む(宣言.入力.実装)
+const { build, builtInSteps, takeIn, expand, toDays, formatDateTime, coreSteps } = 取り出す(文脈, ['build', 'builtInSteps', 'takeIn', 'expand', 'toDays', 'formatDateTime', 'coreSteps'])
 
 // ---- 入力を組む ------------------------------------------------------------
 // 枠も需要も刻み直さない。宣言の行を型に通して、出てきたものをそのまま食わせる。
 
 /** 引用符の中のコンマを割らないだけの CSV の読み。友達欄が引用符付きで入っている。 */
 function CSVを読む(文) {
-  return 文.replace(/^﻿/, '').trim().split(/\r?\n/).map((行) => {
-    const セル = []
-    let 溜め = ''
-    let 引用符の中 = false
-    for (const 文字 of 行) {
-      if (文字 === '"') 引用符の中 = !引用符の中
-      else if (文字 === ',' && !引用符の中) { セル.push(溜め); 溜め = '' }
-      else 溜め += 文字
-    }
-    セル.push(溜め)
-    return セル
-  })
+  return 文
+    .replace(/^﻿/, '')
+    .trim()
+    .split(/\r?\n/)
+    .map((行) => {
+      const セル = []
+      let 溜め = ''
+      let 引用符の中 = false
+      for (const 文字 of 行) {
+        if (文字 === '"') 引用符の中 = !引用符の中
+        else if (文字 === ',' && !引用符の中) {
+          セル.push(溜め)
+          溜め = ''
+        } else 溜め += 文字
+      }
+      セル.push(溜め)
+      return セル
+    })
 }
 
 /** 回答シートに貼るとタイムスタンプのセルは日時になるので、それに合わせる。 */
@@ -65,15 +65,15 @@ const 時刻の検め = 前回の5時刻を検める()
 /** 回答の行から、コアに渡す入力の一式を組む。回答以外は宣言のまま。 */
 function 入力一式(回答の行) {
   return {
-    '日ごとの営業時刻': 営業時刻の行(),
-    '役割と必要人数': 宣言.入力.条件入力.役割と必要人数,
-    '調理責任者の学年': 宣言.入力.条件入力.調理責任者の学年.map((学年) => [学年]),
-    '委員会の指定枠': 宣言.入力.条件入力.委員会の指定枠,
+    日ごとの営業時刻: 営業時刻の行(),
+    役割と必要人数: 宣言.入力.条件入力.役割と必要人数,
+    調理責任者の学年: 宣言.入力.条件入力.調理責任者の学年.map((学年) => [学年]),
+    委員会の指定枠: 宣言.入力.条件入力.委員会の指定枠,
     '準備・片付けのルール': Object.entries(宣言.入力.条件入力['準備・片付けのルール']).map(([項目, 値]) => [項目, 値]),
-    '置き方のルール': Object.entries(宣言.入力.条件入力['置き方のルール']).map(([項目, 値]) => [項目, 値]),
-    '回答': 回答の行,
-    '割り当て': [],
-    '手直し': [],
+    置き方のルール: Object.entries(宣言.入力.条件入力['置き方のルール']).map(([項目, 値]) => [項目, 値]),
+    回答: 回答の行,
+    割り当て: [],
+    手直し: [],
   }
 }
 
@@ -87,7 +87,7 @@ const 止まる人 = 希望
     try {
       expand([一人], 日)
       return false
-    } catch (例外) {
+    } catch {
       return true
     }
   })
@@ -187,12 +187,12 @@ const 規模ごと = 宣言.規模を増やす倍率.map((倍率) => {
 
 const 期待 = 宣言.入力の期待値
 const 実際 = {
-  '回答の行': 回答の全行.length,
-  '取り込んだ人数': 希望.length,
-  '展開で止まる人数': 止まる人.length,
-  '組む人数': 希望.length - 止まる人.length,
-  '枠': 日.reduce((合計, 一日) => 合計 + 一日.slots.length, 0),
-  '日ごとの枠': 日.map((一日) => 一日.slots.length),
+  回答の行: 回答の全行.length,
+  取り込んだ人数: 希望.length,
+  展開で止まる人数: 止まる人.length,
+  組む人数: 希望.length - 止まる人.length,
+  枠: 日.reduce((合計, 一日) => 合計 + 一日.slots.length, 0),
+  日ごとの枠: 日.map((一日) => 一日.slots.length),
 }
 const 外れた入力 = Object.keys(実際).filter((名) => JSON.stringify(実際[名]) !== JSON.stringify(期待[名]))
 
@@ -214,7 +214,9 @@ Object.keys(実際).forEach((名) => {
 })
 console.log(`         展開で止まった人: ${止まる人.join(' / ')}（終端 ≤ 始端。外してから 1 周させた → 宣言）`)
 // 需要は全枠に一律ではないので（→ issue #210）、1 枠あたりで割らず内訳のまま出す。
-const 内訳 = Object.keys(期待.需要のべの内訳).map((もと) => `${もと} ${期待.需要のべの内訳[もと]}`).join(' ＋ ')
+const 内訳 = Object.keys(期待.需要のべの内訳)
+  .map((もと) => `${もと} ${期待.需要のべの内訳[もと]}`)
+  .join(' ＋ ')
 console.log(`         需要のべ: ${期待.需要のべ}（${内訳} → 6 の #3 の理由 ②。数え直すのは scripts/M2の判定.mjs）`)
 
 console.log('\n  日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/前回の5時刻.mjs）')
@@ -222,11 +224,15 @@ console.log('\n  日ごとの 5 時刻（data/ の前回の確定シフトから
   const 帯 = `準備 ${一日.帯の枠['準備']} ／ 調理 ${一日.帯の枠['調理']} ／ 片付け ${一日.帯の枠['片付け']}`
   console.log(`         ${一日.日}  ${一日.時刻.join(' ')}  全 ${一日.全枠} 枠 = ${帯}`)
 })
-時刻の検め.確かめた.forEach((一つ) => console.log(`    ${一つ.合否 ? 'OK  ' : 'NG  '} ${一つ.何}`))
+時刻の検め.確かめた.forEach((一つ) => {
+  console.log(`    ${一つ.合否 ? 'OK  ' : 'NG  '} ${一つ.何}`)
+})
 if (時刻の検め.外れ.length === 0) {
   console.log('    OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
 } else {
-  時刻の検め.外れ.forEach((一つ) => console.log(`    NG   5 時刻が期待と違う: ${一つ}`))
+  時刻の検め.外れ.forEach((一つ) => {
+    console.log(`    NG   5 時刻が期待と違う: ${一つ}`)
+  })
 }
 console.log('')
 
@@ -235,7 +241,9 @@ coreSteps.forEach((段) => {
   if (段の中央値[段.name] === undefined) return
   console.log(`    ${段.name.padEnd(12, '　')} ${秒で(段の中央値[段.name])}`)
 })
-未了の段.forEach((名) => console.log(`    ${名} … まだ中身が入っていない（時間は乗っていない → 宣言の「測らないもの」）`))
+未了の段.forEach((名) => {
+  console.log(`    ${名} … まだ中身が入っていない（時間は乗っていない → 宣言の「測らないもの」）`)
+})
 console.log(`    ${'コアを 1 周'.padEnd(12, '　')} ${秒で(中央)}（最小 ${秒で(最小)} ／ 最大 ${秒で(最大)}）\n`)
 
 console.log('  規模を増やした側（回答の行を複製して人数だけ増やす。枠は 88 のまま。3 回の中央値）')

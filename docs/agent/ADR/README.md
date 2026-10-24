@@ -61,7 +61,9 @@ docs/agent/ADR/
 │   └── 0001-<slug>.md
 ├── design-doc/                  ← Design Doc の判定が動いた記録
 │   └── 0001-<slug>.md
-└── tech-requirements/           ← 技術の要件定義の判定が動いた記録
+├── tech-requirements/           ← 技術の要件定義の判定が動いた記録
+│   └── 0001-<slug>.md
+└── dev-env/                     ← 開発環境（実装者の道具・配布の手順）の判定が動いた記録
     └── 0001-<slug>.md
 ```
 
@@ -73,6 +75,7 @@ docs/agent/ADR/
 | `hmw/` | [`docs/agent/hmw.md`](../hmw.md) の**判定が動いた記録**。選んだ改善機会が替わった・採用ソリューションが覆った・却下理由が変わった・候補の束ね方が誤っていた |
 | `design-doc/` | [`docs/agent/design-doc.md`](../design-doc.md) の**判定が動いた記録**。7 セクションのどれかの結論が変わった・スコープの内外が入れ替わった・要件の前提が崩れた・△ が増減した |
 | `tech-requirements/` | [`docs/agent/tech-requirements.md`](../tech-requirements.md) の**判定が動いた記録**。技術選定が覆った・仕様が変わった・**完了の測り方が変わった**・△ が増減した |
+| `dev-env/` | **実装者の道具と配布の手順**の判定が動いた記録（成果物の本文は無い。**今の結論は [`CONTRIBUTING.md`](../../../CONTRIBUTING.md) が持つ**）。ビルド・配布・検査・CI の選び方が覆った・前提の理由が崩れた。要件定義書の 6 は成果物の選定なので、ここには混ぜない |
 
 今後 `interview-questions/` が増えても、**同じ形で第 1 階層に足す**。
 **フォルダを足したら、この表にも 1 行足す。** ここが薄いと「なんの ADR か分からない」に戻る。

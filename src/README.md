@@ -9,28 +9,29 @@
 
 | ファイル | 何を持つか | どちら側か |
 | --- | --- | --- |
-| [`sheet-layout.js`](sheet-layout.js) | **8 枚のシートの定義だけ**（**割り当ては日ごとの 4 枚である** → 下の「シートは 8 枚である」）。**日ごとの 4 枚の名前（`dayLabels`）は、希望時間 4 設問のラベル ◎ と同じ 1 か所である。**どの検査も最初に読むので、**コードの食い違い（バグ）のときだけ出る例外を作る `internalError` もここ**である — 作成者には「開発者に連絡してください」の一文だけを見せ、元の文は実行ログと `detail` に残す（→ [#249](https://github.com/jun-eg/school-festival-shift/issues/249)） | **コア** |
-| [`input-types.js`](input-types.js) | **入力の型 7 種類だけ**（→ 5-1）。行の配列を型に直し、揃っていない値を名指しして止める（**揃えるのは学籍番号の大文字・小文字だけ** → `readStudentId`） | **コア** |
-| [`core.js`](core.js) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`coreSteps`）と、段をつなぐ 1 本（`build`）と、中身が入っている段（`builtInSteps`）と、**手直しの後に生成を通さず数え直す 1 本（`recount`）** | **コア** |
-| [`take-in.js`](take-in.js) | **回答の行を 1 人 1 件に畳む**（→ 3 の規則 2。`取り込む` の段の中身）。**採る向き（後から来た行 → ADR design-doc-0006）を名前で持つ** | **コア** |
-| [`expand.js`](expand.js) | **回答文字列をその人の 30 分枠の集合にする**（→ 3 の規則 1。`展開する` の段の中身）。**境界値と特別扱いの 4 つを名前で持つ**（`wishBoundaries`） | **コア** |
-| [`generate.js`](generate.js) | **候補・条件・希望から割り当ての行を組む**（→ 5 の #6・5-5。`生成する` の段の中身）。**踏む 5 段（`generationOrder`。先頭が担当者の手直しを置く段 → 5-3）と、目的にしない 4 つ（`generationNotAimed`）と、まとまりで置けない端 5 つ（`runExceptions`）を名前で持つ。****置けない手直しを行にする `固定を照らす` の段の中身（`nameFixedConflicts`）もここ**である（→ 下の「手直しは、生成し直しても残る」） | **コア** |
-| [`count-violations.js`](count-violations.js) | **置いた人が条件を破っている所を行にする**（→ 5-4。`違反を数える` の段の中身）。**数える 5 つと、数えない ⑥ を名前で持つ** | **コア** |
-| [`assignment-grid.js`](assignment-grid.js) | **割り当ての行を、従来のシフト表の形に敷く／その形から戻す**（→ [#213](https://github.com/jun-eg/school-festival-shift/issues/213)）。**行が人・列が 30 分枠・セルが役割名 1 つ**で、**1 日 1 枚**である。**段ではない** — 敷き方だけを持ち、規則を 1 つも持たない。**役割ごとの背景色（`roleColors`）と、違反の行を印を付けるセルに当て戻すのもここである**（検証結果の赤・水色・黄色の行 `checkResultBackgrounds` もここ → 下の「検証結果は、違反の行が赤、店の役割の行が黄色である」）（`violationCells` → 下の「手直しは、書き換えたその場で数え直す」）。**手直しの印（`fixedNote`）と、印の付いたセルだけを読む口（`fixedFromAssignmentGrid`）・書き戻すメモを組む口（`gridNotes`）もここ**である（→ 下の「手直しは、生成し直しても残る」） | **コア** |
-| [`name-unmet.js`](name-unmet.js) | **人数が足りない枠を行にする**（→ 5-4。`未充足を名指しする` の段の中身）。**数えるもと 2 つ（必要人数・委員会の指定枠）を名前で持つ** | **コア** |
-| [`fairness-metrics.js`](fairness-metrics.js) | **人ごとの合計時間・シフト回数・準備回数を行にする**（→ 5 の #7・5-6。`指標を出す` の段の中身）。**何を 1 と数えるか（`metricDefinitions`）を名前で持つ。****並べるだけで、順位付けも閾値も出さない** | **コア** |
-| [`form-definition.js`](form-definition.js) | **フォームの定義一式だけ**（→ 4-1〜4-3。設問 9 つ ＋ 画像アイテム 1 つ・正規表現 2 箇所（友達欄は自由記述 → [#200](https://github.com/jun-eg/school-festival-shift/issues/200)）・エラーメッセージの句点の揺れ ◎）。**ラベル 4 つの値は持たない** — [`sheet-layout.js`](sheet-layout.js) の `dayLabels` を見る | **コア** |
-| [`shell.js`](shell.js) | **シートを読んで値の表現を揃え、コアを呼び、返ってきた行を書く。**マス目の色を塗り直す（`paintGrids`。背景は役割の色、違反した所は赤い太字）のと、検証結果の行を塗り直す（`paintCheckResults`）のと、**書き換えを拾って数え直す中身（`recountOnEdit`）と、書き換えたセルに手直しの印を付ける口（`markFixedCells`）もここ**である | **殻** |
-| [`verify-structure.js`](verify-structure.js) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
-| [`build-template.js`](build-template.js) | 定義どおりにシートを作り、見出しと条件入力の初期値を置き、8 枚に保護をかける（**かけ方は 2 つ** → 下の「保護のかけ方は 2 つである」） | **殻** |
-| [`build-form.js`](build-form.js) | **定義から本番のフォームを作り、回答先をこのスプレッドシート自身に向ける**（→ 6 の #6・下の「フォームは定義から作る」） | **殻** |
-| [`clear-for-next-year.js`](clear-for-next-year.js) | **使い終わったファイルのコピーを、来年に渡せる形に戻す**（引き継ぎの予備 → [ADR tech-requirements-0018](../docs/agent/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。**フォームとの紐付けを外し、回答・割り当て 4 枚・検証結果・指標・フォームの URL を消す。条件入力の値は残す** | **殻** |
-| [`form-picker.html`](form-picker.html) | **名簿の画像を選ぶダイアログ 1 枚。**外から読み込むファイルは 0 個である | **殻** |
-| [`distribution-image.js`](distribution-image.js) | **マス目 1 枚から、配る画像 1 枚の中身を組む**（→ 5 の #9。表と、塗る図形の位置まで）。**名前の列は氏名だけで、学籍番号を描かない。**1 枠も入っていない行を落とす | **コア** |
-| [`export-images.html`](export-images.html) | **配る画像を書き出すダイアログ 1 枚。**コアが組んだ図形を `<canvas>` に塗って PNG にするだけである（→ 6 の #5）。外から読み込むファイルは 0 個である | **殻** |
-| [`menu.js`](menu.js) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`）と、**マス目を書き換えたときに走る口 1 つ**（`onEdit`）。**どちらも単純トリガーである** | **殻** |
+| [`sheet-layout.ts`](core/sheet-layout.ts) | **8 枚のシートの定義だけ**（**割り当ては日ごとの 4 枚である** → 下の「シートは 8 枚である」）。**日ごとの 4 枚の名前（`dayLabels`）は、希望時間 4 設問のラベル ◎ と同じ 1 か所である。**どの検査も最初に読むので、**コードの食い違い（バグ）のときだけ出る例外を作る `internalError` もここ**である — 作成者には「開発者に連絡してください」の一文だけを見せ、元の文は実行ログと `detail` に残す（→ [#249](https://github.com/jun-eg/school-festival-shift/issues/249)） | **コア** |
+| [`input-types.ts`](core/input-types.ts) | **入力の型 7 種類だけ**（→ 5-1）。行の配列を型に直し、揃っていない値を名指しして止める（**揃えるのは学籍番号の大文字・小文字だけ** → `readStudentId`） | **コア** |
+| [`core.ts`](core/core.ts) | **配列を受けて配列を返す純粋な関数の置き場。**段の一覧（`coreSteps`）と、段をつなぐ 1 本（`build`）と、中身が入っている段（`builtInSteps`）と、**手直しの後に生成を通さず数え直す 1 本（`recount`）** | **コア** |
+| [`take-in.ts`](core/take-in.ts) | **回答の行を 1 人 1 件に畳む**（→ 3 の規則 2。`取り込む` の段の中身）。**採る向き（後から来た行 → ADR design-doc-0006）を名前で持つ** | **コア** |
+| [`expand.ts`](core/expand.ts) | **回答文字列をその人の 30 分枠の集合にする**（→ 3 の規則 1。`展開する` の段の中身）。**境界値と特別扱いの 4 つを名前で持つ**（`wishBoundaries`） | **コア** |
+| [`generate.ts`](core/generate.ts) | **候補・条件・希望から割り当ての行を組む**（→ 5 の #6・5-5。`生成する` の段の中身）。**踏む 5 段（`generationOrder`。先頭が担当者の手直しを置く段 → 5-3）と、目的にしない 4 つ（`generationNotAimed`）と、まとまりで置けない端 5 つ（`runExceptions`）を名前で持つ。****置けない手直しを行にする `固定を照らす` の段の中身（`nameFixedConflicts`）もここ**である（→ 下の「手直しは、生成し直しても残る」） | **コア** |
+| [`count-violations.ts`](core/count-violations.ts) | **置いた人が条件を破っている所を行にする**（→ 5-4。`違反を数える` の段の中身）。**数える 5 つと、数えない ⑥ を名前で持つ** | **コア** |
+| [`assignment-grid.ts`](core/assignment-grid.ts) | **割り当ての行を、従来のシフト表の形に敷く／その形から戻す**（→ [#213](https://github.com/jun-eg/school-festival-shift/issues/213)）。**行が人・列が 30 分枠・セルが役割名 1 つ**で、**1 日 1 枚**である。**段ではない** — 敷き方だけを持ち、規則を 1 つも持たない。**役割ごとの背景色（`roleColors`）と、違反の行を印を付けるセルに当て戻すのもここである**（検証結果の赤・水色・黄色の行 `checkResultBackgrounds` もここ → 下の「検証結果は、違反の行が赤、店の役割の行が黄色である」）（`violationCells` → 下の「手直しは、書き換えたその場で数え直す」）。**手直しの印（`fixedNote`）と、印の付いたセルだけを読む口（`fixedFromAssignmentGrid`）・書き戻すメモを組む口（`gridNotes`）もここ**である（→ 下の「手直しは、生成し直しても残る」） | **コア** |
+| [`name-unmet.ts`](core/name-unmet.ts) | **人数が足りない枠を行にする**（→ 5-4。`未充足を名指しする` の段の中身）。**数えるもと 2 つ（必要人数・委員会の指定枠）を名前で持つ** | **コア** |
+| [`fairness-metrics.ts`](core/fairness-metrics.ts) | **人ごとの合計時間・シフト回数・準備回数を行にする**（→ 5 の #7・5-6。`指標を出す` の段の中身）。**何を 1 と数えるか（`metricDefinitions`）を名前で持つ。****並べるだけで、順位付けも閾値も出さない** | **コア** |
+| [`form-definition.ts`](core/form-definition.ts) | **フォームの定義一式だけ**（→ 4-1〜4-3。設問 9 つ ＋ 画像アイテム 1 つ・正規表現 2 箇所（友達欄は自由記述 → [#200](https://github.com/jun-eg/school-festival-shift/issues/200)）・エラーメッセージの句点の揺れ ◎）。**ラベル 4 つの値は持たない** — [`sheet-layout.ts`](core/sheet-layout.ts) の `dayLabels` を見る | **コア** |
+| [`shell.ts`](shell/shell.ts) | **シートを読んで値の表現を揃え、コアを呼び、返ってきた行を書く。**マス目の色を塗り直す（`paintGrids`。背景は役割の色、違反した所は赤い太字）のと、検証結果の行を塗り直す（`paintCheckResults`）のと、**書き換えを拾って数え直す中身（`recountOnEdit`）と、書き換えたセルに手直しの印を付ける口（`markFixedCells`）もここ**である | **殻** |
+| [`verify-structure.ts`](shell/verify-structure.ts) | **走る前に構造（シートの有無・見出し・列数）を照らし、崩れていれば名指しして止める** | **殻** |
+| [`build-template.ts`](shell/build-template.ts) | 定義どおりにシートを作り、見出しと条件入力の初期値を置き、8 枚に保護をかける（**かけ方は 2 つ** → 下の「保護のかけ方は 2 つである」） | **殻** |
+| [`build-form.ts`](shell/build-form.ts) | **定義から本番のフォームを作り、回答先をこのスプレッドシート自身に向ける**（→ 6 の #6・下の「フォームは定義から作る」） | **殻** |
+| [`clear-for-next-year.ts`](shell/clear-for-next-year.ts) | **使い終わったファイルのコピーを、来年に渡せる形に戻す**（引き継ぎの予備 → [ADR tech-requirements-0018](../docs/agent/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。**フォームとの紐付けを外し、回答・割り当て 4 枚・検証結果・指標・フォームの URL を消す。条件入力の値は残す** | **殻** |
+| [`form-picker.html`](ui/form-picker.html) | **名簿の画像を選ぶダイアログ 1 枚。**外から読み込むファイルは 0 個である | **殻** |
+| [`distribution-image.ts`](core/distribution-image.ts) | **マス目 1 枚から、配る画像 1 枚の中身を組む**（→ 5 の #9。表と、塗る図形の位置まで）。**名前の列は氏名だけで、学籍番号を描かない。**1 枠も入っていない行を落とす | **コア** |
+| [`export-images.html`](ui/export-images.html) | **配る画像を書き出すダイアログ 1 枚。**コアが組んだ図形を `<canvas>` に塗って PNG にするだけである（→ 6 の #5）。外から読み込むファイルは 0 個である | **殻** |
+| [`menu.ts`](shell/menu.ts) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`）と、**マス目を書き換えたときに走る口 1 つ**（`onEdit`）。**どちらも単純トリガーである** | **殻** |
 | [`appsscript.json`](appsscript.json) | マニフェスト。**要求する権限スコープを手で 3 つ書いてある**（→ 下の「要求するのは 3 スコープである」） | — |
-| `*.test.mjs` | **手元で回す検査。**Apps Script には上げない（`.claspignore` で外してある） | — |
+| [`version.ts`](shell/version.ts) | **このスクリプトの版**（ビルドが HEAD のタグ、無ければ短い SHA を定数に埋める）。**メニュー末尾の「バージョン」が画面の隅に出す**（→ [ADR dev-env-0001](../docs/agent/ADR/dev-env/0001-配布はsrcの20ファイルではなくdistの4つになった.md)） | **殻** |
+| `*.test.ts` | **手元で回す検査。**Apps Script には貼らない（貼るのは `dist/` の 4 つだけで、`*.test.ts` は `dist/` に入らない） | — |
 | [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、**下の「確かめ方」の表との対応**も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
 
 **コアの側は `SpreadsheetApp` を 1 度も掴まない**（→ 6 の #8・下の「コアと殻の境目」）。
@@ -66,15 +67,15 @@
 
 | | |
 | --- | --- |
-| **シートの名前** | **希望時間 4 設問のラベル ◎ と同じ 4 つ**（`準備日` ／ `学祭1日目` ／ `学祭2日目` ／ `片付け`）。**値は [`sheet-layout.js`](sheet-layout.js) の `dayLabels` 1 か所で、フォームの側もここを見る** — **2 か所に書くと、食い違ったときにどちらが正かが決まらない** |
+| **シートの名前** | **希望時間 4 設問のラベル ◎ と同じ 4 つ**（`準備日` ／ `学祭1日目` ／ `学祭2日目` ／ `片付け`）。**値は [`sheet-layout.ts`](core/sheet-layout.ts) の `dayLabels` 1 か所で、フォームの側もここを見る** — **2 か所に書くと、食い違ったときにどちらが正かが決まらない** |
 | **日との対応** | **条件入力の「日ごとの営業時刻」の行の順**（上から 1 対 1）。**4 行でなければ、どのラベルがどの日かが決まらない**（→ 4-1） |
 | **行** | **1 人 1 行。****引くのは学籍番号である** — **同じ仮名に学籍番号が 2 つ付いている組が 4 つある ◎**（→ [`ADR tech-requirements-0004`](../docs/agent/ADR/tech-requirements/0004-同じ仮名の4組は別人で確定シフトの実人数は40だった.md)）ので、**氏名で引くと行が潰れる**（記録では 0 / 3 / 3 / 2 行） |
 | **並び** | **学籍番号の昇順。**生成の出てきた順に並べない — **順が変わると、担当者が書き換えたセルが別の行へ移ったように見えて、5 の #11 が数えられなくなる** |
 | **列** | **その日の 30 分枠**（→ 規則 1 の ①）。**名前を持たない** — 何時の枠かは毎回の入力で変わる。**当てるのは位置ではなく、見出しに書いてある時刻そのものである。****幅は 48 列**（1 日に刻める枠の上限 → `maxSlotsPerDay`） |
-| **見出しの寄せ** | **時刻の見出しは左に寄せる**（書き戻すたびに揃える → [`shell.js`](shell.js) の `writeGrids`）。**時刻のセルは既定で右寄せになる**ので、そのままだと見出しが自分の列ではなく右隣の列の頭に見えて、どの列が何時か読みにくい |
+| **見出しの寄せ** | **時刻の見出しは左に寄せる**（書き戻すたびに揃える → [`shell.ts`](shell/shell.ts) の `writeGrids`）。**時刻のセルは既定で右寄せになる**ので、そのままだと見出しが自分の列ではなく右隣の列の頭に見えて、どの列が何時か読みにくい |
 | **セル** | **役割名 1 つ。****1 セル 1 人 1 役割である** — **5 の #8 が「セルを 1 つ書き換える」と言っている**ので、複数を詰めると手直しの 1 手が拾えない |
-| **氏名** | **回答から引いて、見出しの列に置くだけである**（→ [`assignment-grid.js`](assignment-grid.js) の `namesFromAnswers`）。**生成は氏名を 1 度も見ない** — 型 #6 に氏名は無い（→ 5 の #1）。**列は「回答」の氏名のプルダウンで、候補の外は打てない。****氏名を選ぶと、表記の完全一致で回答から学籍番号を引いて入れる**（→ [#271](https://github.com/jun-eg/school-festival-shift/issues/271) ／ [`shell.js`](shell.js) の `putNameDropdowns` ・ `fillStudentIds`、引き方は [`assignment-grid.js`](assignment-grid.js) の `studentIdsFromAnswers`）。**選び直せば学籍番号も入れ替え、氏名を消せば学籍番号も消す**（→ [#286](https://github.com/jun-eg/school-festival-shift/issues/286)。残すと、画面は新しい人なのに前の人で数える）。**同じ氏名で学籍番号が異なる人が複数いれば、今の学籍番号がそのどれかなら残し、違えば消して一言で知らせる。****学籍番号の列も一緒に書き換えたときは、学籍番号は空のときだけ埋める。****プルダウンは塗り直すたびに付け直す** |
-| **一緒に組みたいお友達** | **氏名の右、時刻の列の左に置く**（→ 5-2 ／ [#200](https://github.com/jun-eg/school-festival-shift/issues/200)）。**回答に書かれたとおりの文字列を、生成のたびに引いて置くだけである**（→ [`assignment-grid.js`](assignment-grid.js) の `friendsFromAnswers`）。**担当者が余裕のあるときに、友達と組ませたい人を手で寄せるために読む列**で、**寄せるのはセルの書き換え（手直し）で行う。****生成・数え直し・手直しの印・配る画像のどれも読まない** — 書き換えても割り当ては変わらない。**固定する列は学籍番号と氏名の 2 列のまま**（友達欄は長くなりうるので、固定すると時刻の列を見る幅が狭くなる）。**幅は時刻の列 3 つ分を取り、時刻の列との境に太い灰色の線を引く**（氏名との境の固定の線に似せる → [#245](https://github.com/jun-eg/school-festival-shift/issues/245)）。**幅と線はテンプレートを作るときに置き、線は塗り直すたびに引き直す**（→ [`sheet-layout.js`](sheet-layout.js) の `dividerLine`） |
+| **氏名** | **回答から引いて、見出しの列に置くだけである**（→ [`assignment-grid.ts`](core/assignment-grid.ts) の `namesFromAnswers`）。**生成は氏名を 1 度も見ない** — 型 #6 に氏名は無い（→ 5 の #1）。**列は「回答」の氏名のプルダウンで、候補の外は打てない。****氏名を選ぶと、表記の完全一致で回答から学籍番号を引いて入れる**（→ [#271](https://github.com/jun-eg/school-festival-shift/issues/271) ／ [`shell.ts`](shell/shell.ts) の `putNameDropdowns` ・ `fillStudentIds`、引き方は [`assignment-grid.ts`](core/assignment-grid.ts) の `studentIdsFromAnswers`）。**選び直せば学籍番号も入れ替え、氏名を消せば学籍番号も消す**（→ [#286](https://github.com/jun-eg/school-festival-shift/issues/286)。残すと、画面は新しい人なのに前の人で数える）。**同じ氏名で学籍番号が異なる人が複数いれば、今の学籍番号がそのどれかなら残し、違えば消して一言で知らせる。****学籍番号の列も一緒に書き換えたときは、学籍番号は空のときだけ埋める。****プルダウンは塗り直すたびに付け直す** |
+| **一緒に組みたいお友達** | **氏名の右、時刻の列の左に置く**（→ 5-2 ／ [#200](https://github.com/jun-eg/school-festival-shift/issues/200)）。**回答に書かれたとおりの文字列を、生成のたびに引いて置くだけである**（→ [`assignment-grid.ts`](core/assignment-grid.ts) の `friendsFromAnswers`）。**担当者が余裕のあるときに、友達と組ませたい人を手で寄せるために読む列**で、**寄せるのはセルの書き換え（手直し）で行う。****生成・数え直し・手直しの印・配る画像のどれも読まない** — 書き換えても割り当ては変わらない。**固定する列は学籍番号と氏名の 2 列のまま**（友達欄は長くなりうるので、固定すると時刻の列を見る幅が狭くなる）。**幅は時刻の列 3 つ分を取り、時刻の列との境に太い灰色の線を引く**（氏名との境の固定の線に似せる → [#245](https://github.com/jun-eg/school-festival-shift/issues/245)）。**幅と線はテンプレートを作るときに置き、線は塗り直すたびに引き直す**（→ [`sheet-layout.ts`](core/sheet-layout.ts) の `dividerLine`） |
 | **空のセル** | **その人がその枠に入っていないだけである。****未充足（人数が足りない）を名指しするのは「検証結果」である**（→ 5-4）。**マス目は名指しを置き換えない** |
 
 **載らないものは黙って捨てない。**
@@ -83,8 +84,8 @@
 
 **条件入力の 6 区画には、前回（2025 年）の値が初期値として入っている**（→ [#240](https://github.com/jun-eg/school-festival-shift/issues/240) ／
 [`ADR tech-requirements-0015`](../docs/agent/ADR/tech-requirements/0015-テンプレートは空ではなくなり条件入力に前回の値が初期値として入った.md)）。
-**値は [`sheet-layout.js`](sheet-layout.js) の各区画の `initialRows` 1 か所で、置くのはテンプレートを作るときだけである**
-（[`build-template.js`](build-template.js) の `putInitialRows`。**区画に中身があれば置かない**）。
+**値は [`sheet-layout.ts`](core/sheet-layout.ts) の各区画の `initialRows` 1 か所で、置くのはテンプレートを作るときだけである**
+（[`build-template.ts`](shell/build-template.ts) の `putInitialRows`。**区画に中身があれば置かない**）。
 **担当者は今年の値に書き換えてから走らせる** — **前回の値は正しい形なので、書き換え忘れても型の段では止まらない。**
 **片付け日（4 日目）だけは記録どおりではない** — 記録の役割名は `準備` だが、初期値は `片付け` を置き、その日の帯を片付け帯にしてある（`08:00 08:00 08:00 08:00 15:00`）。
 **役割名と帯は組で変える** — 時間帯を空けた `片付け` は `片付け開始`〜`片付け終了` に効くので、片方だけ変えるとその日の需要が 0 枠になる（→ [#279](https://github.com/jun-eg/school-festival-shift/issues/279) ／
@@ -115,18 +116,33 @@
 **コアは配列を受けて配列を返す純粋な関数で、`SpreadsheetApp` に触るのは読み書きの殻だけである**（→ 6 の #8）。
 **値の表現を揃えるのも殻の仕事である。**
 
-| | コア（[`core.js`](core.js)・[`input-types.js`](input-types.js)・[`take-in.js`](take-in.js)・[`expand.js`](expand.js)・[`generate.js`](generate.js)・[`count-violations.js`](count-violations.js)・[`name-unmet.js`](name-unmet.js)・[`fairness-metrics.js`](fairness-metrics.js)・[`sheet-layout.js`](sheet-layout.js)・[`form-definition.js`](form-definition.js)） | 殻（[`shell.js`](shell.js)） |
+| | コア（[`core.ts`](core/core.ts)・[`input-types.ts`](core/input-types.ts)・[`take-in.ts`](core/take-in.ts)・[`expand.ts`](core/expand.ts)・[`generate.ts`](core/generate.ts)・[`count-violations.ts`](core/count-violations.ts)・[`name-unmet.ts`](core/name-unmet.ts)・[`fairness-metrics.ts`](core/fairness-metrics.ts)・[`sheet-layout.ts`](core/sheet-layout.ts)・[`form-definition.ts`](core/form-definition.ts)） | 殻（[`shell.ts`](shell/shell.ts)） |
 | --- | --- | --- |
 | **受け取るもの** | **文字列と数値だけでできた行の配列** | スプレッドシート |
 | **返すもの** | 生成シート 3 枚ぶんの**行の配列** | — |
 | **`SpreadsheetApp`** | **1 度も掴まない** | **ここだけが掴む** |
 | **持つもの** | 入力の型と、割り当ての規則と、段のつなぎ方 | 読む範囲・書く範囲・値の表現 |
 
-**構造の検証（[`verify-structure.js`](verify-structure.js)）も殻の側である** — スプレッドシートを読むからである。
-**フォームを作る側（[`build-form.js`](build-form.js)）も殻である** — `FormApp` と `SpreadsheetApp` を掴む。
-**写した定義（[`form-definition.js`](form-definition.js)）はコアで、どちらも掴まない。**
+**構造の検証（[`verify-structure.ts`](shell/verify-structure.ts)）も殻の側である** — スプレッドシートを読むからである。
+**フォームを作る側（[`build-form.ts`](shell/build-form.ts)）も殻である** — `FormApp` と `SpreadsheetApp` を掴む。
+**写した定義（[`form-definition.ts`](core/form-definition.ts)）はコアで、どちらも掴まない。**
 **ただし `SpreadsheetApp` を名指しはしない**（スプレッドシートを引数で受ける）ので、
 **手元では偽のスプレッドシートを渡して回せる**（→ 下の「確かめ方」）。
+
+**境目はディレクトリで引いてあり、道具が止める。**
+
+| 置き場 | 入るもの | 掴んでよいもの |
+| --- | --- | --- |
+| [`core/`](core/) | 上の表のコア 12 本（[`assignment-grid.ts`](core/assignment-grid.ts) と [`distribution-image.ts`](core/distribution-image.ts) を含む）と、コアの入出力の型だけを置く [`types.ts`](core/types.ts)（値を 1 つも持たない） | `core/` の中の `import` だけ |
+| [`shell/`](shell/) | 殻（[`shell.ts`](shell/shell.ts)・[`verify-structure.ts`](shell/verify-structure.ts)・[`build-template.ts`](shell/build-template.ts)・[`build-form.ts`](shell/build-form.ts)・[`clear-for-next-year.ts`](shell/clear-for-next-year.ts)）と、メニュー・トリガー（[`menu.ts`](shell/menu.ts)） | `SpreadsheetApp` などの Apps Script のグローバルと `core/` |
+| [`ui/`](ui/) | ダイアログの HTML 2 枚と、その TypeScript（ブラウザで動く。`import` は型だけ（`import type`）で、ビルドが型を剥がして HTML に差し込む）。`google.script.run` が呼ぶ関数の型は [`server.d.ts`](ui/server.d.ts) | ブラウザのグローバルと `google.script.run` |
+| [`entry.ts`](entry.ts) | **Apps Script が名前で呼ぶ関数の一覧**（`onOpen` ／ `onEdit` ／ メニューの 5 項目 ／ HTML の呼び先 ／ 手で実行する `buildTemplate` ／ E2E 用の 4 つ（`e2eGenerate` ・ `e2eCheckStructure` ・ `e2eClearForNextYear` ・ `e2eUnlinkAnswers`。メニューにも画面にも出さない → [`shell/e2e.ts`](shell/e2e.ts)）） | `shell/` |
+
+**[`boundary.test.ts`](boundary.test.ts) が、`core/` から `core/` の外への `import` と、`core/` の中の Apps Script のグローバル（`SpreadsheetApp` など）の参照を落とす。**
+**[`entry.test.ts`](entry.test.ts) が、`entry.ts` の一覧と、`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` ・ E2E 用の 4 つの食い違いを名指しで落とす。**
+**`npm run build` が `dist/` に 4 つ（`main.gs` ・ HTML 2 枚 ・ `appsscript.json`）を出し**（[`build.mjs`](../build.mjs)）、`main.gs` の最上位には一覧ぶんの `function` 宣言が並ぶ
+（エディタの関数一覧と、メニュー・`google.script.run` が名前で引く形）。**`dist/` は git に入れない。**
+HTML の `<script src>` は、ビルドが [`ui/`](ui/) の JS の中身に差し替える（出来上がりの HTML は外から読み込むものを持たない → 6 の #5）。
 
 **境目を引いてあるのは、書いてある逃げ道を書き方で消さないためである。**
 
@@ -140,22 +156,22 @@
 | 何 | 形 | どこから来たか |
 | --- | --- | --- |
 | **日付** | `YYYY-MM-DD` | [`data/前回の確定シフト-モック-0N.json`](../data/) の転記元の形 |
-| **時刻** | `HH:MM` | [`sheet-layout.js`](sheet-layout.js) の注記（条件入力の「日ごとの営業時刻」） |
+| **時刻** | `HH:MM` | [`sheet-layout.ts`](core/sheet-layout.ts) の注記（条件入力の「日ごとの営業時刻」） |
 | **日時** | `YYYY-MM-DD HH:MM:SS` | 回答のタイムスタンプ（→ 規則 2 の畳み込みのキー） |
 | **数** | 数値のまま | 必要人数など |
 
 **空のセルは空文字に、真偽値は `TRUE` ／ `FALSE` になる。文字列は両端の空白を落とすだけで、中身に手を入れない。**
-**揃っていない値がコアに入ったら、黙って直さずに区画・行・列を名指しして止まる**（`core.js` の `checkRepresentation`）。
+**揃っていない値がコアに入ったら、黙って直さずに区画・行・列を名指しして止まる**（`core.ts` の `checkRepresentation`）。
 
 ### 段が受け取るのは、行ではなく型である
 
-**`build` の入口で、条件入力の 6 区画を 5-1 の 7 種類のうち 6 つに直す**（[`input-types.js`](input-types.js) ／ [#140](https://github.com/jun-eg/school-festival-shift/issues/140)）。
+**`build` の入口で、条件入力の 6 区画を 5-1 の 7 種類のうち 6 つに直す**（[`input-types.ts`](core/input-types.ts) ／ [#140](https://github.com/jun-eg/school-festival-shift/issues/140)）。
 **段が掴むのは型であって、シートの列の並びではない。**
 
 | # | 型 | どこから | 型のかたち |
 | --- | --- | --- | --- |
 | 1 | **枠**（`days`） | 条件入力「日ごとの営業時刻」 | 日ごとの **5 時刻 ＋ そこから刻んだ 30 分枠の列**（→ 規則 1 の ①・[ADR tech-requirements-0006](../docs/agent/ADR/tech-requirements/0006-営業4時刻からは日の終わりが決まらず片付け終了が増えた.md)） |
-| 2 | **役割と必要人数**（`roleNeeds`） | 条件入力「役割と必要人数」 | `{ date, start, end, role, count }` の集合。**日の空欄は「絞らない」、時間帯の空欄はその役割の帯である**（準備 → 準備帯 ／ 片付け → 片付け帯 ／ それ以外 → 調理帯。→ 5-1 の #2。**枠に当てる読みは `name-unmet.js` の `needCovers` が持つ**） |
+| 2 | **役割と必要人数**（`roleNeeds`） | 条件入力「役割と必要人数」 | `{ date, start, end, role, count }` の集合。**日の空欄は「絞らない」、時間帯の空欄はその役割の帯である**（準備 → 準備帯 ／ 片付け → 片付け帯 ／ それ以外 → 調理帯。→ 5-1 の #2。**枠に当てる読みは `name-unmet.ts` の `needCovers` が持つ**） |
 | 3 | **調理責任者の学年条件**（`cookLeaderGrades`） | 条件入力「調理責任者の学年」 | 学年の集合。**セルには数字だけ（`3`）を書き、型ではフォームの選択肢の形（`3年生`）になる**（→ #237） |
 | 4 | **委員会の指定枠**（`committeeNeeds`） | 条件入力「委員会の指定枠」 | **#2 と同じ形**（→ 5-1 の「#2 と #4 を同じ形式にした理由」） |
 | 5 | **準備・片付けのルール**（`prepCleanupRule`） | 条件入力「準備・片付けのルール」 | `{ noonBoundary }`。**規則 3 の ①〜⑤ は規則そのもので、入力で来るのは境目だけ**である |
@@ -165,12 +181,12 @@
 **型に無いものは、型に無い。** **氏名も友達欄もタイムスタンプも型 #6 に乗らない**
 （友達欄は → 5-2、タイムスタンプは規則 2 の畳み込みのキーで畳んだ後には残らない）。
 **割り当ての `氏名` は、生成が空のまま置く**（→ 5-5。**埋めると 5 の #1 が破れる**）。
-**検証結果と指標の `氏名` も、コアは空のまま返す。****埋めるのは殻で、回答から引く**（割り当ての 4 枚と同じ手 → [`shell.js`](shell.js) の `writeOutputs` ／ [#154](https://github.com/jun-eg/school-festival-shift/issues/154)・[#229](https://github.com/jun-eg/school-festival-shift/issues/229)）。
+**検証結果と指標の `氏名` も、コアは空のまま返す。****埋めるのは殻で、回答から引く**（割り当ての 4 枚と同じ手 → [`shell.ts`](shell/shell.ts) の `writeOutputs` ／ [#154](https://github.com/jun-eg/school-festival-shift/issues/154)・[#229](https://github.com/jun-eg/school-festival-shift/issues/229)）。
 **違反と食い違った固定は、学籍番号だけでなく氏名でも名指しされる。****学籍番号の無い未充足の行は空のまま残る。**
 
-**検証結果の `候補` も同じ手である** — **コアはその行の 30 分枠を希望（展開した候補の枠）に含み、その枠にまだ置かれていない人の学籍番号を `、` でつなぎ**（[`core.js`](core.js) の `withCandidates`）、**殻が氏名に置き換える**（回答に氏名の無い人は学籍番号のまま残す → [#246](https://github.com/jun-eg/school-festival-shift/issues/246)）。**見るのは希望の時間と、その枠の割り当てだけである** — **その枠に役割を問わず 1 件でも置かれている人は外す**（数え直しではマス目に書いてあるとおり → [#254](https://github.com/jun-eg/school-festival-shift/issues/254)）。**ほかの規則（学年・調理可否・規則 3）に合うかは見ない。****誰を寄せるかは担当者が決める**（→ 5-3）。**枠が 1 つに決まらない行**（開始が空の規則 3 の違反・いまの枠に無い手直し）**は空のままである。**
+**検証結果の `候補` も同じ手である** — **コアはその行の 30 分枠を希望（展開した候補の枠）に含み、その枠にまだ置かれていない人の学籍番号を `、` でつなぎ**（[`core.ts`](core/core.ts) の `withCandidates`）、**殻が氏名に置き換える**（回答に氏名の無い人は学籍番号のまま残す → [#246](https://github.com/jun-eg/school-festival-shift/issues/246)）。**見るのは希望の時間と、その枠の割り当てだけである** — **その枠に役割を問わず 1 件でも置かれている人は外す**（数え直しではマス目に書いてあるとおり → [#254](https://github.com/jun-eg/school-festival-shift/issues/254)）。**ほかの規則（学年・調理可否・規則 3）に合うかは見ない。****誰を寄せるかは担当者が決める**（→ 5-3）。**枠が 1 つに決まらない行**（開始が空の規則 3 の違反・いまの枠に無い手直し）**は空のままである。**
 
-**列の幅はテンプレートを作るときに置く**（[`build-template.js`](build-template.js) の `shapeColumns`。構成の `wideColumns` で、物差しの列「あと何人」の 5 倍 → [`sheet-layout.js`](sheet-layout.js) の `widthBaseColumn`）。**`候補` の列が無い前の形のファイルは、テンプレートを作る手（`buildTemplate`）をもう 1 回走らせると J 列に見出しが足され、幅も付く** — **中身のある見出しが構成と同じで、空のセルがあるだけなら、止まらずに埋める。****走らせないと、走る前の検証が「見出しが違う」で止まる。**
+**列の幅はテンプレートを作るときに置く**（[`build-template.ts`](shell/build-template.ts) の `shapeColumns`。構成の `wideColumns` で、物差しの列「あと何人」の 5 倍 → [`sheet-layout.ts`](core/sheet-layout.ts) の `widthBaseColumn`）。**`候補` の列が無い前の形のファイルは、テンプレートを作る手（`buildTemplate`）をもう 1 回走らせると J 列に見出しが足され、幅も付く** — **中身のある見出しが構成と同じで、空のセルがあるだけなら、止まらずに埋める。****走らせないと、走る前の検証が「見出しが違う」で止まる。**
 
 **揃っていない値は、黙って直さずに区画・行・列を名指しして止まる**
 （時刻が `HH:MM` でない／時刻が早い順でない／人数が 1 以上の整数でない／学年が選択肢の外／学籍番号が 10 桁英数字でない、など）。
@@ -183,13 +199,13 @@
 
 | 段 | 何をするか | 入れる issue |
 | --- | --- | --- |
-| `取り込む` | 回答の行を 1 人 1 件に畳む（規則 2。**採るのは後から来た行である**） | **入っている**（[`take-in.js`](take-in.js) ／ [#146](https://github.com/jun-eg/school-festival-shift/issues/146)） |
-| `展開する` | 回答文字列をその人の 30 分枠の集合にする（規則 1。**枠は型 #1 で渡る**） | **入っている**（[`expand.js`](expand.js) ／ [#149](https://github.com/jun-eg/school-festival-shift/issues/149)） |
-| `固定を照らす` | 手直しのうち、いまの入力で置けないものを行にする（5-3。**種別は `反映できなかった修正`**。**数え直しでは照らさない**） | **入っている**（[`generate.js`](generate.js) の `nameFixedConflicts` ／ [#156](https://github.com/jun-eg/school-festival-shift/issues/156)） |
-| `生成する` | 候補・条件・希望から割り当ての行を組む（5 の #6。**適用の順序は 5-5**。**担当者の手直しを先に置く** → 5-3） | **入っている**（[`generate.js`](generate.js) ／ [#151](https://github.com/jun-eg/school-festival-shift/issues/151)） |
-| `違反を数える` | 置いた人が条件を破っている所を行にする（5-4） | **入っている**（[`count-violations.js`](count-violations.js) ／ [#141](https://github.com/jun-eg/school-festival-shift/issues/141)） |
-| `未充足を名指しする` | 人数が足りない枠を行にする（5-4） | **入っている**（[`name-unmet.js`](name-unmet.js) ／ [#142](https://github.com/jun-eg/school-festival-shift/issues/142)） |
-| `指標を出す` | 人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7。**数え方は 5-6**） | **入っている**（[`fairness-metrics.js`](fairness-metrics.js) ／ [#154](https://github.com/jun-eg/school-festival-shift/issues/154)） |
+| `取り込む` | 回答の行を 1 人 1 件に畳む（規則 2。**採るのは後から来た行である**） | **入っている**（[`take-in.ts`](core/take-in.ts) ／ [#146](https://github.com/jun-eg/school-festival-shift/issues/146)） |
+| `展開する` | 回答文字列をその人の 30 分枠の集合にする（規則 1。**枠は型 #1 で渡る**） | **入っている**（[`expand.ts`](core/expand.ts) ／ [#149](https://github.com/jun-eg/school-festival-shift/issues/149)） |
+| `固定を照らす` | 手直しのうち、いまの入力で置けないものを行にする（5-3。**種別は `反映できなかった修正`**。**数え直しでは照らさない**） | **入っている**（[`generate.ts`](core/generate.ts) の `nameFixedConflicts` ／ [#156](https://github.com/jun-eg/school-festival-shift/issues/156)） |
+| `生成する` | 候補・条件・希望から割り当ての行を組む（5 の #6。**適用の順序は 5-5**。**担当者の手直しを先に置く** → 5-3） | **入っている**（[`generate.ts`](core/generate.ts) ／ [#151](https://github.com/jun-eg/school-festival-shift/issues/151)） |
+| `違反を数える` | 置いた人が条件を破っている所を行にする（5-4） | **入っている**（[`count-violations.ts`](core/count-violations.ts) ／ [#141](https://github.com/jun-eg/school-festival-shift/issues/141)） |
+| `未充足を名指しする` | 人数が足りない枠を行にする（5-4） | **入っている**（[`name-unmet.ts`](core/name-unmet.ts) ／ [#142](https://github.com/jun-eg/school-festival-shift/issues/142)） |
+| `指標を出す` | 人ごとの合計時間・シフト回数・準備回数を行にする（5 の #7。**数え方は 5-6**） | **入っている**（[`fairness-metrics.ts`](core/fairness-metrics.ts) ／ [#154](https://github.com/jun-eg/school-festival-shift/issues/154)） |
 
 **段は差し替えで渡す。**`build(inputs, steps)` の `steps` に入れた段だけが走る —
 **数える側だけを先に入れて、生成が無いまま回せる**（**8 の 3 が 8 の 8 より先にある** ための形である）。
@@ -202,26 +218,25 @@
 **生成と数える側に渡るのは条件入力の 6 区画までである。**
 **友達欄が生成の入力に現れない**（→ 5-2）のは、この形の帰結である。
 
-**メニューの「生成」が、殻の `runOnActiveSpreadsheet` を押す口である**（→ [`menu.js`](menu.js) の `runGeneration`）。
+**メニューの「生成」が、殻の `runOnActiveSpreadsheet` を押す口である**（→ [`menu.ts`](shell/menu.ts) の `runGeneration`）。
 **段が欠けているあいだは 1 枚も書かず、何が入っていないかを名指しで出す。**
 **崩れ（シートが無い・見出しが違う・表現が揃っていない）は捕まえない** — 直すのは担当者のシートのほうなので、
 **例外の文をそのまま見せる**（→ 下の「走る前に構造を検証する」）。
 
-**ファイルを貼る順に依存しない。** Apps Script は `.gs` を 1 つずつ順に評価するので、
-**他のファイルの値をファイルの最上位で使うと、並び順で壊れる。**`core.js` も `shell.js` も
-`verify-structure.js` も、[`sheet-layout.js`](sheet-layout.js) を見るのは関数の中だけにしてある。
-**貼り忘れは名指しで止まる** — `builtInSteps` は [`take-in.js`](take-in.js) と [`expand.js`](expand.js) と
-[`generate.js`](generate.js)（**古い `generate.js` が貼ってあって `固定を照らす` の中身が無いときも**）と [`count-violations.js`](count-violations.js) と [`name-unmet.js`](name-unmet.js) と [`fairness-metrics.js`](fairness-metrics.js) のどれが無くても、
-**段を「まだ作っていない」に混ぜずに、貼られていないことを名指しする。**
+**他のファイルの値を、ファイルの最上位で使わない。** `import` は互いに循環している（`core.ts` が段を `import` し、段が `core.ts` の `sheetColumns` などを `import` する）ので、
+**最上位で使うと評価の順で壊れる。**`core.ts` も `shell.ts` も `verify-structure.ts` も、[`sheet-layout.ts`](core/sheet-layout.ts) を見るのは関数の中だけにしてある。
+**`import` の書き間違いは、ビルドか検査が止める** — `builtInSteps` が返す段は [`take-in.ts`](core/take-in.ts) と [`expand.ts`](core/expand.ts) と
+[`generate.ts`](core/generate.ts)（`固定を照らす` の `nameFixedConflicts` も）と [`count-violations.ts`](core/count-violations.ts) と [`name-unmet.ts`](core/name-unmet.ts) と [`fairness-metrics.ts`](core/fairness-metrics.ts) から `import` したものなので、
+**`import` の行き先や名前を間違えればビルドが止まり、`import` の行そのものが無ければ `npm test` が `ReferenceError` で落ちる（ビルドは通る）。**段を「まだ作っていない」に混ぜて黙って進むことはない。（以前は `.gs` を手で貼ったので、貼り忘れを実行時に名指しして止めていた。）
 
 ### 取り込む側は、後から来た行を採る
 
-**[`take-in.js`](take-in.js) が持つ**（→ 3 の規則 2 ／ [#146](https://github.com/jun-eg/school-festival-shift/issues/146)）。
+**[`take-in.ts`](core/take-in.ts) が持つ**（→ 3 の規則 2 ／ [#146](https://github.com/jun-eg/school-festival-shift/issues/146)）。
 **回答シートの行を、1 人 1 件の型 #6 にする。**
 
 | 規則 2 | 何をするか |
 | --- | --- |
-| **①** | **学籍番号でまとめる**（識別キーは学籍番号である ◎ → 5-1）。**大文字・小文字だけ違う学籍番号は同じ人である** ◎ — **揃えるのは読むときで、型 #6 には大文字で乗る**（→ [`input-types.js`](input-types.js) の `readStudentId`） |
+| **①** | **学籍番号でまとめる**（識別キーは学籍番号である ◎ → 5-1）。**大文字・小文字だけ違う学籍番号は同じ人である** ◎ — **揃えるのは読むときで、型 #6 には大文字で乗る**（→ [`input-types.ts`](core/input-types.ts) の `readStudentId`） |
 | **②** | **タイムスタンプを見て 1 件に畳む**（畳み込みのキーは 学籍番号 ＋ タイムスタンプ ◎） |
 | **③** | **採るのは、タイムスタンプが最も新しい 1 行である**（→ `foldDirection`） |
 | **④** | **学籍番号もタイムスタンプも同じ 2 行は、黙って選ばずに名指しして止まる** |
@@ -230,7 +245,7 @@
 （→ [ADR design-doc-0006](../docs/agent/ADR/design-doc/0006-出し直しは後から来た行を採る.md)。
 **記録に残る出し直しは「希望そのものの修正」である ◎**）。**向きが動いたら `foldDirection` と 3 の規則 2 が一緒に動く。**
 
-**行を型に直すのは [`input-types.js`](input-types.js) の `toWish` である。**
+**行を型に直すのは [`input-types.ts`](core/input-types.ts) の `toWish` である。**
 **ここが持つのは「どの 1 行を型にするか」だけ**で、**畳んで落ちる行も型に直す**（落ちる側も黙って通さない）。
 **人の並びは、その人が最初に現れた行の順である** — 採った行の位置で並べ直さない。
 
@@ -239,17 +254,17 @@
 
 **大文字・小文字だけ違う学籍番号は、止まらずに 1 件へ畳まれる。****大文字・小文字に意味は無い** ◎
 （2026-09-22 → [`docs/agent/interviews/02-作る側.md`](../docs/agent/interviews/02-作る側.md)）ので、
-**学籍番号は読むときに大文字へ揃えて型 #6 に乗る**（→ [`input-types.js`](input-types.js) の `readStudentId`）。
-**揃えるのはその 1 箇所だけで、ここも [`count-violations.js`](count-violations.js) も素の等値で比べる。**
+**学籍番号は読むときに大文字へ揃えて型 #6 に乗る**（→ [`input-types.ts`](core/input-types.ts) の `readStudentId`）。
+**揃えるのはその 1 箇所だけで、ここも [`count-violations.ts`](core/count-violations.ts) も素の等値で比べる。**
 
 ### 展開する側は、完全に含まれる枠だけを取る
 
-**[`expand.js`](expand.js) が持つ**（→ 3 の規則 1 ／ [#149](https://github.com/jun-eg/school-festival-shift/issues/149)）。
+**[`expand.ts`](core/expand.ts) が持つ**（→ 3 の規則 1 ／ [#149](https://github.com/jun-eg/school-festival-shift/issues/149)）。
 **1 人 1 件の希望（型 #6）と、その年の枠（型 #1）を受けて、その人がその日に入れる候補の枠を返す。**
 
 | 規則 1 | 何をするか |
 | --- | --- |
-| **①** | **その日の営業 5 時刻から 30 分枠を刻む** — **刻むのは型 #1 のほうである**（→ [`input-types.js`](input-types.js) の `cutSlots`）。ここは刻み終わった枠を受けるだけで、枠を作り直さない |
+| **①** | **その日の営業 5 時刻から 30 分枠を刻む** — **刻むのは型 #1 のほうである**（→ [`input-types.ts`](core/input-types.ts) の `cutSlots`）。ここは刻み終わった枠を受けるだけで、枠を作り直さない |
 | **②** | **回答文字列を `,` で区切って区間に分ける**（通す形は 4-2 の正規表現と同じである → `wishIntervalPattern`） |
 | **③** | **区間に完全に含まれる枠だけを取る**（**重なるだけの枠は取らない**） |
 | **④** | **複数区間は和集合を取る**（並びは、その日の枠の並びのままである） |
@@ -258,7 +273,7 @@
 **候補からどの枠へ置くかは生成が持つ**（→ [#151](https://github.com/jun-eg/school-festival-shift/issues/151)。規則 1 の ⑤）。
 **1 人 1 日に 1 件を返す** — **候補が 0 枠の日も件として返る**（日が消えるのではない）。
 
-**境界値と特別扱いは 3 の表が持つ。**[`expand.js`](expand.js) は名前で持つだけである（`wishBoundaries`）。
+**境界値と特別扱いは 3 の表が持つ。**[`expand.ts`](core/expand.ts) は名前で持つだけである（`wishBoundaries`）。
 
 | 入力の形 | どうなるか |
 | --- | --- |
@@ -268,15 +283,15 @@
 | **終端 ≤ 始端の区間** | **候補を作らず、名指しして止まる**（黙って解釈しない） |
 
 **4 つのうち 3 つは、規則を足さなくてもそうなる。****足しているものが 1 つも無い**のが、この形の要である。
-**切り方が逆向きなのは委員会の指定枠だけで、そちらは数える側が持つ**（**重なる枠を取る** → [`name-unmet.js`](name-unmet.js)）。
+**切り方が逆向きなのは委員会の指定枠だけで、そちらは数える側が持つ**（**重なる枠を取る** → [`name-unmet.ts`](core/name-unmet.ts)）。
 
 **回答の日ごとの列と、条件入力の「日ごとの営業時刻」の行は、上から順に 1 対 1 で当てる**（→ 4-1）。
 **数が食い違えば、前から当てずに名指しして止まる** —
-**どの回答がどの日かが決まらない**（→ [`form-definition.js`](form-definition.js) の `checkDaysForForm` と同じ理由である）。
+**どの回答がどの日かが決まらない**（→ [`form-definition.ts`](core/form-definition.ts) の `checkDaysForForm` と同じ理由である）。
 
 ### 違反を数える側は、5 つを数えて ⑥ を数えない
 
-**[`count-violations.js`](count-violations.js) が持つ**（→ 5-4 ／ [#141](https://github.com/jun-eg/school-festival-shift/issues/141)）。
+**[`count-violations.ts`](core/count-violations.ts) が持つ**（→ 5-4 ／ [#141](https://github.com/jun-eg/school-festival-shift/issues/141)）。
 **未充足（人数が足りない）はここが数えない** — 別に数えて、同じ 1 枚に種別で分けて並べる（→ [#142](https://github.com/jun-eg/school-festival-shift/issues/142)）。
 
 | 数えるもの | 何を見るか | 1 件の単位 |
@@ -300,7 +315,7 @@
 
 ### 未充足を名指しする側は、枠と役割ごとに 1 件である
 
-**[`name-unmet.js`](name-unmet.js) が持つ**（→ 5-4 の「未充足は、枠と役割ごとに 1 件である」 ／
+**[`name-unmet.ts`](core/name-unmet.ts) が持つ**（→ 5-4 の「未充足は、枠と役割ごとに 1 件である」 ／
 [#142](https://github.com/jun-eg/school-festival-shift/issues/142)）。
 **違反（置いた人が条件を破っている）はここが数えない** — 分けないと、**違反 0 の案が永久に出ない**（→ 5-4）。
 
@@ -324,7 +339,7 @@
 （日が「日ごとの営業時刻」に無い ／ 時間帯が営業時刻の外）。
 **落とすと、「名指しされていない未充足が 0 件」が数え落としのぶんだけ嘘になる。**
 
-**置いた行を読むのは [`count-violations.js`](count-violations.js) の `readAssignments` である。**
+**置いた行を読むのは [`count-violations.ts`](core/count-violations.ts) の `readAssignments` である。**
 **同じ行を 2 通りに読むと、片方が古くなる。**
 
 ### 段のあいだを渡るものは、行ではなく型と枠である
@@ -334,7 +349,7 @@
 | 引数 | 何 | 誰が作るか |
 | --- | --- | --- |
 | `assignments` | **割り当ての行**（生成シートに書く形そのもの） | `生成する`（[#151](https://github.com/jun-eg/school-festival-shift/issues/151)） |
-| `conditions` | **条件入力の 6 区画を直した型** | `build` の入口（→ [`input-types.js`](input-types.js)） |
+| `conditions` | **条件入力の 6 区画を直した型** | `build` の入口（→ [`input-types.ts`](core/input-types.ts)） |
 | `wishes` | **希望（型 #6。1 人 1 件）** | `取り込む`（[#146](https://github.com/jun-eg/school-festival-shift/issues/146)） |
 | `candidates` | **`{ studentId, date, slots: [{ start, end }] }` の配列** | `展開する`（[#149](https://github.com/jun-eg/school-festival-shift/issues/149)） |
 
@@ -349,7 +364,7 @@
 ## 保護のかけ方は 2 つである
 
 **8 枚すべてに保護をかけている**（→ [#234](https://github.com/jun-eg/school-festival-shift/issues/234)）。
-**かけ方は、そのシートを誰が手で書くかで決まる**（→ [`sheet-layout.js`](sheet-layout.js) の `protectionKind`）。
+**かけ方は、そのシートを誰が手で書くかで決まる**（→ [`sheet-layout.ts`](core/sheet-layout.ts) の `protectionKind`）。
 
 | かけ方 | どのシートか | 持ち主（担当者）には | 共有された編集者には |
 | --- | --- | --- | --- |
@@ -367,13 +382,13 @@
 **持ち主だけが書ける形なら、持ち主の手直しは今までどおりで、共有された編集者だけが止まる。**
 **そのかわり、生成・数え直し・画像の書き出しを押すのは持ち主である** — 編集者が押すと、割り当てに書けずに止まる。
 
-**条件入力の入力欄は、区画ごとに列名の下からシートの最下行まで・区画の幅である**（→ [`build-template.js`](build-template.js) の `inputRanges`）。
+**条件入力の入力欄は、区画ごとに列名の下からシートの最下行まで・区画の幅である**（→ [`build-template.ts`](shell/build-template.ts) の `inputRanges`）。
 **最下行より下に行を足すと、足した行は保護の内になる**（警告が出るだけで、書ける）。
 **「日ごとの営業時刻」だけは 8 行目までである** — 下の 9〜10 行目にフォームの URL 欄があるからで、**読むのも 8 行目まで**である
-（→ [`sheet-layout.js`](sheet-layout.js) の `formUrlBlock` と区画の `lastRow` ／ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）。
+（→ [`sheet-layout.ts`](core/sheet-layout.ts) の `formUrlBlock` と区画の `lastRow` ／ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）。
 **URL 欄は保護の内（警告のみ）に残す。** 書くのはフォームを作るときのスクリプトだけで、**警告のみはスクリプトを止めない。**
 **13 行目には引き継ぎ書の所在（リポジトリの URL）を置く** — テンプレートを作るときに書き、URL 欄と同じく保護の内に残す
-（→ [`sheet-layout.js`](sheet-layout.js) の `handoverBlock` ／ [#274](https://github.com/jun-eg/school-festival-shift/issues/274)）。
+（→ [`sheet-layout.ts`](core/sheet-layout.ts) の `handoverBlock` ／ [#274](https://github.com/jun-eg/school-festival-shift/issues/274)）。
 
 **保護は構造を壊さないための片方である**（→ 2 の「止まる箇所」#8）。
 もう片方（**走る前に構造を検証し、崩れていれば名指しで出す**）が下の節である。
@@ -382,8 +397,8 @@
 ## 走る前に構造を検証する
 
 **保護と並ぶ、2 の「止まる箇所」#8 のもう片方の予防である**
-（[`verify-structure.js`](verify-structure.js)／[#138](https://github.com/jun-eg/school-festival-shift/issues/138)）。
-**[`shell.js`](shell.js) の `run` が、シートを読む前に最初に呼ぶ。**
+（[`verify-structure.ts`](shell/verify-structure.ts)／[#138](https://github.com/jun-eg/school-festival-shift/issues/138)）。
+**[`shell.ts`](shell/shell.ts) の `run` が、シートを読む前に最初に呼ぶ。**
 
 | 見るもの | 崩れていたら |
 | --- | --- |
@@ -402,7 +417,7 @@
 **見るのは見出しの行だけである。** データの行は見ない —
 **条件入力と割り当ては担当者が書く所**で、**行が増えたり減ったりするのが仕様である**（→ 5-1・5-3）。
 **構成に無いシートが 1 枚増えていても止めない** — 生成が書く先は 3 枚に決まっていて、崩れないからである
-（**組み立てのほうは、構成に無いシートに中身があれば残して名指しする** → [`build-template.js`](build-template.js)）。
+（**組み立てのほうは、構成に無いシートに中身があれば残して名指しする** → [`build-template.ts`](shell/build-template.ts)）。
 
 ## フォームは定義から作る
 
@@ -412,9 +427,9 @@
 
 | どこが持つか | 何を |
 | --- | --- |
-| [`form-definition.js`](form-definition.js) | **4-1〜4-3 を写した定義だけ。**設問 9 つ ＋ 画像アイテム 1 つ・正規表現 2 箇所・エラーメッセージ。**友達欄の正規表現だけは写さない**（自由記述 → 4-1 の #5 の但し書き）。**希望時間 4 設問の題と営業時間だけは値を持たない** — 持つのは**ラベル 4 つ ◎** と、**今年の日付・帯からそれを組む口**である（→ 下の「日付と営業時間は今年の入力から出る」）。**作り方を持たない** |
-| [`build-form.js`](build-form.js) | **作り方だけ。**条件入力の「日ごとの営業時刻」を読んでから、フォームに置き、回答先を向け、**配る用 URL ／ 編集用 URL を条件入力の C9 ／ C10 に書き**（→ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）、フォームが作ったシートを構成の「回答」に繋ぐ。**設問も文言も足さない・揃えない** |
-| [`form-picker.html`](form-picker.html) | **担当者が画像を選ぶ 1 枚。**選んだ画像はそのまま画像アイテムに入る。**作り終えたら、同じ 1 枚の中身を「作成が完了しました」と配る用 URL ／ 編集用 URL に差し替える**（別のダイアログは開かない → [#244](https://github.com/jun-eg/school-festival-shift/issues/244)）。**閉じた後も 2 つの URL は「条件入力」の 9〜10 行目から開ける**と添える（→ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）。**外から読み込むファイルは 0 個である** |
+| [`form-definition.ts`](core/form-definition.ts) | **4-1〜4-3 を写した定義だけ。**設問 9 つ ＋ 画像アイテム 1 つ・正規表現 2 箇所・エラーメッセージ。**友達欄の正規表現だけは写さない**（自由記述 → 4-1 の #5 の但し書き）。**希望時間 4 設問の題と営業時間だけは値を持たない** — 持つのは**ラベル 4 つ ◎** と、**今年の日付・帯からそれを組む口**である（→ 下の「日付と営業時間は今年の入力から出る」）。**作り方を持たない** |
+| [`build-form.ts`](shell/build-form.ts) | **作り方だけ。**条件入力の「日ごとの営業時刻」を読んでから、フォームに置き、回答先を向け、**配る用 URL ／ 編集用 URL を条件入力の C9 ／ C10 に書き**（→ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）、フォームが作ったシートを構成の「回答」に繋ぐ。**設問も文言も足さない・揃えない** |
+| [`form-picker.html`](ui/form-picker.html) | **担当者が画像を選ぶ 1 枚。**選んだ画像はそのまま画像アイテムに入る。**作り終えたら、同じ 1 枚の中身を「作成が完了しました」と配る用 URL ／ 編集用 URL に差し替える**（別のダイアログは開かない → [#244](https://github.com/jun-eg/school-festival-shift/issues/244)）。**閉じた後も 2 つの URL は「条件入力」の 9〜10 行目から開ける**と添える（→ [#255](https://github.com/jun-eg/school-festival-shift/issues/255)）。**外から読み込むファイルは 0 個である** |
 
 **写す。揃えない・直さない。** **エラーメッセージの句点の揺れ ◎**（`11月3日(学祭2日目)` だけ「無効な書式です**。**」）
 **も、揃えずに渡している**（→ 4-3）。**揃えたいなら [`docs/agent/design-doc.md`](../docs/agent/design-doc.md) に戻して判断を起こす。**
@@ -428,7 +443,7 @@
 
 **見出しは照らしてから繋ぐ。** フォームが作った 1 行目が**タイムスタンプ ＋ いま置いた設問の題 9 つ**と
 1 つでも違えば、**繋がずに名指しして止まる。** **黙って直さない。**
-**構成（→ [`sheet-layout.js`](sheet-layout.js)）が名前で持つのは前の 6 列だけ**なので、
+**構成（→ [`sheet-layout.ts`](core/sheet-layout.ts)）が名前で持つのは前の 6 列だけ**なので、
 **照らす相手は構成の列名ではなく、いま置いた題のほうである**（→ 下の「日付と営業時間は今年の入力から出る」）。
 
 **2 回目は作らない。** **「回答」にすでにフォームが紐付いていれば、名指しして止まる** —
@@ -451,7 +466,7 @@
 | **題** | **`<月>月<日>日(<ラベル>)`。** **ラベル 4 つ（`準備日` ／ `学祭1日目` ／ `学祭2日目` ／ `片付け`）は転記 ◎ で定義側が持ち**、**入力から出るのは日付だけ**である（**学祭は例年この 4 日 ◎**） |
 | **説明文の営業時間** | **その日の `準備開始`〜`片付け終了`。** **1 日の端から端まで**であって、調理の帯ではない |
 | **止まる形** | **「日ごとの営業時刻」が 空 ／ 4 行でない ／ 5 時刻が早い順でない なら、フォームを 1 つも作らずに名指しして止まる**（→ 2 の止まる箇所 9）。**掴む前に読む** — 作ってから止まると、**作りかけのフォームが残る** |
-| **回答シートの列名** | **毎年変わる**（列名＝設問の題である）。**取り込みも構造の検証も、列名ではなく位置で当てる**（→ [`input-types.js`](input-types.js) の `dayAnswerColumns`・[`verify-structure.js`](verify-structure.js)） |
+| **回答シートの列名** | **毎年変わる**（列名＝設問の題である）。**取り込みも構造の検証も、列名ではなく位置で当てる**（→ [`input-types.ts`](core/input-types.ts) の `dayAnswerColumns`・[`verify-structure.ts`](shell/verify-structure.ts)） |
 
 **前回の日付（2025-11-01〜04）と営業時刻を入れれば、4 の表がそのまま出る。**
 **それが仕様 #2 の判定である**（→ 5 の #2）— **一致しないなら、入力から組む側が壊れている。**
@@ -476,16 +491,16 @@
 | **ファイル名と表題** | **`11月1日シフト表.png`** ／ 表題は **`11月1日（準備日）シフト表`**。日付は条件入力の「日ごとの営業時刻」から出る |
 | **行** | **その日に 1 枠でも入っている人だけ**（前回の配布物の行と同じ ◎）。並びはマス目のまま（学籍番号の昇順） |
 | **名前の列** | **氏名だけ。学籍番号は描かない** — 前回の配布物に無い ◎。**アカウントの外へ出るのは氏名だけで、Before と同じである**（→ 2「個人情報が通る経路」）。**氏名が空の行に役割が入っていたら、描かずに名指しして止まる**（配っても誰の行か読めない） |
-| **列とセル** | **その日の 30 分枠と、役割名 1 つ。**背景はマス目と同じ役割の色である（→ [`assignment-grid.js`](assignment-grid.js) の `roleColors`）。**違反の赤い太字は描かない** — 違反は担当者が直すもので、配るものではない |
+| **列とセル** | **その日の 30 分枠と、役割名 1 つ。**背景はマス目と同じ役割の色である（→ [`assignment-grid.ts`](core/assignment-grid.ts) の `roleColors`）。**違反の赤い太字は描かない** — 違反は担当者が直すもので、配るものではない |
 | **描く元** | **マス目の 4 枚そのもの。**手直しの後のセルを、そのまま描く（→ 5-3）。**生成も数え直しも走らせず、1 セルも書き換えない** |
 
 **何をどこに描くかはコアが決め、ダイアログは塗るだけである。**
 
 | どこが持つか | 何を |
 | --- | --- |
-| [`distribution-image.js`](distribution-image.js) | **表と、塗る図形の位置まで。**文字の幅は canvas で測らず、**全角 1 字 ＝ 1 文字ぶん・半角 ＝ 約半分**で見積もる — 位置をコアに置くと、**手元の検査で形まで見られる**（→ [`distribution-image.test.mjs`](distribution-image.test.mjs)）。**セルの幅は役割名で決めない** — 長い役割名（`クリーンパトロール`）が 1 つある日だけ表が横に伸びないようにするためで、**収まらない分は塗る側が字を詰める** |
-| [`shell.js`](shell.js) の `distributionImagesOn` | **構造を確かめてから、生成・数え直しと同じ口でマス目を読む。**崩れていれば、同じ名指しで止まる |
-| [`export-images.html`](export-images.html) | **図形を `<canvas>` に塗り、PNG にする。****画素は 2 倍で塗る** — スマホで拡大して読まれる ◎（入る側 ACTION 6）。**字体は端末のまま**（→ 2 の「止まる箇所」#7）。**保存のリンクと、同じ画像を並べて出す** — リンクで保存が始まらない端末でも、画像を長押し・右クリックで保存できる |
+| [`distribution-image.ts`](core/distribution-image.ts) | **表と、塗る図形の位置まで。**文字の幅は canvas で測らず、**全角 1 字 ＝ 1 文字ぶん・半角 ＝ 約半分**で見積もる — 位置をコアに置くと、**手元の検査で形まで見られる**（→ [`distribution-image.test.ts`](core/distribution-image.test.ts)）。**セルの幅は役割名で決めない** — 長い役割名（`クリーンパトロール`）が 1 つある日だけ表が横に伸びないようにするためで、**収まらない分は塗る側が字を詰める** |
+| [`shell.ts`](shell/shell.ts) の `distributionImagesOn` | **構造を確かめてから、生成・数え直しと同じ口でマス目を読む。**崩れていれば、同じ名指しで止まる |
+| [`export-images.html`](ui/export-images.html) | **図形を `<canvas>` に塗り、PNG にする。****画素は 2 倍で塗る** — スマホで拡大して読まれる ◎（入る側 ACTION 6）。**字体は端末のまま**（→ 2 の「止まる箇所」#7）。**保存のリンクと、同じ画像を並べて出す** — リンクで保存が始まらない端末でも、画像を長押し・右クリックで保存できる |
 
 **前回の記録から描いたときに粒度が落ちないこと（M4 の差分 0）は、[`scripts/前回のシフト表.mjs`](../scripts/前回のシフト表.mjs) が見る。**
 
@@ -502,12 +517,13 @@
 何が入っていないかを名指しで出す**（→ 上の「段は 6 つで、中身は全部入っている」）。
 **「画像を書き出す」の中身も入っている**（→ 下の「配る画像は、日ごとに 4 枚である」）。**押すと書き出すダイアログが開く。**
 **3 項目とも中身が入ったので、「まだ作っていない」と言う項目は残っていない。**
+**末尾の「バージョン」は、貼った版（タグ、無ければ短い SHA）を画面の隅に出すだけの項目で、押さなくても困らない**（担当者の操作は増えない → ADR dev-env-0001）。
 
 **4 つ目の「来年用に空にする」だけは、2 の一覧の操作ではない**（→ [ADR tech-requirements-0018](../docs/agent/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。
 **引き継ぎの予備で、前年の担当者が自分のファイルのコピーの上で 1 回だけ押す。****本線（ルートの [`README.md`](../README.md) の `/copy` リンク）では押さないので、担当者の操作は増えていない。**
 **回答を消す項目なので、区切り線の下に離して置き、押すと「コピーで押していますか？」の確認が出る。**
-**押すと、フォームとの紐付けを外し、回答・割り当て 4 枚・検証結果・指標・条件入力の 9〜10 行目を消す。条件入力の値は残し、来年の初期値になる**（→ [`clear-for-next-year.js`](clear-for-next-year.js)）。
-**コピーで複製されたフォームは消さない** — 消すにはドライブのスコープが要る（→ 下の「書かないもの」）。**押した後の画面が、そのフォームの URL を出し、ゴミ箱に移すよう名指しする。**
+**押すと、フォームとの紐付けを外し、回答・割り当て 4 枚・検証結果・指標・条件入力の 9〜10 行目を消す。条件入力の値は残し、来年の初期値になる**（→ [`clear-for-next-year.ts`](shell/clear-for-next-year.ts)）。
+**コピーで複製されたフォームは消さない** — 消すにはドライブのスコープが要る（→ 下の「書かないもの」）。**押した後の画面（折り返せる HTML のダイアログ。ui.alert はハイフンの無い URL が横にはみ出す → #351）が、そのフォームの URL をリンクで出し、ゴミ箱に移すよう名指しする。題名では名指ししない — ドライブのファイル名は題名と違い、元のフォームも同じ題名で並ぶ。**
 
 **`buildTemplate` はメニューに出していない。**
 **走らせるのはテンプレートを用意する側で、担当者ではない**（2 の一覧に無い操作を増やさないため）。
@@ -520,9 +536,9 @@
 
 | | |
 | --- | --- |
-| **拾う口** | **[`menu.js`](menu.js) の `onEdit`**（単純トリガー）。**インストール型のトリガーを作らないので、承認画面にもスコープの一覧にも何も増えない**（→ 上の「要求するのは 3 スコープである」） |
+| **拾う口** | **[`menu.ts`](shell/menu.ts) の `onEdit`**（単純トリガー）。**インストール型のトリガーを作らないので、承認画面にもスコープの一覧にも何も増えない**（→ 上の「要求するのは 3 スコープである」） |
 | **いつ走るか** | **マス目の 4 枚のどれかが書き換えられたときだけ**である。**条件入力の書き換えでは走らない** — 書きかけの途中で型に乗らないのが普通で、1 文字ごとに名指しを出すことになる。**条件を動かした後はメニューの「生成」を押す**（→ 2 の一覧 7）。**スクリプトが書いたセル（生成の書き戻し）では走らない** |
-| **何をするか** | **構造を照らす → 読む → 数え直す → 検証結果と指標を書く → マス目の色を塗り直す**（→ [`shell.js`](shell.js) の `recountSpreadsheet`）。**生成を走らせない**（→ [`core.js`](core.js) の `recount`）— 1 セル書き換えるたびに残りの枠が組み直されると、**その 1 手で何が変わったかが見えなくなる。****数える段は生成のときと同じものを通す**（数え方を 2 通りに持たない） |
+| **何をするか** | **構造を照らす → 読む → 数え直す → 検証結果と指標を書く → マス目の色を塗り直す**（→ [`shell.ts`](shell/shell.ts) の `recountSpreadsheet`）。**生成を走らせない**（→ [`core.ts`](core/core.ts) の `recount`）— 1 セル書き換えるたびに残りの枠が組み直されると、**その 1 手で何が変わったかが見えなくなる。****数える段は生成のときと同じものを通す**（数え方を 2 通りに持たない） |
 | **マス目** | **書き戻さない。**担当者がいま書いたセルそのものを読んで数える。**規則 1 の違反も、生成は作らないが手直しは作りうる** — **その場合も、そのまま違反として出る**（→ 5 の #13 の ①） |
 | **担当者に見えるもの** | **右下の一言**（`集計し直しました：違反 N 件／人数不足 M 件`）と、**検証結果・指標の中身**と、**違反した所の赤い太字**である |
 | **止まったとき** | **止まった理由を一言にして出し、検証結果も指標も書き換えない。**枠に無い時刻・学籍番号の無い行に入った役割・見出しの無い列に入った役割は、**書き換えた直後に名指しされる**（次に「生成」を押すまで待たない）。**捕まえているのは、単純トリガーの中で投げた例外が担当者の画面に出ないからである**（実行ログに残るだけである）— メニューの「生成」が例外の文をそのまま見せるのと同じことを、一言にして出している |
@@ -530,8 +546,8 @@
 ### 違反した所は、セルの色で出る
 
 **背景は役割の色、違反した所は赤い太字である。**
-**色の値と印を付けるセルはコアが決め（[`assignment-grid.js`](assignment-grid.js) の `roleColors`・`gridBackgrounds`・`violationCells`）、
-殻が塗る（[`shell.js`](shell.js) の `paintGrids`）。**
+**色の値と印を付けるセルはコアが決め（[`assignment-grid.ts`](core/assignment-grid.ts) の `roleColors`・`gridBackgrounds`・`violationCells`）、
+殻が塗る（[`shell.ts`](shell/shell.ts) の `paintGrids`）。**
 **生成を押したときも、数え直したときも、同じに塗り直す** — **役割を書き換えればそのセルの色も変わり**、前の周の赤い太字は違反でなくなったセルに残らない。
 
 **背景は役割ごとの色である** — **前回の配布物 ◎ がそうなっている**（→ [#213](https://github.com/jun-eg/school-festival-shift/issues/213) の「色」の行）。
@@ -550,18 +566,18 @@
 **表に無い役割名は塗らない** — 役割名は条件入力から来るので、年で増えることがある（→ 5-1 の #2）。**黙って別の色に寄せない。**
 **名前のある 3 列（学籍番号・氏名・友達欄）は塗らない。**
 
-**違反した所は、文字を赤い太字にする**（`#cc0000` → [`shell.js`](shell.js) の `violationMark`）。
+**違反した所は、文字を赤い太字にする**（`#cc0000` → [`shell.ts`](shell/shell.ts) の `violationMark`）。
 **背景を役割の色に使っているので、違反は文字のほうで出す** — **同じ背景に 2 つの意味を重ねると、どちらの色かを担当者が見分けることになる。**
 
 ### 検証結果は、違反の行が赤、店の役割の行が黄色である
 
 **`種別` が `違反` の行は、役割に関係なく行ぜんぶ赤（`#ea9999`）にする。****ただし、準備も片付けも入っている規則 3 の違反は行ぜんぶ水色（`#9fc5e8`）にする**（→ [#258](https://github.com/jun-eg/school-festival-shift/issues/258)）。**違反でない行は、`役割` が `準備`・`片付け` 以外の行（＝ 店の役割の未充足・食い違った固定）だけを、行ぜんぶ黄色（`#ffff00`）にする**（→ [#220](https://github.com/jun-eg/school-festival-shift/issues/220)）。
-**どの行を何色にするかはコアが決め（[`assignment-grid.js`](assignment-grid.js) の `checkRowHighlights`・`checkResultBackgrounds`）、殻が塗る（[`shell.js`](shell.js) の `paintCheckResults`）。**
+**どの行を何色にするかはコアが決め（[`assignment-grid.ts`](core/assignment-grid.ts) の `checkRowHighlights`・`checkResultBackgrounds`）、殻が塗る（[`shell.ts`](shell/shell.ts) の `paintCheckResults`）。**
 
 | 行 | 色 | なぜ |
 | --- | --- | --- |
 | **`種別` が `違反`**（役割が何でも。`準備`・`片付け`・空も） | **行ぜんぶ赤** | **置いた人が条件を破っている所で、担当者が直すものである。**未充足と見分けがつくよう、色を分ける |
-| **`種別` が `違反`** で、**準備も片付けも入っている規則 3**（`内容` が `今：準備あり／片付けあり）` で終わる） | **行ぜんぶ水色** | **要る方は入っていて、もう一方が余分に入っているだけである。****公平性を取るために作成者が意図的に入れる場合がある**ので、直すべき赤に紛れさせない。判定は文を作る側が持つ（[`count-violations.js`](count-violations.js) の `isPrepCleanupSurplus`） |
+| **`種別` が `違反`** で、**準備も片付けも入っている規則 3**（`内容` が `今：準備あり／片付けあり）` で終わる） | **行ぜんぶ水色** | **要る方は入っていて、もう一方が余分に入っているだけである。****公平性を取るために作成者が意図的に入れる場合がある**ので、直すべき赤に紛れさせない。判定は文を作る側が持つ（[`count-violations.ts`](core/count-violations.ts) の `isPrepCleanupSurplus`） |
 | 違反でなく、`役割` が `準備` ／ `片付け` | 塗らない | **未充足のほとんどがこの 2 つで、何十行も並ぶ**（→ 5-4）。塗ると店の役割の行が埋もれる |
 | 違反でなく、`役割` が空 | 塗らない | 店の役割の行ではない |
 | 違反でなく、それ以外（`調理` ／ `会計` など） | **行ぜんぶ黄色** | 店を回す役割の未充足・食い違った固定である |
@@ -588,7 +604,7 @@
 | **本物の上で、単純トリガーが書き換えのたびに走り、一言が出るか。1 回に何秒かかるか**（**構造の検証と読みは生成のときと同じで、実機では読みだけで 4.5 秒ほどかかっている**） | [`real-device-log.md`](real-device-log.md) の項目 16（**まだ見ていない**） |
 | **続けて書き換えたとき、前の数え直しが終わる前に次が走ったらどうなるか**（**後から終わったほうが残る。****ロックは掛けていない**） | 同上（**実機で続けて書き換えたときに見る**） |
 | **固定（前の周の手直し）が新しい入力と食い違ったときの名指し** | **入った**（→ 下の「手直しは、生成し直しても残る」／ [#156](https://github.com/jun-eg/school-festival-shift/issues/156)）。**数え直しは書いてあるとおりを数えるだけで、固定を照らすのは「生成」を押したときである** |
-| **1 セルに役割を 2 つ書いたとき**（`調理、会計` など）。**いまは 1 つの役割名として読まれる** — **役割名を弾かない**（→ [`generate.js`](generate.js)）ので、違反にも未充足にもならずに通る | **決めていない** |
+| **1 セルに役割を 2 つ書いたとき**（`調理、会計` など）。**いまは 1 つの役割名として読まれる** — **役割名を弾かない**（→ [`generate.ts`](core/generate.ts)）ので、違反にも未充足にもならずに通る | **決めていない** |
 
 ## 手直しは、生成し直しても残る
 
@@ -598,17 +614,17 @@
 
 | | |
 | --- | --- |
-| **どのセルが手直しか** | **セルのメモ（ノート）「シフト作成者による修正済み」が付いたセル**である（→ [`assignment-grid.js`](assignment-grid.js) の `fixedNote`）。**付けるのは `onEdit`** — マス目を書き換えると、数え直す前にそのセルへ付く（→ [`shell.js`](shell.js) の `markFixedCells`）。**スクリプトの書き戻しでは付かない**（単純トリガーは人の編集でしか走らない）ので、**前の周に機械が置いたセルと、担当者が書き換えたセルが区別される** |
+| **どのセルが手直しか** | **セルのメモ（ノート）「シフト作成者による修正済み」が付いたセル**である（→ [`assignment-grid.ts`](core/assignment-grid.ts) の `fixedNote`）。**付けるのは `onEdit`** — マス目を書き換えると、数え直す前にそのセルへ付く（→ [`shell.ts`](shell/shell.ts) の `markFixedCells`）。**スクリプトの書き戻しでは付かない**（単純トリガーは人の編集でしか走らない）ので、**前の周に機械が置いたセルと、担当者が書き換えたセルが区別される** |
 | **空にしたセル** | **それも手直しである** — 「この人をこの枠に置かない」。印は空のセルに付き、生成はその人をその枠に置かない |
 | **学籍番号を書き換えた行** | **役割の入っているセルぜんぶに印が付く。**行の持ち主を替えたので、その行の割り当ては担当者が別の人に置き直したものである |
-| **取りこぼした書き換え** | **本物で間を置かずに 2 セル書き換えると、`onEdit` が 1 回しか走らず、2 手目に印が付かない**（→ [`real-device-log.md`](real-device-log.md) の「続けて書き換えると、2 手目に印が付かない」）。**生成と数え直しのたびにマス目 4 枚の控え（学籍番号 × 見出しの時刻 → 役割）をシートの developer metadata に置き**（→ [`shell.js`](shell.js) の `keepSeenGrid`）、**次に読んだとき、控えと違うのに印の無いセルに印を付けてから数える・生成する**（→ [`shell.js`](shell.js) の `markMissedEdits` ／ [`assignment-grid.js`](assignment-grid.js) の `missedEdits` ／ [#226](https://github.com/jun-eg/school-festival-shift/issues/226)）。**印は今までどおりメモだけで、控えは取りこぼしを印に変える道具である**（→ 5-3 ／ [`ADR tech-requirements-0013`](../docs/agent/ADR/tech-requirements/0013-取りこぼした書き換えを拾うために前に見たマス目を見えない所に控えるようになった.md)）。**控えが無い・読めないときは拾わないだけで、黙って全部を手直しにしない。****画像の書き出しは拾わない**（1 セルも書き換えない）。**同じ値に書き直した手は、控えと違わないので、`onEdit` が落ちれば拾えない** |
+| **取りこぼした書き換え** | **本物で間を置かずに 2 セル書き換えると、`onEdit` が 1 回しか走らず、2 手目に印が付かない**（→ [`real-device-log.md`](real-device-log.md) の「続けて書き換えると、2 手目に印が付かない」）。**生成と数え直しのたびにマス目 4 枚の控え（学籍番号 × 見出しの時刻 → 役割）をシートの developer metadata に置き**（→ [`shell.ts`](shell/shell.ts) の `keepSeenGrid`）、**次に読んだとき、控えと違うのに印の無いセルに印を付けてから数える・生成する**（→ [`shell.ts`](shell/shell.ts) の `markMissedEdits` ／ [`assignment-grid.ts`](core/assignment-grid.ts) の `missedEdits` ／ [#226](https://github.com/jun-eg/school-festival-shift/issues/226)）。**印は今までどおりメモだけで、控えは取りこぼしを印に変える道具である**（→ 5-3 ／ [`ADR tech-requirements-0013`](../docs/agent/ADR/tech-requirements/0013-取りこぼした書き換えを拾うために前に見たマス目を見えない所に控えるようになった.md)）。**控えが無い・読めないときは拾わないだけで、黙って全部を手直しにしない。****画像の書き出しは拾わない**（1 セルも書き換えない）。**同じ値に書き直した手は、控えと違わないので、`onEdit` が落ちれば拾えない** |
 | **印の外し方** | **メモを消す。**次の「生成」でそのセルは組み直される。**担当者が自分で書いたメモは印にならない**（頭が「シフト作成者による修正済み」のものだけが印である） |
-| **生成がすること** | **印のあるセルだけを読み**（入力の `手直し` → [`core.js`](core.js) の `inputNames`）、**先に置いてから残りを組む**（→ [`generate.js`](generate.js) の `placeFixed`）。**前の周に機械が置いたセルは読まない** — 読むと、却下した「前回の案全体を初期解にする」になる（→ 5-3）。**入れ替え（2 段目）は手直しを動かさない** |
+| **生成がすること** | **印のあるセルだけを読み**（入力の `手直し` → [`core.ts`](core/core.ts) の `inputNames`）、**先に置いてから残りを組む**（→ [`generate.ts`](core/generate.ts) の `placeFixed`）。**前の周に機械が置いたセルは読まない** — 読むと、却下した「前回の案全体を初期解にする」になる（→ 5-3）。**入れ替え（2 段目）は手直しを動かさない** |
 | **置けない手直し** | **置かない。黙って外さない。**検証結果の**先頭**に、種別 `反映できなかった修正` で**理由つき**で並び（規則 1・3・4・5 ／ 同じ枠に二重 ／ いまの枠に無い）、**そのセルのメモも理由に差し替わる**（いまの枠に無いものは学籍番号のセル）。**メニューの一言にも件数が出る。**理由のメモは印ではないので、**同じ食い違いを生成のたびに名指ししない** — もう一度書き換えれば印に戻る |
-| **規則 3 の見方** | **店の割り当てが出そろってから見る**（→ [`generate.js`](generate.js) の `releaseFixesBreakingRule3`）。**午前だけの店の手直しでも、生成が午後の枠を足せば ④ で満たす**ので、手直しだけを見て外さない。**生成は向きの合う側にしか店の枠を足さず**、出そろっても向きが合わない日だけ、**外す手直しが少ない側から**外して名指しする。**帯に出られる空きが無いだけの日は外さない**（準備・片付けなしで店に置ける → [`ADR tech-requirements-0017`](../docs/agent/ADR/tech-requirements/0017-規則3の2から4は入れるならどちらかの規則になり準備も片付けも無い日は違反でなくなった.md)） |
+| **規則 3 の見方** | **店の割り当てが出そろってから見る**（→ [`generate.ts`](core/generate.ts) の `releaseFixesBreakingRule3`）。**午前だけの店の手直しでも、生成が午後の枠を足せば ④ で満たす**ので、手直しだけを見て外さない。**生成は向きの合う側にしか店の枠を足さず**、出そろっても向きが合わない日だけ、**外す手直しが少ない側から**外して名指しする。**帯に出られる空きが無いだけの日は外さない**（準備・片付けなしで店に置ける → [`ADR tech-requirements-0017`](../docs/agent/ADR/tech-requirements/0017-規則3の2から4は入れるならどちらかの規則になり準備も片付けも無い日は違反でなくなった.md)） |
 | **営業時刻を動かした後** | **前の周の列（いまの枠に無い見出し）があっても、「生成」は止まらない。**印のあるものは名指しで返り、印の無いものは組み直される。**数え直しは止まる**（書いてあるとおりを数えるので、枠に無い列は数えられない）— 一言が「生成を押す」と言う |
-| **書き戻すとき** | **メモをぜんぶ消してから付け直す**（→ [`shell.js`](shell.js) の `writeGrids`）。**行は学籍番号の順なので、人が増えれば行がずれる** — 残したままにすると、印が別の人のセルに移る。**担当者が自分で書いたメモも消える**（背景色や太字と同じ）。**1 枠も置かれなかった人でも、手直しがあれば行が残る** |
-| **数え直し** | **固定を照らさない**（→ [`core.js`](core.js) の `recount`）。手直しはマス目にもう書いてあるので、**条件を破っていれば違反として赤い太字で出る**（→ 5 の #13 の ①）。照らすと、同じ 1 セルが「違反」と「食い違った固定」の 2 行で出る |
+| **書き戻すとき** | **メモをぜんぶ消してから付け直す**（→ [`shell.ts`](shell/shell.ts) の `writeGrids`）。**行は学籍番号の順なので、人が増えれば行がずれる** — 残したままにすると、印が別の人のセルに移る。**担当者が自分で書いたメモも消える**（背景色や太字と同じ）。**1 枠も置かれなかった人でも、手直しがあれば行が残る** |
+| **数え直し** | **固定を照らさない**（→ [`core.ts`](core/core.ts) の `recount`）。手直しはマス目にもう書いてあるので、**条件を破っていれば違反として赤い太字で出る**（→ 5 の #13 の ①）。照らすと、同じ 1 セルが「違反」と「食い違った固定」の 2 行で出る |
 
 ### ここで決めていないこと
 
@@ -628,9 +644,9 @@
 
 | 要求するスコープ | 何を許すか | 何がこれを要求しているか |
 | --- | --- | --- |
-| `https://www.googleapis.com/auth/spreadsheets.currentonly` | **このスクリプトが入っているスプレッドシート 1 つだけ**の参照・編集 | **`SpreadsheetApp.getActive()`**（[`shell.js`](shell.js) の 1 行 ／ [`build-template.js`](build-template.js) ／ [`build-form.js`](build-form.js) ／ [`menu.js`](menu.js) の `toast`）と、**その先で触るシート・範囲・保護の全部**（`Protection` の全メソッドもこの対で足りる） |
-| `https://www.googleapis.com/auth/forms` | **フォームの作成と編集** | **`FormApp.create`** と、そこに置く設問・正規表現・画像アイテム、**`setDestination`**（→ [`build-form.js`](build-form.js)・[#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。**「来年用に空にする」の `FormApp.openByUrl` ／ `removeDestination` もこれで足りる** — 開くのは**このファイルの「回答」に紐付いたフォーム 1 つだけ**である（→ [`clear-for-next-year.js`](clear-for-next-year.js)）。**`forms.currentonly` では足りない** — あちらは**フォームにバインドしたスクリプト用**で、**こちらはスプレッドシート側からフォームを新しく作る** |
-| `https://www.googleapis.com/auth/script.container.ui` | **このファイルの上にダイアログを出すこと** | **`showModalDialog`**（名簿の画像を選ぶ 1 枚 → [`build-form.js`](build-form.js)）。**メニューを出すだけなら要らなかった** — **`getUi` ／ `createMenu` ／ `addToUi` ／ `toast` は 1 スコープのときに実機を通っている**（→ [`real-device-log.md`](real-device-log.md) の「`oauthScopes` を書いた後に出た画面」）。**画像の書き出し（[#157](https://github.com/jun-eg/school-festival-shift/issues/157)）もこのスコープで足りる** |
+| `https://www.googleapis.com/auth/spreadsheets.currentonly` | **このスクリプトが入っているスプレッドシート 1 つだけ**の参照・編集 | **`SpreadsheetApp.getActive()`**（[`shell.ts`](shell/shell.ts) の 1 行 ／ [`build-template.ts`](shell/build-template.ts) ／ [`build-form.ts`](shell/build-form.ts) ／ [`menu.ts`](shell/menu.ts) の `toast`）と、**その先で触るシート・範囲・保護の全部**（`Protection` の全メソッドもこの対で足りる） |
+| `https://www.googleapis.com/auth/forms` | **フォームの作成と編集** | **`FormApp.create`** と、そこに置く設問・正規表現・画像アイテム、**`setDestination`**（→ [`build-form.ts`](shell/build-form.ts)・[#144](https://github.com/jun-eg/school-festival-shift/issues/144)）。**「来年用に空にする」の `FormApp.openByUrl` ／ `removeDestination` もこれで足りる** — 開くのは**このファイルの「回答」に紐付いたフォーム 1 つだけ**である（→ [`clear-for-next-year.ts`](shell/clear-for-next-year.ts)）。**`forms.currentonly` では足りない** — あちらは**フォームにバインドしたスクリプト用**で、**こちらはスプレッドシート側からフォームを新しく作る** |
+| `https://www.googleapis.com/auth/script.container.ui` | **このファイルの上にダイアログを出すこと** | **`showModalDialog`**（名簿の画像を選ぶ 1 枚 → [`build-form.ts`](shell/build-form.ts)）。**メニューを出すだけなら要らなかった** — **`getUi` ／ `createMenu` ／ `addToUi` ／ `toast` は 1 スコープのときに実機を通っている**（→ [`real-device-log.md`](real-device-log.md) の「`oauthScopes` を書いた後に出た画面」）。**画像の書き出し（[#157](https://github.com/jun-eg/school-festival-shift/issues/157)）もこのスコープで足りる** |
 
 **`.currentonly` の付かない `https://www.googleapis.com/auth/spreadsheets` を要求しない。**
 **付かない側は「すべてのスプレッドシート」で、担当者のドライブにある全部のファイルが対象になる。**
@@ -652,7 +668,7 @@
 | 要求していないもの | なぜ要らないか |
 | --- | --- |
 | `.../auth/spreadsheets`（すべてのスプレッドシート） | **上のとおり。**掴むのは `getActive()` だけである |
-| `.../auth/drive` ／ `.../auth/drive.file` | **ドライブを探さない・消さない。****「来年用に空にする」も、コピーで複製されたフォームをゴミ箱に移さない**（担当者の手でやる → [ADR tech-requirements-0018](../docs/agent/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。**テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1）。**フォームを作るのは `FormApp` の側で足りる**（ドライブから**選ばせない** — 名簿の画像は担当者の端末から直接受け取る → [`form-picker.html`](form-picker.html)） |
+| `.../auth/drive` ／ `.../auth/drive.file` | **ドライブを探さない・消さない。****「来年用に空にする」も、コピーで複製されたフォームをゴミ箱に移さない**（担当者の手でやる → [ADR tech-requirements-0018](../docs/agent/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。**テンプレートをコピーするのは担当者の手**であって、スクリプトではない（→ 2 の一覧 1）。**フォームを作るのは `FormApp` の側で足りる**（ドライブから**選ばせない** — 名簿の画像は担当者の端末から直接受け取る → [`form-picker.html`](ui/form-picker.html)） |
 | `.../auth/forms.currentonly` | **フォームにバインドしたスクリプト用である。**こちらはスプレッドシート側から**フォームを新しく作る**ので足りない（→ 上の表） |
 | `.../auth/script.external_request` | **外部に 1 度も出ない**（→ 2「個人情報が通る経路」・[#157](https://github.com/jun-eg/school-festival-shift/issues/157) の「外部から読み込むファイルが 0 個」） |
 | `.../auth/script.scriptapp`（トリガー） | **`onOpen` も `onEdit` も単純トリガーで承認が要らない。****インストール型のトリガーを 1 つも作らない** |
@@ -699,20 +715,12 @@
 
 1. Google ドライブで**スプレッドシートを 1 つ**作り、**名前を付ける**
 2. **拡張機能 → Apps Script** を開く
-3. `src/` の **`.js` 18 本**（`*.test.mjs` を除いた全部）を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
-   `sheet-layout` ／ `input-types` ／ `core` ／ `take-in` ／ `expand` ／ `generate` ／ `count-violations` ／ `name-unmet` ／
-   `fairness-metrics` ／ `assignment-grid` ／ `form-definition` ／ `shell` ／ `verify-structure` ／ `build-template` ／
-   `build-form` ／ `menu` ／ `distribution-image` ／ `clear-for-next-year`。
-   **`clear-for-next-year` を除く 17 本で実機に貼って走らせてある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」）。
-   **18 本目はまだ実機で見ていない**（→ [`real-device-log.md`](real-device-log.md) の項目 24）。
-   **[`form-picker.html`](form-picker.html) と [`export-images.html`](export-images.html) の 2 枚も貼る** — エディタの**「＋」→「HTML」**で
-   `form-picker` ／ `export-images` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）。
-   **1 つ貼り忘れれば、走らせたときに名指しで止まる**（→「コアと殻の境目」の最後）。
-   **日本語の名前でも通ることは実機で見たが、英字にそろえてある**
-   （→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175)・上の「名前の線」）。
-   **関数名も同じで、日本語のままでもメニューから呼べることを実機で見たうえで英字にしてある**
-   （→ [#178](https://github.com/jun-eg/school-festival-shift/issues/178)）。
-   **貼る順は問わない**（→「コアと殻の境目」の最後）
+3. `npm run build` が `dist/` に出す **4 つ**を貼る（`dist/` は git に入れない。貼る前にタグを打つ → ルートの [`CONTRIBUTING.md`](../CONTRIBUTING.md) の「手で貼る」）。
+   - **`main.gs`**: エディタの `.gs` 1 本の中身にする（`src/` の TypeScript を全部束ねた 1 本である）。**ほかの `.gs` は置かない**
+   - **`form-picker.html` と `export-images.html`**: エディタの**「＋」→「HTML」**で `form-picker` ／ `export-images` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）
+   - **`appsscript.json`**: 手順 5 で写す
+   **`main.gs` に束ねたので、貼り忘れた `.gs` が走らせたときに名指しで止まる形は無くなった**（HTML の貼り忘れは、開いたときに止まる）。
+   **20 ファイルを 1 つずつ貼った実機の記録は残してある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」。**見たものを後から書き換えない**）。**4 つを貼った実機の記録は [#331](https://github.com/jun-eg/school-festival-shift/issues/331) が持つ**
 4. **Apps Script プロジェクトにも名前を付ける**（初期値は `無題のプロジェクト` である）
 5. **プロジェクトの設定 →「`appsscript.json` マニフェスト ファイルをエディタで表示する」**を入れ、
    [`appsscript.json`](appsscript.json) の中身を写す
@@ -735,82 +743,92 @@
    [#136](https://github.com/jun-eg/school-festival-shift/issues/136) ／ 6-1 の #3）。
    **作った後にコードを直したら、テンプレートのスクリプトを差し替える**（→ ルートの [`CONTRIBUTING.md`](../CONTRIBUTING.md)）
 
-### clasp を本筋にしない
+### clasp を本筋にしない — テンプレートへの差し替えの話である
 
-**clasp（`clasp push`）でも入る。** それでも**手貼りを原本にする。**
+**テンプレート（jun-eg のドライブ）への差し替えは、`clasp push` でも入る。** それでも**手貼りを原本にする**（→ [ADR dev-env-0001](../docs/agent/ADR/dev-env/0001-配布はsrcの20ファイルではなくdistの4つになった.md)）。
+**検証用スプレッドシートへの `clasp push` ・ `clasp run` は別の話で、開発側の本線である**（→ [#307](https://github.com/jun-eg/school-festival-shift/issues/307)）。
 
 | | |
 | --- | --- |
-| **貼るのにインストールが 1 つも要らなかった** | 実機でなぞった結果、**ブラウザだけで 4 ファイルが入った**（当時のファイル数である）**。**clasp は Node と npm と `clasp login` を要求する |
-| **`.clasp.json` がリポジトリに無い** | **スプレッドシートごとに違う**ので入れない（`.gitignore` に置いてある）。**clasp を使う人は毎回これを作る**ことになる |
-| **貼るのは 1 回だけである** | テンプレートを作るのは**用意する側が 1 回**で、担当者ではない。**繰り返さない作業に道具を増やさない** |
-| **ファイル名が 1 対 1 で対応する** | **貼った名前がそのまま付く**ので、リポジトリの `.js` と Apps Script の `.gs` が名前で突き合わせられる（**日本語の名前でもそのまま通った** → [`real-device-log.md`](real-device-log.md)。**いまは英字である** → [#175](https://github.com/jun-eg/school-festival-shift/issues/175)） |
+| **`.clasp.json` がリポジトリに無い** | **スプレッドシートごとに違う**ので入れない（`.gitignore` に置いてある）。**clasp を使う人は毎回これを作る**ことになる。**残る理由はこれである** |
+| **貼る物が 4 つに減った** | 貼る手間はファイル数では測れなくなった（以前は 20 本で、clasp の旨味だった）。**手貼りでも `main.gs` ・ HTML 2 枚 ・ マニフェストの 4 回で済む** |
+| **（落とした）インストールが 0 で済む** | ビルドに Node と esbuild が要る（→ [#300](https://github.com/jun-eg/school-festival-shift/issues/300) ・ [#302](https://github.com/jun-eg/school-festival-shift/issues/302)）ので、**差し替える側には成り立たない**。**担当者に要求するものが 0 のことは変わらない**（担当者はテンプレートをコピーするだけである） |
+| **（落とした）貼るのは 1 回だけである** | タグごとに貼る形にした（→ CONTRIBUTING.md）。**繰り返す作業になった**が、貼り替えは 4 回で、clasp を要求するほどではない |
+| **（落とした）ファイル名が 1 対 1 で対応する** | `main.gs` 1 本になったので、リポジトリの `.ts` と Apps Script の `.gs` は名前で突き合わせられない。**代わりに版（タグ）で突き合わせる** |
 
-**却下ではない** — clasp を使いたい実装者が使うのは構わない。**手順の原本がどちらかを決めただけである。**
-**`src/` のファイルが増えたら、この判断は見直す。****4 つから 16 になったが、動かしていない**
-（`core.js` と `shell.js` → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)、
-`verify-structure.js` → [#138](https://github.com/jun-eg/school-festival-shift/issues/138)、
-`input-types.js` → [#140](https://github.com/jun-eg/school-festival-shift/issues/140)、
-`count-violations.js` → [#141](https://github.com/jun-eg/school-festival-shift/issues/141)、
-`name-unmet.js` → [#142](https://github.com/jun-eg/school-festival-shift/issues/142)、
-`take-in.js` → [#146](https://github.com/jun-eg/school-festival-shift/issues/146)、
-`expand.js` → [#149](https://github.com/jun-eg/school-festival-shift/issues/149)、
-`generate.js` → [#151](https://github.com/jun-eg/school-festival-shift/issues/151)、
-`fairness-metrics.js` → [#154](https://github.com/jun-eg/school-festival-shift/issues/154)、
-`form-definition.js` と `build-form.js` ＋ `form-picker.html` → [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）
-— **貼る回数はまだ手で追える**し、**貼るのが 1 回だけであることも、インストールが 0 であることも変わっていない。**
+**却下ではない** — clasp を使いたい実装者が使うのは構わない（`rootDir` は `dist`）。**手順の原本がどちらかを決めただけである。**
 **clasp の導入を担当者に要求することは、どちらにしても無い。**
 
 ## 確かめ方
 
 ```
-node src/sheet-layout.test.mjs
-node src/assignment-grid.test.mjs
-node src/input-types.test.mjs
-node src/core.test.mjs
-node src/take-in.test.mjs
-node src/expand.test.mjs
-node src/generate.test.mjs
-node src/count-violations.test.mjs
-node src/name-unmet.test.mjs
-node src/fairness-metrics.test.mjs
-node src/form-definition.test.mjs
-node src/shell.test.mjs
-node src/verify-structure.test.mjs
-node src/build-template.test.mjs
-node src/build-form.test.mjs
-node src/distribution-image.test.mjs
-node src/clear-for-next-year.test.mjs
+npm test
 ```
 
-**依存はゼロである**（Node の標準だけを使う）。**何も書き換えない。**
+**先に型を検査し**（`npm run typecheck` ＝ `tsc --noEmit` を 3 つの設定で。下の「型を検査する」）、**通ったら `src/**/*.test.ts` を全部回す**（Node の `node --test`。一覧を別に持たないので、検査を足しても抜けない）。
+**検査の `.ts` は、Node の型剥がし（22.18 以降は既定）でそのまま走る**（変換は要らない。`enum` ・ `namespace` ・ パラメータプロパティは型剥がしで走らないので、`erasableSyntaxOnly` が禁じている）。
+**回す前に `.node-version` の Node を入れ、`npm ci` を 1 回やる**（→ [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
+1 本ずつ回したいときは `node --test src/<core か shell>/<名前>.test.ts`（`boundary.test.ts` と `entry.test.ts` は `src/` 直下）。
+**ルートの `package.json` は `"type": "module"` で、`src/` の `.ts` はすべて ES モジュールである**（検査が `import` で直接読む。`vm` で文字列として走らせない）。
+**`src/package.json` は置かない**（`type: commonjs` に戻していたのは、`.gs` を素のスクリプトとして `require` していた間だけの暫定だった）。
+
+**担当者に要求する依存はゼロである**（実行時に読むものは無く、`devDependencies` は開発者の道具だけである — `esbuild`（`npm run build`）・`typescript` ・ 型の定義 3 つ（`@types/node` ・ `@types/google-apps-script` ・ `@types/google.script.client-side`））。**検査は何も書き換えない。**
+**検査の器は `node:test` と `node:assert` である**（[#301](https://github.com/jun-eg/school-festival-shift/issues/301)）。
+**1 件ずつの断定は [`test/check.ts`](../test/check.ts) の `check(見出し, 実測, 期待)` が持ち**（`it` と `assert.deepStrictEqual`）、
+**偽のスプレッドシートは [`test/fakes/spreadsheet.ts`](../test/fakes/spreadsheet.ts)、偽のフォームは [`test/fakes/form.ts`](../test/fakes/form.ts) の 1 本ずつを共有する**
+（本物と違う振る舞いは、それぞれの先頭のコメントが名指しする）。
+**数字（カバレッジ）は `node --test --experimental-test-coverage "src/**/*.test.ts"` で出る**（閾値は [#311](https://github.com/jun-eg/school-festival-shift/issues/311)）。
+**`src/` の `.ts` は `import` で直接読むので、数字に `src/` のファイルも載る。**
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
+
+### lint と書式
+
+**`npm run lint` が Biome の `biome check`（lint と書式の検査だけ。書き換えない）、`npm run format` が `biome format --write`（書式だけ書き換える）。**
+対象は `src/` と `scripts/` の `.ts` ・ `.js` ・ `.mjs`（HTML は対象外）。設定は [`biome.jsonc`](../biome.jsonc)。
+**守る書式は 2 スペース・セミコロン無し・シングルクォートの 3 点**。改行の位置とキーの引用符は、最初の 1 回の `format`（書式だけの commit）で Biome が組み直して変わった。以後の揺れは `npm run lint` が落とす。`lineWidth` は 320 と広く取り、折り返しで長い行が縦に伸びすぎないようにしてある。**未使用の変数・import は落とす**。外した規則には理由をコメントで残してある。
+
+### 型を検査する
+
+**`npm run typecheck` が `tsc --noEmit` を 3 つの設定で回す**（出力は無く、変換は esbuild が持つ → [`build.mjs`](../build.mjs)）。
+**どれも `strict` ・ `erasableSyntaxOnly` ・ `verbatimModuleSyntax` を入れ、`lib` を `es2019` に落としてある**（Apps Script の V8 に合わせる。`build.mjs` の `target` も `es2019`）。
+
+| 設定 | 見るもの | 入れる型 |
+| --- | --- | --- |
+| [`tsconfig.json`](../tsconfig.json) | `core/` ・ `shell/` ・ `entry.ts`（**Apps Script で動く側**） | `google-apps-script`。**`dom` も `node` も入れない**（`structuredClone` のような手元でしか動かない API を弾くため） |
+| [`ui/tsconfig.json`](ui/tsconfig.json) | `ui/` のダイアログの TypeScript（**ブラウザで動く側**） | `dom` と `google.script.client-side`。`google.script.run` の関数は [`server.d.ts`](ui/server.d.ts) で型を付ける |
+| [`tsconfig.test.json`](../tsconfig.test.json) | `*.test.ts` と `test/` | `node`（`node:test` など）。**検査だけは `noImplicitAny` を外してある** — 偽物（[`test/fakes/`](../test/fakes/)）を本物の型の口に渡す所は `asGas()` を通す |
+
+**型は `import type` で読む**（型剥がしは `import type` でない型の import を消さず、実行時に `SyntaxError` になる。`verbatimModuleSyntax` が止める）。
+**コアの入出力の型は [`core/types.ts`](core/types.ts) に置く**（行 `Row` ・ 枠 `Slot` ・ 日 `Day` ・ 7 種類の型 ・ 条件 `Conditions` ・ 出力 `Output`）。シートの構成の型（`Layout` ・ `Section`）は [`sheet-layout.ts`](core/sheet-layout.ts) が持つ。
 
 | 検査 | 何を見るか | 件数 |
 | --- | --- | --- |
-| [`sheet-layout.test.mjs`](sheet-layout.test.mjs) | 8 枚（**割り当ては日ごとの 4 枚で、名前はラベル ◎ と同じ 1 か所**）・担当者が書く側・**保護のかけ方**・区画・列名・**時刻の列と固定列**・**友達欄の幅と右の線が名前のある列を指すか**（→ #245）／**広く取る列（友達欄・検証結果の候補）の物差しが、広げない列のうち一番右か**（→ #246）。**回答シートの並びは [`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の見出しと突き合わせる** — **名前で見るのは前の 6 列だけで、後ろ 4 列は数と位置だけを見る**（列名は毎年変わる → 4-1） | 26 |
-| [`input-types.test.mjs`](input-types.test.mjs) | **型が 7 種類だけであること／枠が営業時刻から刻まれること／揃っていない値で止まること（まとまりの長さが 30 分の倍数でなければ止まり、空なら既定の 1 時間で乗ること**を含む**）／学籍番号が大文字で型に乗ること／日ごとの回答文字列を位置で当てること**（見出しが今年の題に変わっても同じ並びで乗るか）**。****[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) をそのまま食わせる** — 50 行が型 #6 に乗るか。**確定シフト 4 本が型に乗るか（→ M1 ①）は、ここでは数えない** — 判定の手（[`scripts/M1①の判定.mjs`](../scripts/M1①の判定.mjs)）が持つ | 27 |
-| [`core.test.mjs`](core.test.mjs) | **スプレッドシートを 1 つも作らずにコアを走らせる。**`SpreadsheetApp` を掴むファイルの一覧／配列を渡して配列が返るか／入っていない段が名指しで返るか／段を差し替えて先に回せるか／**条件が 5-1 の型で段に渡るか**／**表現の揺れ・列数の違い・決めていない種別で止まるか**／**中身が入っている段が未了に出ないか**／**割り当てだけがシート 1 枚に対応しないこと**／**手直しの後の数え直しが生成を通さず、書いたとおりの割り当てから違反と指標を返すか**（手直しで作った規則 1 の違反が出る）／**生成に渡る固定が手直しだけで、置けない固定が検証結果の先頭に名指しで並び、数え直しでは照らさないか**／**検証結果の候補に、その日のその 30 分枠を希望に含む人の学籍番号だけが並び、枠が 1 つに決まらない行は空のままか** | 42 |
-| [`take-in.test.mjs`](take-in.test.mjs) | **規則 2 の 3 つを踏むか**（学籍番号でまとめる／タイムスタンプで畳む／**採るのは後から来た行**）**／[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の全 50 行 ◎ が 39 人 ◎ になり、学籍番号の重複が 0 か**（→ 仕様 #4）／**畳まれるのが出し直し 11 行 ◎ か**／**返るのが型 #6 だけか**（タイムスタンプも氏名も友達欄も乗らない）／**大文字・小文字だけ違う学籍番号が 1 件に畳まれ、残るのが大文字か**／**キーで 1 行に決まらない 2 行・揃っていないタイムスタンプで止まるか**／**コアの段として繋がっているか** | 28 |
-| [`expand.test.mjs`](expand.test.mjs) | **規則 1 の順序を踏むか**（刻んだ枠を受ける／`,` で区切る／**完全に含まれる枠だけ**／**和集合**）**／境界値と特別扱いの 4 つがそのとおりに出るか**（`00:00-00:00` は空集合／営業時間の外は落ちる／端に半分だけかかる枠は入らない／**終端 ≤ 始端は名指しして止まる**）**／[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 39 人が記録どおりに展開されるか**（**終端 ≤ 始端の 3 人で止まり、残る 36 人 × 4 日が 144 件・のべ 1191 枠**）**／出るのが候補であって割り当てでないか**（**役割が付いていない** → 仕様 #5）**／書式・日数の食い違いで止まるか／コアの段として繋がっているか** | 37 |
-| [`generate.test.mjs`](generate.test.mjs) | **違反 0 の案が 1 つ出るか**（規則 1・3・4・5 と二重を 1 つずつ見る）**／人数が足りない枠が全部名指しで出るか**（**置いた数 ＋ あと何人 ＝ 需要の合計**）**／同じ入力から同じ案が出るか／外部のソルバーを読んでいないか**（受け入れ条件の 4 つ）**／5-5 の適用の順序どおりに置くか**（きつい順 ／ 同じ枠の中の入れ替え 1 手 ／ 準備・片付けは帯の中 ／ 帯を希望していない人も店に置き、準備・片付けに入れない ／ 4 段目が逆の帯に置かない ／ 需要が残っていれば 4 段目が埋める ／ 氏名は空 ／ 役割名を弾かない）**／まとまりと散らしが入っているか**（**その日に置いた枠が少ない人から採る ／ 1 時間ずつの塊で回る ／ 「連続して入る最小の長さ」を 2 時間にすると塊が 4 枠になる ／ 置けない端 5 つが名前で置いてある**）**／決まらない入力で止まるか／コアの段として繋がっているか。****[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 36 人 × 88 枠を通し、違反 0・需要のべ 704 が 置いた 660 ＋ あと何人 44 に揃うことを見る**（**需要は時間帯を明示して全 88 枠に置いている** — **ここは 1 日を 1 本の帯として刻む側なので調理帯が 0 枠で、時間帯を空けた行はどの枠にも立たない** → 5-1 の #2）（**判定そのものは M2 → [#153](https://github.com/jun-eg/school-festival-shift/issues/153)**。**塊と散らしを数えるのは [`scripts/まとまりと散らし.mjs`](../scripts/まとまりと散らし.mjs)**）**／手直しを先に置き、再実行で残すか**（**書き換えた・空にしたセルが戻らない ／ 違反 0 ／ 超過の手直しも置く ／ 規則 1・3・4・5・二重・いまの枠に無い、のそれぞれで置かずに名指しする ／ 規則 3 は店の割り当てが出そろってから見る**。**モックの 36 人 × 88 枠でも、7 行に 1 行を手直しにして通し直し、戻ったセル 0・違反 0**） | 59 |
-| [`count-violations.test.mjs`](count-violations.test.mjs) | **数えるのは 5 つで ⑥ を数えないこと／違反を 1 件ずつ仕込むとそれぞれが名指しで出ること／未充足を 1 件も混ぜないこと／割り当ての学籍番号が小文字でもその人の希望に繋がること／準備も片付けも入っている規則 3 の違反を見分けること／準備も片付けも入っていない日を規則 3 の違反にしないこと／判定できない行で止まること／コアの段として繋がっていること** | 35 |
-| [`assignment-grid.test.mjs`](assignment-grid.test.mjs) | **従来の形に敷けるか**（行が人・列が 30 分枠・セルが役割名 1 つ）**／行の並びが学籍番号の昇順で、割り当ての順を入れ替えても同じマス目が出るか／敷いて戻すと元の行に戻るか／当てるのが位置ではなく見出しの時刻か／載らないもので名指しして止まるか**（枠に無い時刻・1 セルに 2 役割・学籍番号が空／形式違い・いまの枠に無い見出し・その日の行が無い）**／違反の行が塗るセルに当たるか**（枠 1 つの違反はその枠 ／ 規則 3 は学籍番号と氏名の 2 列 ／ 未充足・別の日・当たらない違反は塗らない ／ 同じセルは 1 回）**／手直しの印の付いたセルだけを読み、書き戻すメモを組むか**（空のセルの印 ／ 担当者のメモは印にならない ／ いまの枠に無い見出しでも止まらない ／ 1 枠も無い人の行が残る）**／友達欄が回答に書かれたとおりに並び、戻すときには読まないか**（出し直しは後の行 ／ 消した友達欄は戻さない）。**記録がこの形に載るか（→ [`scripts/前回のシフト表.mjs`](../scripts/前回のシフト表.mjs)）はここでは数えない** | 35 |
-| [`name-unmet.test.mjs`](name-unmet.test.mjs) | **数えるもとは 2 つで、切り方が希望と逆向きであること／必要人数と指定枠の不足がどちらも名指しで出ること／名指しされていない未充足が 0 件であること／数えられない需要で止まること／コアの段として繋がっていること／条件入力の初期値の需要が、どの行も 1 枠以上に効くこと**（→ #279） | 34 |
-| [`fairness-metrics.test.mjs`](fairness-metrics.test.mjs) | **3 つの値が 5-6 のとおりに数えられるか**（合計時間に準備・片付けが入る ／ シフト回数は塊の数で、役割が変わる・時刻が飛ぶ・日が変わると切れる ／ 準備回数は準備か片付けに入った日の数）**／1 枠も置かれない人も 0 で並ぶか／並びが学籍番号の昇順で値に依らないか／順位・平均・閾値の列を足していないか／二重を 2 回数えないか／枠に乗らない行で止まるか／コアの段として繋がっているか** | 16 |
-| [`form-definition.test.mjs`](form-definition.test.mjs) | **前回の日付と営業時刻を入れた定義を、4-1〜4-3 の表と 1 行ずつ突き合わせて差分が 0 か**（設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。**→ 仕様 #2 の判定**）／**正規表現が 2 箇所で希望時間の 4 設問は同じ 1 本か／友達欄が任意の自由記述か**／**句点の揺れ ◎ を揃えずに写しているか**／**説明文が例 3 つと営業時間を持つか**／**入る側から数え直すと 6 項目か**／**今年の日付を入れれば題も営業時間も今年のものになり、空・4 行でないときは組まずに止まるか**。**[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 50 行を通し、正規表現も選択肢も必須も 1 件も弾かないことを見る** | 29 |
-| [`shell.test.mjs`](shell.test.mjs) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか**／**構造が崩れていれば 1 行も読まず 1 枚も書かずに止まるか**／**マス目の 4 枚がまとまって「割り当て」1 つに戻るか**／**割り当てがマス目で書かれ、氏名と友達欄が回答から入るか**／**段を差し替えずに回すと指標が書かれ、氏名が回答から入るか**／**検証結果の違反と食い違った固定にも氏名が回答から入り、未充足の行は空のままか**／**検証結果の J 列（候補）に、学籍番号ではなく氏名が並ぶか**（回答に氏名の無い人は学籍番号のまま）／**マス目を 1 セル書き換えると、マス目を書き戻さずに検証結果と指標が書き直され、背景が役割の色になり、違反した所が赤い太字になり、前の周の印が消えるか**（生成を押したときも塗り直す ／ 条件入力の書き換えでは走らない ／ 載らない書き換えは一言で名指しして何も書かない ／ 書式は 1 枚につき 5 回まで ／ 友達欄の右の線が引き直される）**／書き換えたセルに手直しの印が付き、生成し直しても残るか**（2 回生成し直しても残る ／ 印の無い前の周のセルは組み直される ／ 空にしたセルに戻らない ／ 置けない手直しは検証結果の先頭とセルのメモに理由が出る ／ 営業時刻を動かした後の前の周の列で止まらない ／ 学籍番号を書き換えた行）**／条件入力の 9〜10 行目にフォームの URL 欄があっても、「日ごとの営業時刻」を 4 行のまま読むか**（→ #255）**／配る画像の中身がいまのマス目のとおりに組まれ、1 セルも書き換えず、崩れていれば描かずに止まるか**／**`onEdit` が落ちた書き換えにも印が付くか**（生成で控えが置かれる ／ 続けて書き換えた 2 手目に次の数え直しで付く ／ 最後の 1 手が落ちても生成が読む ／ 学籍番号を書き換えた行 ／ 控えが無ければ今までどおり ／ 生成し直しただけでは付かない ／ 画像の書き出しは拾わない ／ 控えが読めなくても止まらない） | 75 |
-| [`verify-structure.test.mjs`](verify-structure.test.mjs) | **読むだけの偽のスプレッドシートの上で構造を照らす。****シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える／行を 1 つ消す／生成シートを上書きする／行と列をまとめて消す、のそれぞれで名指しの行が出るか**／**セルが 1 つも変わっていないか**／読むのがシートごとに 1 回か／**マス目の 4 枚は名前のある 3 列だけを照らし、広げられていなければ読む前に列数を名指しするか** | 18 |
-| [`build-template.test.mjs`](build-template.test.mjs) | **偽のスプレッドシートの上で組み立てを走らせる。**8 枚できるか（**「回答」に置くのは構成が名前で持つ 6 列だけである** — 後ろ 4 列は題が決まってから埋まる）／**保護が 8 枚にかかり、割り当ての 4 枚は持ち主だけ・ほかは警告のみで、条件入力だけ区画の入力欄が外れているか**／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか**／**条件入力の区画に初期値が置かれ、中身のある区画には置かないか**／**割り当ての 4 枚だけ、友達欄が時刻の列 3 つ分の幅になり、右に太い線が見出しから最下行まで引かれるか**（→ #245）／**検証結果の候補の列が「あと何人」の 5 倍の幅になり、作り直しても倍々に伸びず、候補の列が無い前の形のシートには止まらずに見出しを足すか**（→ #246）／**条件入力の 9〜10 行目に URL 欄（見出し・空の URL 欄・結合・太枠）が置かれ、保護の内に残り、URL が入った後に走らせ直しても消さないか**（→ #255） | 24 |
-| [`build-form.test.mjs`](build-form.test.mjs) | **偽のフォームと偽のスプレッドシートの上でフォームを作る。**定義の順に置かれるか（必須・選択肢・正規表現・文言ごと）／**選んだ画像が画像アイテムに入るか**／**回答先がこのスプレッドシート自身に向くか**／**フォームが作った回答シートが構成の「回答」になるか**（見出し・位置・保護・8 枚のまま）／**2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まるか**／**題と営業時間が条件入力の「日ごとの営業時刻」から出るか**（前回の値で 4 の表、今年の値で今年のもの）**・空／4 行でない／早い順でない ときにフォームを 1 つも作らずに止まるか**／**配る用・編集用の URL が条件入力の C9 ／ C10 に入り、URL 欄があっても「日ごとの営業時刻」は 8 行目までしか読まないか**（→ #255） | 37 |
-| [`distribution-image.test.mjs`](distribution-image.test.mjs) | **前回の配布物 ◎ と同じ形か**（1 日 1 枚・ファイル名と表題に日・見出しは名前の 1 列と時刻だけ）**／マス目の（人・枠・役割）が画像と 1 つも違わないか**（→ M4）**／学籍番号も友達欄も 1 文字も描かないか／1 枠も入っていない行と 1 人も入っていない日を黙って落とさないか・背景は役割の色か／図形がはみ出さず、同じ入力から同じ図形が出るか／描けないもの（氏名が空・4 枚とも空・日付が無い）で名指しして止まるか／ダイアログが外から読み込むものが 0 個か** | 30 |
-| [`clear-for-next-year.test.mjs`](clear-for-next-year.test.mjs) | **偽のフォームと偽のスプレッドシートの上で、1 年使い終わったファイルを空にする。****フォームとの紐付けが外れ、回答の行と今年の題が消えるか**／**割り当て 4 枚・検証結果・指標がテンプレートの形に戻るか**（値・時刻の見出し・手直しの印・色・氏名のプルダウン・前に見たマス目の控え）／**条件入力は 9〜10 行目の URL だけが空き、ほかのセルが 1 つも動かないか**／**空にしたファイルで「フォームを作る」がもう一度通るか**／**フォームが開けなければ何も消さずに名指しして止まり、紐付いていなければ止まらないか**／**8 枚の保護が残るか** | 25 |
+| [`sheet-layout.test.ts`](core/sheet-layout.test.ts) | 8 枚（**割り当ては日ごとの 4 枚で、名前はラベル ◎ と同じ 1 か所**）・担当者が書く側・**保護のかけ方**・区画・列名・**時刻の列と固定列**・**友達欄の幅と右の線が名前のある列を指すか**（→ #245）／**広く取る列（友達欄・検証結果の候補）の物差しが、広げない列のうち一番右か**（→ #246）。**回答シートの並びは [`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の見出しと突き合わせる** — **名前で見るのは前の 6 列だけで、後ろ 4 列は数と位置だけを見る**（列名は毎年変わる → 4-1） | 26 |
+| [`input-types.test.ts`](core/input-types.test.ts) | **型が 7 種類だけであること／枠が営業時刻から刻まれること／揃っていない値で止まること（まとまりの長さが 30 分の倍数でなければ止まり、空なら既定の 1 時間で乗ること**を含む**）／学籍番号が大文字で型に乗ること／日ごとの回答文字列を位置で当てること**（見出しが今年の題に変わっても同じ並びで乗るか）**。****[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) をそのまま食わせる** — 50 行が型 #6 に乗るか。**確定シフト 4 本が型に乗るか（→ M1 ①）は、ここでは数えない** — 判定の手（[`scripts/M1①の判定.mjs`](../scripts/M1①の判定.mjs)）が持つ | 27 |
+| [`core.test.ts`](core/core.test.ts) | **スプレッドシートを 1 つも作らずにコアを走らせる。**`SpreadsheetApp` を掴むファイルの一覧／配列を渡して配列が返るか／入っていない段が名指しで返るか／段を差し替えて先に回せるか／**条件が 5-1 の型で段に渡るか**／**表現の揺れ・列数の違い・決めていない種別で止まるか**／**中身が入っている段が未了に出ないか**／**割り当てだけがシート 1 枚に対応しないこと**／**手直しの後の数え直しが生成を通さず、書いたとおりの割り当てから違反と指標を返すか**（手直しで作った規則 1 の違反が出る）／**生成に渡る固定が手直しだけで、置けない固定が検証結果の先頭に名指しで並び、数え直しでは照らさないか**／**検証結果の候補に、その日のその 30 分枠を希望に含む人の学籍番号だけが並び、枠が 1 つに決まらない行は空のままか** | 42 |
+| [`take-in.test.ts`](core/take-in.test.ts) | **規則 2 の 3 つを踏むか**（学籍番号でまとめる／タイムスタンプで畳む／**採るのは後から来た行**）**／[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の全 50 行 ◎ が 39 人 ◎ になり、学籍番号の重複が 0 か**（→ 仕様 #4）／**畳まれるのが出し直し 11 行 ◎ か**／**返るのが型 #6 だけか**（タイムスタンプも氏名も友達欄も乗らない）／**大文字・小文字だけ違う学籍番号が 1 件に畳まれ、残るのが大文字か**／**キーで 1 行に決まらない 2 行・揃っていないタイムスタンプで止まるか**／**コアの段として繋がっているか** | 28 |
+| [`expand.test.ts`](core/expand.test.ts) | **規則 1 の順序を踏むか**（刻んだ枠を受ける／`,` で区切る／**完全に含まれる枠だけ**／**和集合**）**／境界値と特別扱いの 4 つがそのとおりに出るか**（`00:00-00:00` は空集合／営業時間の外は落ちる／端に半分だけかかる枠は入らない／**終端 ≤ 始端は名指しして止まる**）**／[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 39 人が記録どおりに展開されるか**（**終端 ≤ 始端の 3 人で止まり、残る 36 人 × 4 日が 144 件・のべ 1191 枠**）**／出るのが候補であって割り当てでないか**（**役割が付いていない** → 仕様 #5）**／書式・日数の食い違いで止まるか／コアの段として繋がっているか** | 37 |
+| [`generate.test.ts`](core/generate.test.ts) | **違反 0 の案が 1 つ出るか**（規則 1・3・4・5 と二重を 1 つずつ見る）**／人数が足りない枠が全部名指しで出るか**（**置いた数 ＋ あと何人 ＝ 需要の合計**）**／同じ入力から同じ案が出るか／外部のソルバーを読んでいないか**（受け入れ条件の 4 つ）**／5-5 の適用の順序どおりに置くか**（きつい順 ／ 同じ枠の中の入れ替え 1 手 ／ 準備・片付けは帯の中 ／ 帯を希望していない人も店に置き、準備・片付けに入れない ／ 4 段目が逆の帯に置かない ／ 需要が残っていれば 4 段目が埋める ／ 氏名は空 ／ 役割名を弾かない）**／まとまりと散らしが入っているか**（**その日に置いた枠が少ない人から採る ／ 1 時間ずつの塊で回る ／ 「連続して入る最小の長さ」を 2 時間にすると塊が 4 枠になる ／ 置けない端 5 つが名前で置いてある**）**／決まらない入力で止まるか／コアの段として繋がっているか。****[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 36 人 × 88 枠を通し、違反 0・需要のべ 704 が 置いた 660 ＋ あと何人 44 に揃うことを見る**（**需要は時間帯を明示して全 88 枠に置いている** — **ここは 1 日を 1 本の帯として刻む側なので調理帯が 0 枠で、時間帯を空けた行はどの枠にも立たない** → 5-1 の #2）（**判定そのものは M2 → [#153](https://github.com/jun-eg/school-festival-shift/issues/153)**。**塊と散らしを数えるのは [`scripts/まとまりと散らし.mjs`](../scripts/まとまりと散らし.mjs)**）**／手直しを先に置き、再実行で残すか**（**書き換えた・空にしたセルが戻らない ／ 違反 0 ／ 超過の手直しも置く ／ 規則 1・3・4・5・二重・いまの枠に無い、のそれぞれで置かずに名指しする ／ 規則 3 は店の割り当てが出そろってから見る**。**モックの 36 人 × 88 枠でも、7 行に 1 行を手直しにして通し直し、戻ったセル 0・違反 0**） | 59 |
+| [`count-violations.test.ts`](core/count-violations.test.ts) | **数えるのは 5 つで ⑥ を数えないこと／違反を 1 件ずつ仕込むとそれぞれが名指しで出ること／未充足を 1 件も混ぜないこと／割り当ての学籍番号が小文字でもその人の希望に繋がること／準備も片付けも入っている規則 3 の違反を見分けること／準備も片付けも入っていない日を規則 3 の違反にしないこと／判定できない行で止まること／コアの段として繋がっていること** | 35 |
+| [`assignment-grid.test.ts`](core/assignment-grid.test.ts) | **従来の形に敷けるか**（行が人・列が 30 分枠・セルが役割名 1 つ）**／行の並びが学籍番号の昇順で、割り当ての順を入れ替えても同じマス目が出るか／敷いて戻すと元の行に戻るか／当てるのが位置ではなく見出しの時刻か／載らないもので名指しして止まるか**（枠に無い時刻・1 セルに 2 役割・学籍番号が空／形式違い・いまの枠に無い見出し・その日の行が無い）**／違反の行が塗るセルに当たるか**（枠 1 つの違反はその枠 ／ 規則 3 は学籍番号と氏名の 2 列 ／ 未充足・別の日・当たらない違反は塗らない ／ 同じセルは 1 回）**／手直しの印の付いたセルだけを読み、書き戻すメモを組むか**（空のセルの印 ／ 担当者のメモは印にならない ／ いまの枠に無い見出しでも止まらない ／ 1 枠も無い人の行が残る）**／友達欄が回答に書かれたとおりに並び、戻すときには読まないか**（出し直しは後の行 ／ 消した友達欄は戻さない）。**記録がこの形に載るか（→ [`scripts/前回のシフト表.mjs`](../scripts/前回のシフト表.mjs)）はここでは数えない** | 35 |
+| [`name-unmet.test.ts`](core/name-unmet.test.ts) | **数えるもとは 2 つで、切り方が希望と逆向きであること／必要人数と指定枠の不足がどちらも名指しで出ること／名指しされていない未充足が 0 件であること／数えられない需要で止まること／コアの段として繋がっていること／条件入力の初期値の需要が、どの行も 1 枠以上に効くこと**（→ #279） | 34 |
+| [`fairness-metrics.test.ts`](core/fairness-metrics.test.ts) | **3 つの値が 5-6 のとおりに数えられるか**（合計時間に準備・片付けが入る ／ シフト回数は塊の数で、役割が変わる・時刻が飛ぶ・日が変わると切れる ／ 準備回数は準備か片付けに入った日の数）**／1 枠も置かれない人も 0 で並ぶか／並びが学籍番号の昇順で値に依らないか／順位・平均・閾値の列を足していないか／二重を 2 回数えないか／枠に乗らない行で止まるか／コアの段として繋がっているか** | 16 |
+| [`form-definition.test.ts`](core/form-definition.test.ts) | **前回の日付と営業時刻を入れた定義を、4-1〜4-3 の表と 1 行ずつ突き合わせて差分が 0 か**（設問 9 つ ＋ 画像アイテム 1 つ・順序・形式・必須・選択肢。**→ 仕様 #2 の判定**）／**正規表現が 2 箇所で希望時間の 4 設問は同じ 1 本か／友達欄が任意の自由記述か**／**句点の揺れ ◎ を揃えずに写しているか**／**説明文が例 3 つと営業時間を持つか**／**入る側から数え直すと 6 項目か**／**今年の日付を入れれば題も営業時間も今年のものになり、空・4 行でないときは組まずに止まるか**。**[`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の 50 行を通し、正規表現も選択肢も必須も 1 件も弾かないことを見る** | 29 |
+| [`shell.test.ts`](shell/shell.test.ts) | **偽のスプレッドシートの上で殻を走らせる。**`Date` と真偽値と空白が揃うか／**読んだ入力がそのままコアの入口を通るか**／見出しの行を読まず区画ごとに切って読むか／**読み書きが範囲ごとに 1 回か**／**段が欠けているあいだは 1 枚も書かないか**／**構造が崩れていれば 1 行も読まず 1 枚も書かずに止まるか**／**マス目の 4 枚がまとまって「割り当て」1 つに戻るか**／**割り当てがマス目で書かれ、氏名と友達欄が回答から入るか**／**段を差し替えずに回すと指標が書かれ、氏名が回答から入るか**／**検証結果の違反と食い違った固定にも氏名が回答から入り、未充足の行は空のままか**／**検証結果の J 列（候補）に、学籍番号ではなく氏名が並ぶか**（回答に氏名の無い人は学籍番号のまま）／**マス目を 1 セル書き換えると、マス目を書き戻さずに検証結果と指標が書き直され、背景が役割の色になり、違反した所が赤い太字になり、前の周の印が消えるか**（生成を押したときも塗り直す ／ 条件入力の書き換えでは走らない ／ 載らない書き換えは一言で名指しして何も書かない ／ 書式は 1 枚につき 5 回まで ／ 友達欄の右の線が引き直される）**／書き換えたセルに手直しの印が付き、生成し直しても残るか**（2 回生成し直しても残る ／ 印の無い前の周のセルは組み直される ／ 空にしたセルに戻らない ／ 置けない手直しは検証結果の先頭とセルのメモに理由が出る ／ 営業時刻を動かした後の前の周の列で止まらない ／ 学籍番号を書き換えた行）**／条件入力の 9〜10 行目にフォームの URL 欄があっても、「日ごとの営業時刻」を 4 行のまま読むか**（→ #255）**／配る画像の中身がいまのマス目のとおりに組まれ、1 セルも書き換えず、崩れていれば描かずに止まるか**／**`onEdit` が落ちた書き換えにも印が付くか**（生成で控えが置かれる ／ 続けて書き換えた 2 手目に次の数え直しで付く ／ 最後の 1 手が落ちても生成が読む ／ 学籍番号を書き換えた行 ／ 控えが無ければ今までどおり ／ 生成し直しただけでは付かない ／ 画像の書き出しは拾わない ／ 控えが読めなくても止まらない） | 75 |
+| [`verify-structure.test.ts`](shell/verify-structure.test.ts) | **読むだけの偽のスプレッドシートの上で構造を照らす。****シートを 1 枚消す／列を 1 つ挿す／見出しを 1 つ書き換える／行を 1 つ消す／生成シートを上書きする／行と列をまとめて消す、のそれぞれで名指しの行が出るか**／**セルが 1 つも変わっていないか**／読むのがシートごとに 1 回か／**マス目の 4 枚は名前のある 3 列だけを照らし、広げられていなければ読む前に列数を名指しするか** | 18 |
+| [`build-template.test.ts`](shell/build-template.test.ts) | **偽のスプレッドシートの上で組み立てを走らせる。**8 枚できるか（**「回答」に置くのは構成が名前で持つ 6 列だけである** — 後ろ 4 列は題が決まってから埋まる）／**保護が 8 枚にかかり、割り当ての 4 枚は持ち主だけ・ほかは警告のみで、条件入力だけ区画の入力欄が外れているか**／**2 回走らせても形が変わらないか**／**見出しが違うときに上書きせず名指しで止まるか**／**条件入力の区画に初期値が置かれ、中身のある区画には置かないか**／**割り当ての 4 枚だけ、友達欄が時刻の列 3 つ分の幅になり、右に太い線が見出しから最下行まで引かれるか**（→ #245）／**検証結果の候補の列が「あと何人」の 5 倍の幅になり、作り直しても倍々に伸びず、候補の列が無い前の形のシートには止まらずに見出しを足すか**（→ #246）／**条件入力の 9〜10 行目に URL 欄（見出し・空の URL 欄・結合・太枠）が置かれ、保護の内に残り、URL が入った後に走らせ直しても消さないか**（→ #255） | 24 |
+| [`build-form.test.ts`](shell/build-form.test.ts) | **偽のフォームと偽のスプレッドシートの上でフォームを作る。**定義の順に置かれるか（必須・選択肢・正規表現・文言ごと）／**選んだ画像が画像アイテムに入るか**／**回答先がこのスプレッドシート自身に向くか**／**フォームが作った回答シートが構成の「回答」になるか**（見出し・位置・保護・8 枚のまま）／**2 回目・回答がある・見出しが違う、のそれぞれで名指しして止まるか**／**題と営業時間が条件入力の「日ごとの営業時刻」から出るか**（前回の値で 4 の表、今年の値で今年のもの）**・空／4 行でない／早い順でない ときにフォームを 1 つも作らずに止まるか**／**配る用・編集用の URL が条件入力の C9 ／ C10 に入り、URL 欄があっても「日ごとの営業時刻」は 8 行目までしか読まないか**（→ #255） | 37 |
+| [`distribution-image.test.ts`](core/distribution-image.test.ts) | **前回の配布物 ◎ と同じ形か**（1 日 1 枚・ファイル名と表題に日・見出しは名前の 1 列と時刻だけ）**／マス目の（人・枠・役割）が画像と 1 つも違わないか**（→ M4）**／学籍番号も友達欄も 1 文字も描かないか／1 枠も入っていない行と 1 人も入っていない日を黙って落とさないか・背景は役割の色か／図形がはみ出さず、同じ入力から同じ図形が出るか／描けないもの（氏名が空・4 枚とも空・日付が無い）で名指しして止まるか／ダイアログが外から読み込むものが 0 個か** | 30 |
+| [`clear-for-next-year.test.ts`](shell/clear-for-next-year.test.ts) | **偽のフォームと偽のスプレッドシートの上で、1 年使い終わったファイルを空にする。****フォームとの紐付けが外れ、回答の行と今年の題が消えるか**／**割り当て 4 枚・検証結果・指標がテンプレートの形に戻るか**（値・時刻の見出し・手直しの印・色・氏名のプルダウン・前に見たマス目の控え）／**条件入力は 9〜10 行目の URL だけが空き、ほかのセルが 1 つも動かないか**／**空にしたファイルで「フォームを作る」がもう一度通るか**／**フォームが開けなければ何も消さずに名指しして止まり、紐付いていなければ止まらないか**／**8 枚の保護が残るか** | 25 |
+| [`boundary.test.ts`](boundary.test.ts) | **`core/` の `import` が `core/` の中だけを指すか／`core/` が `SpreadsheetApp` などの Apps Script のグローバルを参照しないか**（コメントと文字列の中の名前は数えない）／**検出そのものが、`shell/` への `import`・`entry.ts` への `import`・パッケージの `import`・グローバルの参照を止めるか**（偽の書き方で確かめる） | 7 |
+| [`typecheck.test.ts`](typecheck.test.ts) | **型検査の設定が止めるべき書き方を止めるか**（わざと悪い 1 本を `tsc` に食わせる）。①悪い書き方が無ければ通る ／ ②**es2019 に無い API（`structuredClone` ・ `replaceAll`）で落ちる** ／ ③**`enum` で落ちる**（`erasableSyntaxOnly`） ／ ④**型だけの import を `import type` にしないと落ちる**（`verbatimModuleSyntax`） |
+| [`entry.test.ts`](entry.test.ts) | **[`entry.ts`](entry.ts) の一覧が、トリガー・`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` ・ E2E 用の 4 つと過不足なく一致するか（E2E 用はメニューにも HTML の呼び先にも出ない）／ビルドが出す `dist` が 4 つで、`main.gs` の最上位の `function` が一覧どおりか／出した `main.gs` を読み込むと `onOpen` がメニュー「シフト」の 5 項目を出し、呼び先がどれも最上位の関数か／出した HTML が外から読み込む `script` を持たず、[`ui/`](ui/) の JS が入っているか**／**食い違いの検出が、足りない名前と余計な名前を名指しするか／ビルドが版（タグ、無ければ短い SHA）を `main.gs` の定数に埋め、メニューの「バージョン」が出すか** | 21 |
 
-**この 17 本で分かるのは、手元で回る範囲だけである。**
+**この 20 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
 [`real-device-log.md`](real-device-log.md) が持つ。ここに二重に書かない。**
 
-**型（[`input-types.js`](input-types.js)・[`sheet-layout.js`](sheet-layout.js)）を触ったら、
+**型（[`input-types.ts`](core/input-types.ts)・[`sheet-layout.ts`](core/sheet-layout.ts)）を触ったら、
 [`scripts/M1①の判定.mjs`](../scripts/M1①の判定.mjs) も走らせる** —
 **前回の確定シフトが型に乗るか（M1 ①）は、型が動けば動く**（→ [`scripts/README.md`](../scripts/README.md)）。
 
