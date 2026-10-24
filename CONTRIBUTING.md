@@ -22,7 +22,7 @@ git config core.hooksPath .githooks
 ## コードを回すには、3 手で足りる
 
 ```
-.node-version の Node を入れる（22）
+.node-version の Node を入れる（22.18 以上）
 npm ci
 npm test
 ```

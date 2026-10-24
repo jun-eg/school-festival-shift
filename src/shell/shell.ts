@@ -500,7 +500,7 @@ export function fillStudentIds(spreadsheet: Spreadsheet, range: Range): StudentI
   const studentIds = sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).getValues()
   const names = sheet.getRange(top, nameColumn, bottom - top + 1, 1).getValues()
   const waiting = names
-    .map((row, index) => ({ index: index, name: String(normalizeValue(row[0])), studentId: String(normalizeValue(studentIds[index][0])) }))
+    .map((row, index) => ({ index: index, name: normalizeValue(row[0]) as string, studentId: normalizeValue(studentIds[index][0]) as string }))
     .filter((one) => (one.name !== '' || one.studentId !== '') && (!studentIdsEdited || one.studentId === ''))
   if (waiting.length === 0) return result
 

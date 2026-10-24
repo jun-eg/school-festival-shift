@@ -1,7 +1,8 @@
 // google.script.run が呼ぶ、サーバー側（Apps Script）の関数の型。
 //
 // 名前と引数は src/entry.ts の一覧のうち「HTML から google.script.run で呼ばれる」2 つである。
-// src/entry.test.ts が、ここに書いた名前と HTML が実際に呼ぶ名前を突き合わせる。
+// 名前の打ち間違いは entry.test ① が entry 一覧との突き合わせで止める。@types/google.script.client-side の PublicEndpoints に
+// 添字型があるので、tsc は名前を止めない。ここで効くのは引数の型だけである。
 // 戻り値は成功ハンドラ（withSuccessHandler）に渡るので、呼んだ側は受け取らない。
 
 declare namespace google.script {
