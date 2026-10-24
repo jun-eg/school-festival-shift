@@ -11,7 +11,7 @@
     "format": "biome format --write",
     "typecheck": "tsc -p tsconfig.json && tsc -p src/ui/tsconfig.json && tsc -p tsconfig.test.json",
     "pretest": "npm run typecheck",
-    "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
+    "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"e2e/**/*.test.mjs\"",
     "e2e": "node e2e/run.mjs"
   },
   "devDependencies": {

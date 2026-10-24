@@ -136,10 +136,10 @@
 | [`core/`](core/) | 上の表のコア 12 本（[`assignment-grid.ts`](core/assignment-grid.ts) と [`distribution-image.ts`](core/distribution-image.ts) を含む）と、コアの入出力の型だけを置く [`types.ts`](core/types.ts)（値を 1 つも持たない） | `core/` の中の `import` だけ |
 | [`shell/`](shell/) | 殻（[`shell.ts`](shell/shell.ts)・[`verify-structure.ts`](shell/verify-structure.ts)・[`build-template.ts`](shell/build-template.ts)・[`build-form.ts`](shell/build-form.ts)・[`clear-for-next-year.ts`](shell/clear-for-next-year.ts)）と、メニュー・トリガー（[`menu.ts`](shell/menu.ts)） | `SpreadsheetApp` などの Apps Script のグローバルと `core/` |
 | [`ui/`](ui/) | ダイアログの HTML 2 枚と、その TypeScript（ブラウザで動く。`import` は型だけ（`import type`）で、ビルドが型を剥がして HTML に差し込む）。`google.script.run` が呼ぶ関数の型は [`server.d.ts`](ui/server.d.ts) | ブラウザのグローバルと `google.script.run` |
-| [`entry.ts`](entry.ts) | **Apps Script が名前で呼ぶ関数の一覧**（`onOpen` ／ `onEdit` ／ メニューの 5 項目 ／ HTML の呼び先 ／ 手で実行する `buildTemplate`） | `shell/` |
+| [`entry.ts`](entry.ts) | **Apps Script が名前で呼ぶ関数の一覧**（`onOpen` ／ `onEdit` ／ メニューの 5 項目 ／ HTML の呼び先 ／ 手で実行する `buildTemplate` ／ E2E 用の 3 つ（`e2eGenerate` ・ `e2eCheckStructure` ・ `e2eClearForNextYear`。メニューにも画面にも出さない → [`shell/e2e.ts`](shell/e2e.ts)）） | `shell/` |
 
 **[`boundary.test.ts`](boundary.test.ts) が、`core/` から `core/` の外への `import` と、`core/` の中の Apps Script のグローバル（`SpreadsheetApp` など）の参照を落とす。**
-**[`entry.test.ts`](entry.test.ts) が、`entry.ts` の一覧と、`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` の食い違いを名指しで落とす。**
+**[`entry.test.ts`](entry.test.ts) が、`entry.ts` の一覧と、`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` ・ E2E 用の 3 つの食い違いを名指しで落とす。**
 **`npm run build` が `dist/` に 4 つ（`main.gs` ・ HTML 2 枚 ・ `appsscript.json`）を出し**（[`build.mjs`](../build.mjs)）、`main.gs` の最上位には一覧ぶんの `function` 宣言が並ぶ
 （エディタの関数一覧と、メニュー・`google.script.run` が名前で引く形）。**`dist/` は git に入れない。**
 HTML の `<script src>` は、ビルドが [`ui/`](ui/) の JS の中身に差し替える（出来上がりの HTML は外から読み込むものを持たない → 6 の #5）。
@@ -822,7 +822,7 @@ npm test
 | [`clear-for-next-year.test.ts`](shell/clear-for-next-year.test.ts) | **偽のフォームと偽のスプレッドシートの上で、1 年使い終わったファイルを空にする。****フォームとの紐付けが外れ、回答の行と今年の題が消えるか**／**割り当て 4 枚・検証結果・指標がテンプレートの形に戻るか**（値・時刻の見出し・手直しの印・色・氏名のプルダウン・前に見たマス目の控え）／**条件入力は 9〜10 行目の URL だけが空き、ほかのセルが 1 つも動かないか**／**空にしたファイルで「フォームを作る」がもう一度通るか**／**フォームが開けなければ何も消さずに名指しして止まり、紐付いていなければ止まらないか**／**8 枚の保護が残るか** | 25 |
 | [`boundary.test.ts`](boundary.test.ts) | **`core/` の `import` が `core/` の中だけを指すか／`core/` が `SpreadsheetApp` などの Apps Script のグローバルを参照しないか**（コメントと文字列の中の名前は数えない）／**検出そのものが、`shell/` への `import`・`entry.ts` への `import`・パッケージの `import`・グローバルの参照を止めるか**（偽の書き方で確かめる） | 7 |
 | [`typecheck.test.ts`](typecheck.test.ts) | **型検査の設定が止めるべき書き方を止めるか**（わざと悪い 1 本を `tsc` に食わせる）。①悪い書き方が無ければ通る ／ ②**es2019 に無い API（`structuredClone` ・ `replaceAll`）で落ちる** ／ ③**`enum` で落ちる**（`erasableSyntaxOnly`） ／ ④**型だけの import を `import type` にしないと落ちる**（`verbatimModuleSyntax`） |
-| [`entry.test.ts`](entry.test.ts) | **[`entry.ts`](entry.ts) の一覧が、トリガー・`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` と過不足なく一致するか／ビルドが出す `dist` が 4 つで、`main.gs` の最上位の `function` が一覧どおりか／出した `main.gs` を読み込むと `onOpen` がメニュー「シフト」の 5 項目を出し、呼び先がどれも最上位の関数か／出した HTML が外から読み込む `script` を持たず、[`ui/`](ui/) の JS が入っているか**／**食い違いの検出が、足りない名前と余計な名前を名指しするか／ビルドが版（タグ、無ければ短い SHA）を `main.gs` の定数に埋め、メニューの「バージョン」が出すか** | 19 |
+| [`entry.test.ts`](entry.test.ts) | **[`entry.ts`](entry.ts) の一覧が、トリガー・`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` ・ E2E 用の 3 つと過不足なく一致するか（E2E 用はメニューにも HTML の呼び先にも出ない）／ビルドが出す `dist` が 4 つで、`main.gs` の最上位の `function` が一覧どおりか／出した `main.gs` を読み込むと `onOpen` がメニュー「シフト」の 5 項目を出し、呼び先がどれも最上位の関数か／出した HTML が外から読み込む `script` を持たず、[`ui/`](ui/) の JS が入っているか**／**食い違いの検出が、足りない名前と余計な名前を名指しするか／ビルドが版（タグ、無ければ短い SHA）を `main.gs` の定数に埋め、メニューの「バージョン」が出すか** | 21 |
 
 **この 20 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は

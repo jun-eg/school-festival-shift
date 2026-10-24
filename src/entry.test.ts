@@ -5,7 +5,7 @@
 //   使い方: node src/entry.test.ts
 //
 // 見るものは 6 つある（→ src/README.md「コアと殻の境目」、build.mjs）。
-//   ① 一覧が、トリガー・menuItems・HTML の呼び先・手で実行する buildTemplate の和集合と一致する
+//   ① 一覧が、トリガー・menuItems・HTML の呼び先・手で実行する buildTemplate ・ E2E 用の 3 つの和集合と一致する
 //   ② ビルドが出した main.gs の最上位の function が、一覧と一致する
 //   ③ 出した main.gs を読み込むと、メニュー「シフト」の 5 項目がそれぞれ最上位の関数を指す
 //   ④ ビルドが出した HTML は、外から読み込む script を持たず、src/ui/*.ts の中身がそのまま入っている
@@ -70,7 +70,8 @@ const htmlNames = fs
 const calledByHtml = htmlNames.flatMap((name) => calledFromHtml(fs.readFileSync(path.join(srcDir, 'ui', `${name}.ts`), 'utf8')))
 const triggers = ['onOpen', 'onEdit']
 const runByHand = ['buildTemplate']
-const expectedNames = [...new Set([...triggers, ...menuItems.map((item) => item.functionName), ...calledByHtml, ...runByHand])]
+const runByE2e = ['e2eGenerate', 'e2eCheckStructure', 'e2eClearForNextYear']
+const expectedNames = [...new Set([...triggers, ...menuItems.map((item) => item.functionName), ...calledByHtml, ...runByHand, ...runByE2e])]
 const listedNames = Object.keys(entryPoints)
 
 // ---- ① 一覧と呼ぶ側 ---------------------------------------------------------
@@ -83,8 +84,10 @@ check(
     ['createFormFromPicker', 'exportImagesFromDialog'],
   ],
 )
-check('① 一覧に足りない名前も、呼ばれていない名前も無い（トリガー・menuItems・HTML の呼び先・buildTemplate と一致する）', mismatch(listedNames, expectedNames), { notListed: [], notCalled: [] })
+check('① 一覧に足りない名前も、呼ばれていない名前も無い（トリガー・menuItems・HTML の呼び先・buildTemplate ・ E2E 用の 3 つと一致する）', mismatch(listedNames, expectedNames), { notListed: [], notCalled: [] })
 check('① 一覧の名前はどれも関数で、メニューの 5 項目は一覧にある', [listedNames.filter((name) => typeof entryPoints[name] !== 'function'), menuItems.map((item) => item.functionName).filter((name) => listedNames.indexOf(name) === -1)], [[], []])
+
+check('① E2E 用の 3 つは一覧にあり、メニューにも HTML の呼び先にも出ない（担当者の操作・画面を増やさない）', [runByE2e.filter((name) => listedNames.indexOf(name) === -1), runByE2e.filter((name) => menuItems.some((item) => item.functionName === name) || calledByHtml.indexOf(name) !== -1)], [[], []])
 
 // ---- ② main.gs の最上位の function ------------------------------------------
 
