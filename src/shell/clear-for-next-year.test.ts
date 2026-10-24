@@ -3,12 +3,13 @@
 //
 //   使い方: node src/shell/clear-for-next-year.test.ts
 //
-// 見るものは 5 つある（→ issue #290 ／ ADR tech-requirements-0018）。
+// 見るものは 6 つある（→ issue #290 ／ ADR tech-requirements-0018）。
 //   ① 回答シートとフォームの紐付けが外れ、「回答」は表のシートから作り直されて、回答の行と今年の題が消える（buildTemplate 直後と同じ形）
 //   ② 割り当て 4 枚・検証結果・指標が、テンプレートの形に戻る（値・手直しの印・色・プルダウン・控え）
 //   ③ 条件入力は 9〜10 行目の URL だけが空き、ほかの値は 1 つも動かない
 //   ④ 空にしたファイルで、もう一度「フォームを作る」が通る（来年の担当者がやること）
 //   ⑤ フォームが開けなければ、何も消さずに手で外す場所を名指しして止まる。紐付いていないファイルでも止まらない
+//   ⑥ 紐付けだけを外す口（npm run e2e の頭と終わり）: 外すだけで何も消さず、「回答」が無い・紐付いていなくても止まらない
 //
 // 本物のスプレッドシートとフォームでの振る舞いは実機が持つ（→ src/real-device-log.md の項目 24）。
 
@@ -17,7 +18,7 @@ import { FakeSpreadsheet, asGas, gasGlobal } from '../../test/fakes/spreadsheet.
 import { createFormApp } from '../../test/fakes/form.ts'
 import { buildFormOn } from './build-form.ts'
 import { buildTemplateInto } from './build-template.ts'
-import { clearForNextYearOn, clearedText } from './clear-for-next-year.ts'
+import { clearForNextYearOn, clearedText, unlinkAnswersOn } from './clear-for-next-year.ts'
 import { dayLabels, formUrlBlock, sheetLayout } from '../core/sheet-layout.ts'
 
 // 偽のスプレッドシートは test/fakes/spreadsheet.ts、偽のフォームは test/fakes/form.ts が持つ。
@@ -194,3 +195,29 @@ check('⑤ 紐付いていないファイルでも止まらず、回答は消え
 check('⑤ 2 回押しても止まらない', twice, null)
 
 check('⑤ 終わりの文は、外したフォームをゴミ箱へ移すよう URL ごと名指しし、無ければその段を言わない', [clearedText('https://forms.example/1/edit').includes('https://forms.example/1/edit'), clearedText('https://forms.example/1/edit').includes('ゴミ箱'), clearedText(null).includes('ゴミ箱')], [true, true, false])
+
+// ---- ⑥ 紐付けだけを外す口（npm run e2e の頭と終わり → shell/e2e.ts） -------------
+
+const linkedOnly = usedBook('linked-only')
+const linkedUrl = linkedOnly.getSheetByName('回答').getFormUrl()
+const linkedForms = forms.filter((form) => form.linkedSheet !== null).length
+const unlinkedUrl = unlinkAnswersOn(asGas(linkedOnly))
+
+check('⑥ 紐付いた「回答」から、紐付けだけが外れる（外したフォームの URL が返る）', [unlinkedUrl, linkedOnly.getSheetByName('回答').getFormUrl()], [linkedUrl, null])
+check('⑥ 紐付けだけで、回答の行も割り当ても URL 欄も消さない', [linkedOnly.getSheetByName('回答').getLastRow(), linkedOnly.getSheetByName(dayLabels[0]).getLastRow(), linkedOnly.getSheetByName('条件入力').getRange(formUrlBlock.row, formUrlBlock.urlColumn).getValues()[0][0] !== ''], [4, 3, true])
+check('⑥ 紐付いているフォームが 1 つ減った', forms.filter((form) => form.linkedSheet !== null).length, linkedForms - 1)
+check('⑥ もう一度呼んでも止まらず、null（紐付いていない）', unlinkAnswersOn(asGas(linkedOnly)), null)
+
+const onlyOneSheet = new FakeSpreadsheet(['シート1'], { id: 'one-sheet', sheetOptions: { maxRows: 40 } })
+books['one-sheet'] = onlyOneSheet
+check('⑥ 「回答」が無い（空に戻した直後のシート 1 枚だけ）ときも止まらず、null', unlinkAnswersOn(asGas(onlyOneSheet)), null)
+
+// 「フォームを作る」が setDestination の後・名前の付け替えの前で落ちた形: 紐付いているのは「フォームの回答 1」で、「回答」は紐付いていない
+const halfBuilt = usedBook('half-built')
+const halfAnswers = halfBuilt.getSheetByName('回答')
+const halfUrl = halfAnswers.getFormUrl()
+halfAnswers.setName('フォームの回答 1')
+halfBuilt.insertSheet('回答')
+const halfForm = forms.filter((form) => form.linkedSheet === halfAnswers)[0]
+
+check('⑥ 「回答」が紐付いておらず「フォームの回答 1」が紐付いている形でも、紐付けが外れて URL が返る', [unlinkAnswersOn(asGas(halfBuilt)), halfAnswers.getFormUrl(), halfForm.linkedSheet], [halfUrl, null, null])
