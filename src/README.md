@@ -773,6 +773,12 @@ npm test
 **ルートの `package.json` は `"type": "module"` だが、`src/*.js` は Apps Script の素のスクリプト（CommonJS として `require` される）なので、`src/package.json` で `"type": "commonjs"` に戻してある**（`.claspignore` で上げない。ESM 化は [#302](https://github.com/jun-eg/school-festival-shift/issues/302)）。
 
 **依存はゼロである**（Node の標準だけを使う）。**何も書き換えない。**
+**検査の器は `node:test` と `node:assert` である**（[#301](https://github.com/jun-eg/school-festival-shift/issues/301)）。
+**1 件ずつの断定は [`test/check.mjs`](../test/check.mjs) の `check(見出し, 実測, 期待)` が持ち**（`it` と `assert.deepStrictEqual`）、
+**偽のスプレッドシートは [`test/fakes/spreadsheet.mjs`](../test/fakes/spreadsheet.mjs)、偽のフォームは [`test/fakes/form.mjs`](../test/fakes/form.mjs) の 1 本ずつを共有する**
+（本物と違う振る舞いは、それぞれの先頭のコメントが名指しする）。
+**数字（カバレッジ）は `node --test --experimental-test-coverage "src/*.test.mjs"` で出る**（閾値は [#311](https://github.com/jun-eg/school-festival-shift/issues/311)）。
+**ただし `src/*.js` は文字列で読んで `vm` で走らせているので、数字に載るのは検査と偽物のファイルだけである**（`src/*.js` が載るのは [#302](https://github.com/jun-eg/school-festival-shift/issues/302) で `import` に替えてから）。
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
 
 | 検査 | 何を見るか | 件数 |

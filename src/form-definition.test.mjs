@@ -18,6 +18,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
@@ -68,14 +69,6 @@ const thisYear = [
 }))
 
 const lastYearItems = formItemsFor(lastYear)
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 // ---- ① 4-1 の表そのもの（写した相手） ---------------------------------------
 
@@ -389,21 +382,3 @@ check(
   }),
   [[true, true], [true, true]],
 )
-
-// ---- 結果 -------------------------------------------------------------------
-
-console.log('フォームの定義の検査（src/form-definition.js／4-1〜4-3 と突き合わせ）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)

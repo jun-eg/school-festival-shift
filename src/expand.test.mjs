@@ -15,6 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
@@ -37,14 +38,6 @@ function load(files) {
 const context = load(coreFiles.concat(['form-definition.js', 'shell.js']))
 const { expand, toDays, takeIn, build, builtInSteps, formatDateTime } = context
 const { wishBoundaries, coreSteps, slotMinutes, wishTimePattern } = vm.runInContext('({ wishBoundaries, coreSteps, slotMinutes, wishTimePattern })', context)
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 /** 止まることを見る。止まらなければ null が返る。 */
 function whyItStopped(work) {
@@ -469,21 +462,3 @@ check(
   coreSteps.filter((step) => step.name === '展開する').map((step) => [step.issue, step.writesTo]),
   [[149, null]],
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('展開する側の検査（src/expand.js／スプレッドシート無し）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-} else {
-  console.log(`結果: ${failed.length} 件が食い違った（${passed.length} 件は一致）`)
-  process.exit(1)
-}

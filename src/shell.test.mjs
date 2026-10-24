@@ -24,179 +24,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
+import { FakeSheet, FakeSpreadsheet, roundTrips } from '../test/fakes/spreadsheet.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- 偽のスプレッドシート ---------------------------------------------------
-// 殻と構造の検証が使う SpreadsheetApp の口だけを持つ。
-
-const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0, validations: 0 }
-
-/** A1 の書き方を 1 始まりの行と列に戻す（RangeList の偽のため）。 */
-function fromA1(a1) {
-  const [, letters, row] = /^([A-Z]+)(\d+)$/.exec(a1)
-  const column = [...letters].reduce((sum, letter) => sum * 26 + letter.charCodeAt(0) - 64, 0)
-  return { row: Number(row), column }
-}
-
-class FakeRange {
-  constructor(sheet, row, column, rowCount, columnCount) {
-    Object.assign(this, { sheet, row, column, rowCount, columnCount })
-  }
-  getValues() {
-    roundTrips.reads += 1
-    const table = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      const row = []
-      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
-      table.push(row)
-    }
-    return table
-  }
-  setValues(table) {
-    roundTrips.writes += 1
-    table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
-    return this
-  }
-  /** 書式だけを変える。値を運ばないので往復には数えない。 */
-  setHorizontalAlignment(alignment) {
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.alignments.set(`${r},${c}`, alignment)
-    }
-    return this
-  }
-  /** 書式を消す（背景色・文字の色・太さ）。値の往復とは別に数える（→ ⑦）。 */
-  clearFormat() {
-    roundTrips.formats += 1
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) {
-        ;['backgrounds', 'fontColors', 'fontWeights', 'rightBorders'].forEach((map) => this.sheet[map].delete(`${r},${c}`))
-      }
-    }
-    return this
-  }
-  /** 罫線を置く。見るのは右の線だけである（→ issue #245）。書式として数える。 */
-  setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
-    roundTrips.formats += 1
-    if (right !== true) return this
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.rightBorders.set(`${r},${c}`, `${color} ${style}`)
-    }
-    return this
-  }
-  /** 背景色を行列でまとめて置く。null は塗らない。 */
-  setBackgrounds(colors) {
-    roundTrips.formats += 1
-    colors.forEach((row, i) => row.forEach((color, j) => {
-      if (color === null) this.sheet.backgrounds.delete(`${this.row + i},${this.column + j}`)
-      else this.sheet.backgrounds.set(`${this.row + i},${this.column + j}`, color)
-    }))
-    return this
-  }
-  /** 入力規則（プルダウン）を置く。値を運ばないので往復には数えず、別に数える（→ ⑫）。 */
-  setDataValidation(rule) {
-    roundTrips.validations += 1
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.validations.set(`${r},${c}`, rule)
-    }
-    return this
-  }
-  getSheet() { return this.sheet }
-  getRow() { return this.row }
-  getColumn() { return this.column }
-  getLastRow() { return this.row + this.rowCount - 1 }
-  getLastColumn() { return this.column + this.columnCount - 1 }
-  /** メモを読む・置く・消す。値の往復とは別に数える（→ ⑧）。 */
-  getNotes() {
-    roundTrips.notes += 1
-    const table = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      const row = []
-      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.notes.get(`${r},${c}`) ?? '')
-      table.push(row)
-    }
-    return table
-  }
-  setNotes(table) {
-    roundTrips.notes += 1
-    table.forEach((row, i) => row.forEach((note, j) => {
-      if (note === '') this.sheet.notes.delete(`${this.row + i},${this.column + j}`)
-      else this.sheet.notes.set(`${this.row + i},${this.column + j}`, note)
-    }))
-    return this
-  }
-  clearNote() {
-    roundTrips.notes += 1
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.notes.delete(`${r},${c}`)
-    }
-    return this
-  }
-  clearContent() {
-    roundTrips.writes += 1
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) this.sheet.cells.delete(`${r},${c}`)
-    }
-    return this
-  }
-}
-
-class FakeSheet {
-  constructor(name, minColumns = 26) {
-    Object.assign(this, {
-      name, cells: new Map(), notes: new Map(), validations: new Map(), alignments: new Map(), backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), rightBorders: new Map(), minColumns,
-    })
-  }
-  getName() { return this.name }
-  getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
-  getRangeList(a1s) {
-    const sheet = this
-    const each = (map, value) => {
-      roundTrips.formats += 1
-      a1s.forEach((a1) => {
-        const { row, column } = fromA1(a1)
-        sheet[map].set(`${row},${column}`, value)
-      })
-    }
-    return {
-      setFontColor(color) { each('fontColors', color); return this },
-      setFontWeight(weight) { each('fontWeights', weight); return this },
-    }
-  }
-  getLastRow() {
-    return [...this.cells.entries()]
-      .filter(([, value]) => value !== '')
-      .reduce((max, [key]) => Math.max(max, Number(key.split(',')[0])), 0)
-  }
-  getLastColumn() {
-    return [...this.cells.entries()]
-      .filter(([, value]) => value !== '')
-      .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
-  }
-  // 1000 行 26 列は新しいスプレッドシートの既定の大きさである
-  getMaxRows() { return Math.max(1000, this.getLastRow()) }
-  getMaxColumns() { return Math.max(this.minColumns, this.getLastColumn()) }
-  put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
-  /** シートに置く見えない記録。鍵と値の組で、値は文字列である。 */
-  getDeveloperMetadata() {
-    const sheet = this
-    return (this.metadata || []).map((entry) => ({
-      getKey() { return entry.key },
-      getValue() { return entry.value },
-      setValue(value) { entry.value = String(value); return this },
-      remove() { sheet.metadata = sheet.metadata.filter((one) => one !== entry) },
-    }))
-  }
-  addDeveloperMetadata(key, value) {
-    this.metadata = (this.metadata || []).concat([{ key, value: String(value) }])
-    return this
-  }
-}
-
-class FakeSpreadsheet {
-  constructor(sheets) { this.sheets = sheets }
-  getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
-}
+// 偽のスプレッドシートは test/fakes/spreadsheet.mjs が持つ。殻と構造の検証が使う SpreadsheetApp の口だけを持つ。
 
 // ---- 読み込む ---------------------------------------------------------------
 
@@ -229,14 +62,6 @@ const { valueRepresentation, sheetLayout, checkKind, coreSteps, dayLabels, viola
   context,
 )
 
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
-
 function whyItStopped(work) {
   try {
     work()
@@ -254,7 +79,7 @@ function whyItStopped(work) {
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
     // マス目の 4 枚は既定の 26 列に収まらない（→ build-template.js の widenTo）
-    const sheet = new FakeSheet(layout.name, Math.max(26, sectionRightEdge(layout)))
+    const sheet = new FakeSheet(layout.name, { maxColumns: Math.max(26, sectionRightEdge(layout)) })
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
@@ -1319,21 +1144,3 @@ check(
   })(),
   '',
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('殻の検査（src/shell.js／偽のスプレッドシートの上）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)

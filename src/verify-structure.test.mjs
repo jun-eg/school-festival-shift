@@ -17,97 +17,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
+import { FakeSheet, FakeSpreadsheet, roundTrips } from '../test/fakes/spreadsheet.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- 読むだけの偽のスプレッドシート -----------------------------------------
-// setValues を持たないので、書こうとしたらそこで落ちる（「黙って直さない」を道具の側で確かめる）。
-
-const roundTrips = { reads: 0 }
-
-class FakeRange {
-  constructor(sheet, row, column, rowCount, columnCount) {
-    Object.assign(this, { sheet, row, column, rowCount, columnCount })
-  }
-  getValues() {
-    roundTrips.reads += 1
-    const table = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      const row = []
-      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
-      table.push(row)
-    }
-    return table
-  }
-}
-
-class FakeSheet {
-  // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
-  constructor(name) {
-    Object.assign(this, { name, cells: new Map(), maxRows: 1000, maxColumns: 26 })
-  }
-  getName() { return this.name }
-  getRange(row, column, rowCount = 1, columnCount = 1) {
-    // 本物と同じく範囲外で例外を投げる
-    if (column + columnCount - 1 > this.maxColumns) throw new Error(`範囲外（${this.name} の ${column + columnCount - 1} 列目）`)
-    if (row + rowCount - 1 > this.maxRows) throw new Error(`範囲外（${this.name} の ${row + rowCount - 1} 行目）`)
-    return new FakeRange(this, row, column, rowCount, columnCount)
-  }
-  getMaxRows() { return this.maxRows }
-  getMaxColumns() { return this.maxColumns }
-  getLastColumn() {
-    return [...this.cells.entries()]
-      .filter(([, value]) => value !== '')
-      .reduce((max, [key]) => Math.max(max, Number(key.split(',')[1])), 0)
-  }
-  put(row, column, value) { this.cells.set(`${row},${column}`, value); return this }
-  /** 担当者が列をまとめて消した状態にする（その列より右が消える）。 */
-  cutColumnsTo(maxColumns) {
-    this.maxColumns = maxColumns
-    this.cells = new Map(
-      [...this.cells.entries()].filter(([key]) => Number(key.split(',')[1]) <= maxColumns),
-    )
-    return this
-  }
-  /** 担当者が行をまとめて消した状態にする（その行より下が消える）。 */
-  cutRowsTo(maxRows) {
-    this.maxRows = maxRows
-    this.cells = new Map(
-      [...this.cells.entries()].filter(([key]) => Number(key.split(',')[0]) <= maxRows),
-    )
-    return this
-  }
-  /** 担当者が列を 1 つ挿した状態にする（その列から右が 1 つずれる）。 */
-  insertColumn(at) {
-    this.cells = new Map(
-      [...this.cells.entries()].map(([key, value]) => {
-        const [row, column] = key.split(',').map(Number)
-        return [`${row},${column < at ? column : column + 1}`, value]
-      }),
-    )
-    return this
-  }
-  /** 担当者が行を 1 つ消した状態にする（その行から下が 1 つ上がる）。 */
-  deleteRow(at) {
-    this.cells = new Map(
-      [...this.cells.entries()]
-        .filter(([key]) => Number(key.split(',')[0]) !== at)
-        .map(([key, value]) => {
-          const [row, column] = key.split(',').map(Number)
-          return [`${row < at ? row : row - 1},${column}`, value]
-        }),
-    )
-    return this
-  }
-  /** シートの中身を丸ごと消した状態にする（生成シートの上書き）。 */
-  clear() { this.cells = new Map(); return this }
-}
-
-class FakeSpreadsheet {
-  constructor(sheets) { this.sheets = sheets }
-  getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
-  snapshot() { return JSON.stringify(this.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])) }
-}
+// 偽のスプレッドシートは test/fakes/spreadsheet.mjs が持つ。
+// 読むだけのシート（readOnly）は書こうとしたらそこで落ちる（「黙って直さない」を道具の側で確かめる）。
 
 // ---- 読み込む ---------------------------------------------------------------
 // headerRowCount と normalizeValue は shell.js にあるので一緒に読む。SpreadsheetApp は置かない。
@@ -118,14 +34,6 @@ for (const name of ['sheet-layout.js', 'core.js', 'shell.js', 'verify-structure.
 }
 const { nameBreakages, checkStructure, breakageToText, sectionRightEdge } = context
 const { sheetLayout } = vm.runInContext('({ sheetLayout })', context)
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 function whyItStopped(work) {
   try {
@@ -139,7 +47,7 @@ function whyItStopped(work) {
 /** sheetLayout どおりに見出しを置いた空の 8 枚（テンプレートを組んだ直後の形）を作る。 */
 function emptyTemplate() {
   const sheets = sheetLayout.map((layout) => {
-    const sheet = new FakeSheet(layout.name)
+    const sheet = new FakeSheet(layout.name, { readOnly: true })
     // マス目の 4 枚は既定の 26 列に収まらないので広げる（→ build-template.js の widenTo）
     sheet.maxColumns = Math.max(sheet.maxColumns, sectionRightEdge(layout))
     layout.sections.forEach((section) => {
@@ -347,21 +255,3 @@ check(
   namedLines(bookWithInsertedColumn).filter((line) => !stopped.includes(line)),
   [],
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('構造の検証の検査（src/verify-structure.js／読むだけの偽のスプレッドシートの上）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)

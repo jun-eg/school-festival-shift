@@ -15,6 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -27,14 +28,6 @@ for (const name of ['sheet-layout.js', 'input-types.js', 'core.js', 'count-viola
 }
 const { fairnessMetrics, takeConditions, build, sheetColumns } = context
 const { metricDefinitions } = vm.runInContext('({ metricDefinitions })', context)
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 /** 止まることを見る。止まらなければ null が返る。 */
 function whyItStopped(work) {
@@ -255,21 +248,3 @@ check(
   output.notBuilt.map((step) => step.name),
   [],
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('指標を出す側の検査（src/fairness-metrics.js／スプレッドシート無し）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)

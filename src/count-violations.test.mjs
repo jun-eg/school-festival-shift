@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,14 +30,6 @@ const { violationRules, violationsNotCounted, checkKind } = vm.runInContext(
   '({ violationRules, violationsNotCounted, checkKind })',
   context,
 )
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 /** 止まることを見る。止まらなければ null が返る。 */
 function whyItStopped(work) {
@@ -476,21 +469,3 @@ check(
   output['検証結果'].map((row) => [row.length, row[columns.indexOf('種別')]]),
   [[columns.length, checkKind.violation]],
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('違反を数える側の検査（src/count-violations.js／スプレッドシート無し）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)

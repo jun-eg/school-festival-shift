@@ -16,192 +16,24 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
+import { FakeSpreadsheet } from '../test/fakes/spreadsheet.mjs'
+import { createFormApp } from '../test/fakes/form.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- 偽のスプレッドシート ---------------------------------------------------
-
-class FakeRange {
-  constructor(sheet, row, column, rowCount, columnCount) {
-    Object.assign(this, { sheet, row, column, rowCount, columnCount })
-  }
-  positions() {
-    const keys = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) keys.push(`${r},${c}`)
-    }
-    return keys
-  }
-  getValues() {
-    const table = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      const row = []
-      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
-      table.push(row)
-    }
-    return table
-  }
-  setValues(table) {
-    table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
-    return this
-  }
-  setNotes(table) {
-    table.forEach((row, i) => row.forEach((note, j) => this.sheet.notes.set(`${this.row + i},${this.column + j}`, note)))
-    return this
-  }
-  setBackgrounds(table) {
-    table.forEach((row, i) => row.forEach((color, j) => {
-      const key = `${this.row + i},${this.column + j}`
-      if (color === null) this.sheet.backgrounds.delete(key)
-      else this.sheet.backgrounds.set(key, color)
-    }))
-    return this
-  }
-  setDataValidation(rule) {
-    this.positions().forEach((key) => this.sheet.validations.set(key, rule))
-    return this
-  }
-  setBackground(color) { return this.setBackgrounds(Array.from({ length: this.rowCount }, () => Array(this.columnCount).fill(color))) }
-  clearContent() { this.positions().forEach((key) => this.sheet.cells.delete(key)); return this }
-  clearNote() { this.positions().forEach((key) => this.sheet.notes.delete(key)); return this }
-  clearFormat() { this.positions().forEach((key) => this.sheet.backgrounds.delete(key)); return this }
-  clearDataValidations() { this.positions().forEach((key) => this.sheet.validations.delete(key)); return this }
-  setFontWeight() { return this }
-  setNote(note) { this.positions().forEach((key) => this.sheet.notes.set(key, note)); return this }
-  setBorder() { this.sheet.borders += 1; return this }
-  merge() { return this }
-}
-
-class FakeProtection {
-  constructor(sheet) { Object.assign(this, { sheet, editors: ['owner@example.com'] }) }
-  setDescription() { return this }
-  setWarningOnly() { return this }
-  getEditors() { return [...this.editors] }
-  removeEditors() { return this }
-  canDomainEdit() { return false }
-  setUnprotectedRanges() { return this }
-  remove() { this.sheet.protections = this.sheet.protections.filter((p) => p !== this) }
-}
-
-class FakeMetadata {
-  constructor(sheet, key, value) { Object.assign(this, { sheet, key, value }) }
-  getKey() { return this.key }
-  getValue() { return this.value }
-  remove() { this.sheet.metadata = this.sheet.metadata.filter((one) => one !== this) }
-}
-
-let nextSheetId = 1
-
-class FakeSheet {
-  constructor(name) {
-    Object.assign(this, {
-      name, id: nextSheetId++, cells: new Map(), notes: new Map(), backgrounds: new Map(), validations: new Map(),
-      metadata: [], borders: 0, protections: [], frozenRows: 0, maxRows: 40, maxColumns: 26, formUrl: null,
-    })
-  }
-  getName() { return this.name }
-  setName(name) { this.name = name; return this }
-  getSheetId() { return this.id }
-  getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
-  setFrozenRows(count) { this.frozenRows = count }
-  setFrozenColumns() {}
-  getColumnWidth() { return 100 }
-  setColumnWidth() {}
-  getMaxRows() { return this.maxRows }
-  getMaxColumns() { return this.maxColumns }
-  insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
-  getProtections() { return [...this.protections] }
-  protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
-  getFormUrl() { return this.formUrl }
-  getLastRow() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[0])), 0) }
-  getLastColumn() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[1])), 0) }
-  getDeveloperMetadata() { return [...this.metadata] }
-  addDeveloperMetadata(key, value) { this.metadata.push(new FakeMetadata(this, key, value)) }
-}
-
-class FakeSpreadsheet {
-  constructor(id) {
-    Object.assign(this, { sheets: [new FakeSheet('シート1')], id, name: '学祭シフト' })
-    this.activeSheet = this.sheets[0]
-  }
-  getId() { return this.id }
-  getName() { return this.name }
-  getSheets() { return [...this.sheets] }
-  getSheetByName(name) { return this.sheets.filter((s) => s.getName() === name)[0] ?? null }
-  insertSheet(name) { const s = new FakeSheet(name); this.sheets.push(s); return s }
-  deleteSheet(sheet) { this.sheets = this.sheets.filter((s) => s !== sheet) }
-  setActiveSheet(sheet) { this.activeSheet = sheet }
-  moveActiveSheet(position) {
-    this.sheets = this.sheets.filter((s) => s !== this.activeSheet)
-    this.sheets.splice(position - 1, 0, this.activeSheet)
-  }
-}
-
-// ---- 偽のフォーム -----------------------------------------------------------
-//
-// setDestination で回答シート「フォームの回答 1」を 1 枚作り、removeDestination でその紐付けを外す。
-// URL はフォームごとに違う（openByUrl で引き当てるため）。
+// 偽のスプレッドシートは test/fakes/spreadsheet.mjs、偽のフォームは test/fakes/form.mjs が持つ。
+// 回答シートとフォームの紐付けは、setDestination で付き、removeDestination で外れる。
+// シートは 40 行にしてある（もとの偽物がそうだった。割り当ての 4 枚の人の行は 2〜40 行目で、下の usedBook がその 39 行にプルダウンを置く）。
 
 const books = {}
-const forms = []
-
-class FakeItem {
-  constructor(kind) { Object.assign(this, { kind, title: null }) }
-  setTitle(title) { this.title = title; return this }
-  setRequired() { return this }
-  setHelpText() { return this }
-  setValidation() { return this }
-  setChoiceValues() { return this }
-  setImage() { return this }
-}
-
-class FakeForm {
-  constructor(title) {
-    Object.assign(this, { title, items: [], number: forms.length + 1, linkedSheet: null })
-  }
-  add(kind) { const item = new FakeItem(kind); this.items.push(item); return item }
-  addTextItem() { return this.add('text') }
-  addParagraphTextItem() { return this.add('paragraph') }
-  addMultipleChoiceItem() { return this.add('radio') }
-  addImageItem() { return this.add('image') }
-  getPublishedUrl() { return `https://forms.example/${this.number}/viewform` }
-  getEditUrl() { return `https://forms.example/${this.number}/edit` }
-  setDestination(type, id) {
-    const sheet = books[id].insertSheet('フォームの回答 1')
-    const header = ['タイムスタンプ', ...this.items.filter((item) => item.kind !== 'image').map((item) => item.title)]
-    sheet.getRange(1, 1, 1, header.length).setValues([header])
-    sheet.formUrl = this.getEditUrl()
-    this.linkedSheet = sheet
-    return this
-  }
-  removeDestination() {
-    if (this.linkedSheet) this.linkedSheet.formUrl = null
-    this.linkedSheet = null
-    return this
-  }
-}
-
-class FakeValidationBuilder {
-  requireTextMatchesPattern() { return this }
-  setHelpText() { return this }
-  build() { return {} }
-}
+const { FormApp, forms } = createFormApp(books)
 
 // ---- 読み込む ---------------------------------------------------------------
 
 const context = vm.createContext({
   SpreadsheetApp: { ProtectionType: { SHEET: 'SHEET' }, BorderStyle: { SOLID_THICK: 'solid-thick' }, flush() {} },
-  FormApp: {
-    DestinationType: { SPREADSHEET: 'SPREADSHEET' },
-    create(title) { const form = new FakeForm(title); forms.push(form); return form },
-    openByUrl(url) {
-      const found = forms.filter((form) => form.getEditUrl() === url || form.getPublishedUrl() === url)[0]
-      if (!found) throw new Error(`偽のフォーム: ${url} が無い`)
-      return found
-    },
-    createTextValidation() { return new FakeValidationBuilder() },
-    createParagraphTextValidation() { return new FakeValidationBuilder() },
-  },
+  FormApp,
   console: { log() {}, error() {} },
 })
 for (const name of [
@@ -214,14 +46,6 @@ const { buildTemplateInto, buildFormOn, clearForNextYearOn, clearedText } = cont
 const { sheetLayout, formUrlBlock, dayLabels } = vm.runInContext('({ sheetLayout, formUrlBlock, dayLabels })', context)
 
 // ---- 道具 -------------------------------------------------------------------
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 function whyItStopped(run) {
   try {
@@ -236,7 +60,7 @@ const rosterImage = { bytes: [1], mimeType: 'image/png', fileName: '調理名簿
 
 /** テンプレートを組み、条件入力の初期値のままフォームを作り、1 年使い終わった形にする。 */
 function usedBook(id) {
-  const book = new FakeSpreadsheet(id)
+  const book = new FakeSpreadsheet(['シート1'], { id, sheetOptions: { maxRows: 40 } })
   books[id] = book
   buildTemplateInto(book)
   buildFormOn(book, rosterImage)
@@ -402,14 +226,3 @@ check(
   ],
   [true, true, false],
 )
-
-// ---- 結果 -------------------------------------------------------------------
-
-passed.forEach((title) => console.log(`ok   ${title}`))
-failed.forEach(({ title, actual, expected }) => {
-  console.log(`NG   ${title}`)
-  console.log(`     いま: ${JSON.stringify(actual)}`)
-  console.log(`     期待: ${JSON.stringify(expected)}`)
-})
-console.log(`\n${passed.length} 件通過 ／ ${failed.length} 件不一致`)
-process.exit(failed.length === 0 ? 0 : 1)
