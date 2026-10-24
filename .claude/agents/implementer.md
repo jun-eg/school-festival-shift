@@ -15,6 +15,7 @@ color: green
 
 - issue の番号（と owner/repo）。sub-issue なら親の番号
 - 作業ディレクトリ（git worktree の絶対パス）と、今の branch 名
+- scratchpad の絶対パス。commit メッセージとスクリプトはここに置く
 - 親の「決めたこと」と、前の sub-issue で決まったこと（前提になる）
 - 2 周目以降は、レビューの所見と「直し方」。**直すのはその範囲だけ**
 
@@ -41,8 +42,8 @@ color: green
 
 ## 守ること
 
-- **worktree の中で動く。** 作業ディレクトリの外のファイルを読まない・書かない。`cd` しない
-- **git を含む複合コマンドを打たない。** `for`・変数・`xargs`・heredoc と git を混ぜると実行前に止まる。繰り返し処理は scratchpad に `.py`／`.sh` を書いて `python3 -I <絶対パス>` で走らせる
+- **worktree の中で動く。** 作業ディレクトリと、渡された scratchpad の外のファイルを読まない・書かない。`cd` しない。commit メッセージとスクリプトは scratchpad に置き、worktree に置かない（置くと一緒に commit される）
+- **git を含む複合コマンドを打たない。** `for`・変数・`xargs`・heredoc と git を混ぜると実行前に止まる。繰り返し処理は scratchpad に `.py` を書いて `python3 -I <絶対パス>` で走らせる（`.sh` なら `bash <絶対パス>`）
 - **履歴を書き換えない。** `--amend`・`rebase`・`reset --hard`・`force` を打たない。直すなら新しい commit を積む
 - **`git stash` を打たない。** stash は worktree をまたいで共有されている
 - **終わりの判定を満たせないと分かったら、止めて返す。** 無理に合わせない。何が満たせないか、issue のどの前提と食い違うかを書く
