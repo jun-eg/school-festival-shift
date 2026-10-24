@@ -1,7 +1,10 @@
 # .claude — 事故を実行前に止める柵の置き場
 
 **ここにあるのは、作業の事故を「実行される前に」止める仕掛けである。** 読んで守る文章ではない。
-**成果物の書き方の規約は混ぜない。** それは [`docs/ADR/README.md`](../docs/ADR/README.md) と [`skills/`](skills/) が持つ。
+**成果物の書き方の規約は混ぜない。** それは [`docs/agent/ADR/README.md`](../docs/agent/ADR/README.md) と [`skills/`](skills/) が持つ。
+**[`agents/`](agents/) は subagent の定義で、使い方は対になる skill が持つ**（`agents/issue-reviewer.md` ↔ `skills/issue-check/`、`agents/implementer.md`・`agents/pr-writer.md`・`agents/pr-reviewer.md` ↔ `skills/implement/`）。
+**人が読む要約・issue・PR 本文の書き方は [`docs/README.md`](../docs/README.md) が持つ。**
+**commit の直前に回る柵は [`.githooks/pre-commit`](../.githooks/pre-commit) が持つ**（何を止めるかはその中の 2 行を読む。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
 
 何を止めているかは [`settings.json`](settings.json) と
 [`hooks/guard-bash.py`](hooks/guard-bash.py) の拒否メッセージを読む（**ここには写さない。二重に持つと片方が古くなる**）。
@@ -17,6 +20,12 @@
 **`git rebase` は `deny` に入れていない。** 前置一致だと、途中で詰まったときの逃げ道である
 `git rebase --abort` まで落ちてしまうためである。rebase の判断はフックが持ち、`--abort` と `--quit` だけ通す。
 **「deny に抜けがある」と思って足さないこと。**
+
+**`gh pr merge` も `deny` に入れていない。** Claude が merge してよいのは `main` 以外の branch（クッション branch）向けの PR だけで
+（[issue #320](https://github.com/jun-eg/school-festival-shift/issues/320)）、前置一致では PR の base を判定できない。
+フックが `gh pr view <N> --json baseRefName` で base を引き、`main` なら止める。引けなければ止める側に倒す。
+番号の無い `gh pr merge` と REST の `pulls/<N>/merge` も止める（base の判定を素通りさせない）。
+`main` への `git push` は refspec で見る。`git push origin main` だけは前置一致で拾えるので `deny` にもある。
 
 ## 例外：どうしても必要になったら
 

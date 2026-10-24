@@ -1,0 +1,22 @@
+# CI — PR と main への push で、repo の文書の検査を回す。
+# コードを置いたら、型・lint・テスト・ビルドの job をここに足す。
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  docs:
+    name: 文書の検査（リンクの実在・要約の古さ）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 相対リンクが実在するファイルに解決するか
+        run: node scripts/リンクの検査.mjs
+      - name: 要約が原本（HEAD）より古くなっていないか
+        run: node scripts/要約の検査.mjs --head

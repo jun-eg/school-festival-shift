@@ -4,15 +4,19 @@
     python3 .claude/hooks/guard-bash.test.py              # 既定（guard-bash.py）
     python3 .claude/hooks/guard-bash.test.py 別の実装のパス   # 実装を入れ替えるとき
 
-**この 37 件が契約であって、実装ではない。** 実装を書き直しても、通るべきはここである。
+**この一覧が契約であって、実装ではない。** 実装を書き直しても、通るべきはここである。
 依存はゼロである（Python の標準だけを使う）。何も書き換えない。
+`gh pr merge` の base は PATH の先頭に置いた偽の `gh` が答える（12 → main、34 → クッション branch、99 → 引けない）。
+ネットワークには出ない。
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
 """
 
 import json
 import os
+import stat
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TARGET = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "guard-bash.py")
@@ -41,13 +45,52 @@ DENY = [
     "git push --force-with-lease=origin/main origin main",
     "cd /tmp && git push origin main --force",
     "echo hi; gh api x -f body=@f.md",
+    # main への push
+    "git push origin main",
+    "git push -u origin main",
+    "git push origin HEAD:main",
+    "git push origin foo:main",
+    "git push origin worktree-320-x:refs/heads/main",
+    # main 向けの PR の merge。base は偽の gh が答える
+    "gh pr merge 12 --merge",
+    "gh pr merge --merge",
+    "gh pr merge",
+    "gh pr merge 34 --rebase",
+    "gh pr merge 99 --merge",
+    "gh api -X PUT repos/o/r/pulls/12/merge",
+    "gh api repos/o/r/pulls/34/merge -X PUT",
+    "git push origin :main",
+    "gh -R o/r pr merge 12 --merge",
+    "gh --repo o/r pr merge 12 --merge",
+    "gh --repo=o/r pr merge 12 --merge",
+    "gh pr merge 34 -rd",
+    "gh pr merge 34 -Ro/r --rebase",
+    "gh pr merge 34 -Rx/y --merge",
+    "gh -R x/y pr merge 34 --merge",
+    "gh pr merge 34 --merge --repo=x/y",
+    "gh pr -R o/r merge 12 --merge",
+    "gh pr --repo=o/r merge 12 --merge",
+    "gh pr -R x/y merge 34 --merge",
+    "gh pr merge 34 --rebase=true",
 ]
 
 # 通ってほしい形（止めすぎていないか）
 ALLOW = [
     "git push origin foo",
     "git push -u origin foo",
-    "git push --follow-tags origin main",
+    "git push --follow-tags origin foo",
+    "git push -u origin worktree-320-x",
+    "git push origin HEAD",
+    "gh pr merge 34 --merge",
+    "gh pr merge 34 --merge --repo o/r",
+    "gh -R o/r pr merge 34 --merge",
+    "gh pr merge -m 34",
+    "gh pr merge 34 -md",
+    "gh pr merge -Ro/r 34 --merge",
+    "gh pr -R o/r merge 34 --merge",
+    "gh pr view 12 --json baseRefName",
+    "gh api repos/o/r/pulls/12",
+    "gh pr checks 34 --watch",
     "git merge origin/main",
     "git rebase --abort",
     "git rebase --quit",
@@ -64,9 +107,29 @@ ALLOW = [
     "grep -f patterns.txt file",
 ]
 
+FAKE_GH = """#!/bin/sh
+# 偽の gh。`gh pr view <N> --json baseRefName --jq .baseRefName [--repo o/r]` にだけ答える。
+# repo が x/y なら番号に関わらず main（hook が repo を落とさず渡していることの確かめ）
+case "$*" in
+  *--repo\ x/y*) echo main; exit 0 ;;
+esac
+case "$3" in
+  12) echo main ;;
+  34) echo worktree-320-implement-skill ;;
+  *) echo "no pull requests found" >&2; exit 1 ;;
+esac
+"""
+fake_dir = tempfile.mkdtemp(prefix="guard-fake-gh-")
+fake_gh = os.path.join(fake_dir, "gh")
+with open(fake_gh, "w") as f:
+    f.write(FAKE_GH)
+os.chmod(fake_gh, os.stat(fake_gh).st_mode | stat.S_IXUSR)
+ENV = dict(os.environ, PATH=fake_dir + os.pathsep + os.environ.get("PATH", ""))
+
+
 def run(cmd):
     out = subprocess.run(HOOK, input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, env=ENV)
     assert out.returncode == 0, f"exit {out.returncode}: {out.stderr}"
     if not out.stdout.strip():
         return None

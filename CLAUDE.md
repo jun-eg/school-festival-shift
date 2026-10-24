@@ -1,8 +1,8 @@
 # CLAUDE.md — 始める前にしか踏めない手
 
 **ここにあるのは、作業を「始める前」に踏まないと、後から戻れなくなる手だけである。**
-**実行前に止める柵は [`.claude/README.md`](.claude/README.md)、成果物の書き方は [`docs/ADR/README.md`](docs/ADR/README.md) と
-[`.claude/skills/`](.claude/skills/) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
+**実行前に止める柵は [`.claude/README.md`](.claude/README.md)、成果物の書き方は [`docs/agent/ADR/README.md`](docs/agent/ADR/README.md) と
+[`.claude/skills/`](.claude/skills/)、人が読む要約・issue・PR 本文の書き方は [`docs/README.md`](docs/README.md) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
 
 ## 実装を始めるとき
 
