@@ -39,6 +39,7 @@ bash .claude/skills/implement/state.sh <番号か URL>
 
 - issue 番号と owner/repo。sub-issue なら親の番号
 - 作業ディレクトリ（worktree の絶対パス）と、今の branch 名
+- scratchpad の絶対パス（commit メッセージとスクリプトの置き場）
 - 親の「決めたこと」（下段）と、前の sub-issue の PR 番号と変えたもの（前提になる）
 - commit 末尾に付ける `Claude-Session:` の行
 - 「push・PR 作成・merge・issue の書き換えを打たないこと」
@@ -68,7 +69,7 @@ gh api repos/<owner>/<repo>/issues/<PR 番号>/comments -F body=@<絶対パス>
    | 判定 | すること |
    | --- | --- |
    | merge してよい | 2-5 へ |
-   | 直しが要る | 同じ implementer に **SendMessage** で「直し方」を渡し、直して commit させる。`git push` して 1 に戻る（周回 +1） |
+   | 直しが要る | 同じ implementer に **SendMessage** で「直し方」を渡し、直して commit させる（implementer が居なければ新しく立て、prompt に前回の所見と直し方を入れる）。`git push` して 1 に戻る（周回 +1） |
    | issue から見直し | **止めて人に返す。** PR は開いたまま。食い違いを subagent の文のまま報告に載せる |
 
    3 周目でも「直しが要る」なら、**merge せず PR を開いたまま人に返す。** 残った所見を報告に載せる。
@@ -98,7 +99,9 @@ sub-issue ごとに `state.sh` の結果で分ける。
 | 状態 | すること |
 | --- | --- |
 | `pr.state == "MERGED"` | 飛ばす。報告に「merge 済み」 |
-| `pr.state == "OPEN"` | その branch に `git switch` して `git pull`。手順 2-4 のレビューから続ける |
+| `pr.state == "OPEN"` | その branch に `git switch` して `git pull`。PR コメントの `pr-reviewer n 周目` の最大値から周回を続け、直前の所見を前回の所見として pr-reviewer に渡す（手順 2-4 のレビューから）。直しが要るときは implementer を新しく立て、prompt に前回の所見と直し方を入れる |
+| `pr.state == "CLOSED"` | merge せず閉じた PR が最新。merge せず人に返す（閉じた PR がある） |
+| sub-issue の `state == "CLOSED"` で PR が MERGED でない | 飛ばして報告に「閉じている」 |
 | `pr == null`、`branch` あり | その branch に `git switch` して `git pull`。commit が無ければ 2-1 から、あれば 2-2 から |
 | 何も無い | `git switch <cushion>`、`git pull`、`git switch -c worktree-<sub番号>-<slug>` → 手順 2 を base = クッションで |
 
@@ -110,7 +113,7 @@ gh pr merge <PR 番号> --merge
 
 `--delete-branch` を付けない（gh が default branch に切り替えようとして、main を持つ本体の worktree と衝突する）。`--squash`・`--rebase` も使わない。merge したら `git switch <cushion>`、続けて `git pull`（別々の 1 コマンドで）。sub-issue の branch は残してよい。
 
-**3-3. 全部 merge したら main 向けの PR を作る。** pr-writer に `main 向け` で本文を書かせる（親と全 sub-issue の `Closes`、sub-issue ごとに 1 行と PR 番号）。
+**3-3. 全部 merge したら main 向けの PR を作る。** pr-writer に `main 向け` で本文を書かせる（親と全 sub-issue の `Closes`、sub-issue ごとに 1 行と PR 番号。`mainPr` があればその PR 番号も渡す）。
 
 ```
 gh pr create --base main --head <cushion> --title "<親 issue のタイトル>（#<親番号>）" --body-file <絶対パス>

@@ -31,7 +31,7 @@ branches="$(gh api --paginate "repos/$nwo/branches?per_page=100" --jq '.[].name'
 branch_for() { grep -m1 -E "^worktree-$1-" <<<"$branches" || true; }
 
 # PR 一覧（open と merged と closed。1 回だけ取る）
-prs="$(gh pr list --repo "$nwo" --state all --limit 200 --json number,state,baseRefName,headRefName,mergedAt,url)"
+prs="$(gh api --paginate "repos/$nwo/pulls?state=all&per_page=100" --jq '.[] | {number, state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end), baseRefName: .base.ref, headRefName: .head.ref, mergedAt: .merged_at, url: .html_url}' | jq -sc '.')"
 pr_for_head_prefix() {
   jq -c --arg p "worktree-$1-" '[.[] | select(.headRefName | startswith($p))] | sort_by(.number) | last // null' <<<"$prs"
 }
@@ -46,7 +46,11 @@ elif [ "$(jq '.parent' <<<"$issue_json")" != "null" ]; then
   role="sub-issue"
 fi
 
-cushion="$(branch_for "$number")"
+if [ "$role" = "sub-issue" ]; then
+  cushion="$(branch_for "$(jq -r .parent.number <<<"$issue_json")")"
+else
+  cushion="$(branch_for "$number")"
+fi
 main_pr="null"
 if [ -n "$cushion" ]; then
   main_pr="$(pr_for_head_base "$cushion" main)"
