@@ -10,6 +10,9 @@ import { api } from './google.mjs'
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const workDir = path.join(root, '.e2e')
 
+/** worktree をまたいで 1 つだけ持つ物（日次の控え・同時実行のロック）の置き場。.env の置き場（~/.config/sfs-e2e/）に揃える。worktree の直下の .e2e/ は読まない。 */
+export const sharedDir = path.join(os.homedir(), '.config/sfs-e2e')
+
 /** スプレッドシートの題名がこれで始まらなければ、検証用ではないとみなして触らない。 */
 export const titlePrefix = 'sfs-e2e'
 
@@ -17,7 +20,7 @@ const required = ['SFS_E2E_SPREADSHEET_ID', 'SFS_E2E_SCRIPT_ID', 'SFS_E2E_GCP_PR
 
 /** .env の置き場。worktree の直下にあればそれ、無ければ ~/.config/sfs-e2e/.env（worktree をまたいで使う）。どちらにも無ければ null。 */
 export function envFile() {
-  return [path.join(root, '.env'), path.join(os.homedir(), '.config/sfs-e2e/.env')].find((file) => fs.existsSync(file)) ?? null
+  return [path.join(root, '.env'), path.join(sharedDir, '.env')].find((file) => fs.existsSync(file)) ?? null
 }
 
 /** .env を読む。無い・欠けているときは、何を用意するかを書いて止まる。環境変数では上書きできない（行き先が .env 以外で変わらないようにする）。 */
