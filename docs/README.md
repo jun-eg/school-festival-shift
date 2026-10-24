@@ -35,7 +35,7 @@
 | 要約 | 上限 |
 | --- | --- |
 | 成果物 1 本（journey・hmw・design-doc・tech-requirements） | 40 行 |
-| ADR 1 本（[`ADR/`](ADR/) の 1 ファイル） | 10 行 |
+| ADR 1 本（`ADR/` の 1 ファイル） | 10 行 |
 | issue 本文の上段 | 20 行 |
 | PR 本文（checkbox と `Closes` を含む） | 40 行 |
 
