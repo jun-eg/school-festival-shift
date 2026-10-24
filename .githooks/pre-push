@@ -1,0 +1,100 @@
+#!/bin/sh
+# pre-push — push の前に、検査を消す・緩める差分を subagent（test-diff-reviewer）に読ませる（issue #343）。
+#
+# 有効にする: git config core.hooksPath .githooks（手順は CONTRIBUTING.md）
+# 検査ファイル・検査を弱める設定に差分が無い push は、claude を呼ばずに通す。
+# 止まったときの抜け道は `git push --no-verify` だけ（人だけが使う。Claude には guard-bash が打たせない）。
+# 環境変数での skip は置かない（Claude が設定できてしまう）。CI では回さない（CI に鍵を置かない）。
+#
+# push される範囲は stdin の `<local ref> <local sha> <remote ref> <remote sha>` から取る。
+#   remote sha がゼロ（新しい branch）か、この repo に無い（取り込んでいない）ときは、
+#   `git rev-list <local sha> --not --remotes=<remote 名>`（hook の第 1 引数）で、どの remote ref にも無い commit だけを取り、
+#   その最古の commit の親から local sha まで。空なら見ない。クッションから切った branch の初回 push で、
+#   merge 済みの commit まで読まないため。branch の削除（local sha がゼロ）は見ない。
+
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+ZERO=0000000000000000000000000000000000000000
+# 検査ファイル（git の glob）
+TEST_PATHS=':(glob)src/**/*.test.ts :(glob)scripts/**/*.test.mjs :(glob)e2e/**/*.test.mjs :(glob)e2e/**/*.e2e.mjs'
+# 検査を弱める設定。差分の +/- の行に test などが出るときだけ見る
+CONFIG_PATHS='package.json'
+# ci.yml は差分が 1 行でもあれば読ませる（if: false や on: の削除は語で拾えない）
+ALWAYS_PATHS='.github/workflows/ci.yml'
+CONFIG_WORDS='test|e2e|skip|todo|continue-on-error|glob'
+
+# hook は GIT_DIR などを子に渡す。claude の中で git を呼ぶので外す
+# （Claude Code のセッションの中から push しても、入れ子の claude -p は拒まれない。CLAUDECODE を残したまま実機で確かめた）
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX
+
+blocked=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "$local_sha" ] || continue
+  [ "$local_sha" != "$ZERO" ] || continue
+
+  if [ "$remote_sha" != "$ZERO" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    base="$remote_sha"
+  else
+    oldest=$(git rev-list --reverse "$local_sha" --not --remotes="$1" | head -n 1)
+    [ -n "$oldest" ] || continue
+    base=$(git rev-parse --verify -q "$oldest^" 2>/dev/null) || base=$(git hash-object -t tree /dev/null)
+  fi
+  [ "$base" != "$local_sha" ] || continue
+  range="$base..$local_sha"
+
+  # shellcheck disable=SC2086
+  files=$(git diff --name-only "$range" -- $TEST_PATHS)
+  for f in $CONFIG_PATHS; do
+    if git diff -U0 "$range" -- "$f" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -qiE "$CONFIG_WORDS"; then
+      files="$files
+$f"
+    fi
+  done
+  # shellcheck disable=SC2086
+  files="$files
+$(git diff --name-only "$range" -- $ALWAYS_PATHS)"
+  files=$(printf '%s\n' "$files" | sed '/^$/d')
+  [ -n "$files" ] || continue
+
+  if ! command -v claude >/dev/null 2>&1; then
+    echo "pre-push: 検査の差分を読ませる claude が PATH に無い。Claude Code（https://claude.com/claude-code）を入れて claude を PATH に通す。" >&2
+    echo "  どうしても今押すなら人が git push --no-verify を打つ。" >&2
+    exit 1
+  fi
+
+  echo "pre-push: 検査の差分があるので test-diff-reviewer に読ませる（$range）..." >&2
+  prompt="差分の範囲は $range。検査に関わる差分があるファイル:
+$files
+この範囲で、検査を消した・緩めた変更に根拠があるかを判定して。1 行目は「判定: 通す」か「判定: 止める」。"
+  out=$(claude -p --agent test-diff-reviewer \
+    --permission-mode dontAsk \
+    --allowedTools "Read Grep Glob Bash(git diff:*) Bash(git log:*) Bash(git show:*) Bash(gh issue view:*)" \
+    --disallowedTools "Edit Write NotebookEdit" \
+    --no-session-persistence \
+    "$prompt" </dev/null) || {
+    echo "pre-push: test-diff-reviewer を回せなかった（claude が非 0 で終わった）。人が確かめるなら git push --no-verify。" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+  }
+
+  verdict=$(printf '%s\n' "$out" | grep -E '^判定: (通す|止める)' | head -n 1)
+  case "$verdict" in
+    '判定: 通す'*)
+      printf '%s\n' "$out" >&2
+      ;;
+    '判定: 止める'*)
+      echo "pre-push: 検査を消す・緩める差分に根拠が無いので止めた（$local_ref）。" >&2
+      printf '%s\n' "$out" >&2
+      echo "  実装の変更か issue の「決めたこと」に根拠を足して打ち直す。人が承知で押すなら git push --no-verify。" >&2
+      blocked=1
+      ;;
+    *)
+      echo "pre-push: test-diff-reviewer の返事から判定の行（判定: 通す／止める）が読めなかったので止めた。" >&2
+      printf '%s\n' "$out" >&2
+      blocked=1
+      ;;
+  esac
+done
+
+exit "$blocked"
