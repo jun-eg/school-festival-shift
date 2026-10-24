@@ -4,7 +4,7 @@
 //   使い方: node src/shell/clear-for-next-year.test.ts
 //
 // 見るものは 5 つある（→ issue #290 ／ ADR tech-requirements-0018）。
-//   ① 回答シートとフォームの紐付けが外れ、回答の行と今年の題が消える
+//   ① 回答シートとフォームの紐付けが外れ、「回答」は表のシートから作り直されて、回答の行と今年の題が消える（buildTemplate 直後と同じ形）
 //   ② 割り当て 4 枚・検証結果・指標が、テンプレートの形に戻る（値・手直しの印・色・プルダウン・控え）
 //   ③ 条件入力は 9〜10 行目の URL だけが空き、ほかの値は 1 つも動かない
 //   ④ 空にしたファイルで、もう一度「フォームを作る」が通る（来年の担当者がやること）
@@ -124,7 +124,18 @@ check('① 回答の行が 1 行も残っていない（氏名・学籍番号を
 
 check('① 見出しは頭 6 列だけが残り、今年の題の 4 列は空いた（テンプレートと同じ形）', answers.getRange(1, 1, 1, 10).getValues()[0], [...sheetLayout.filter((layout) => layout.name === '回答')[0].sections[0].columns, '', '', '', ''])
 
-check('① 「回答」は同じシートのまま残った（消して作り直さない）', answers === answerSheetBefore, true)
+check('① 「回答」は表（テーブル）のシートから作り直された（SpreadsheetApp に表を外す口が無く、見出しを空けても既定の名前が入り直すため）', [answerSheetBefore.tableWidth, answers === answerSheetBefore, answers.tableWidth], [10, false, null])
+
+// 偽の表の振る舞い（実機で見た）。作り直さずに見出しを空けると「列 7」〜「列 10」が入り直る — この形を、上の見出しの検査が止める。
+const naive = usedBook('naive')
+naive.getSheetByName('回答').getRange(1, 7, 1, 4).clearContent()
+check('① （偽の表）作り直さずに見出しを空けると、空けたセルに既定の名前が入り直る', naive.getSheetByName('回答').getRange(1, 7, 1, 4).getValues()[0], ['列 7', '列 8', '列 9', '列 10'])
+
+// 作り直した「回答」は、buildTemplate 直後と同じ形（値・メモ・太字・幅・固定・保護・位置）である。
+const fresh = new FakeSpreadsheet(['シート1'], { id: 'fresh', sheetOptions: { maxRows: 40 } })
+buildTemplateInto(asGas(fresh))
+const shapeOf = (sheet) => [[...sheet.cells.entries()].sort(), [...sheet.notes.entries()].sort(), [...sheet.bold.entries()].sort(), [...sheet.columnWidths.entries()].sort(), sheet.frozenRows, sheet.frozenColumns, sheet.maxColumns, sheet.protections.map((protection) => [protection.warningOnly, protection.description])]
+check('① 作り直した「回答」は buildTemplate 直後と同じ形（値・メモ・太字・幅・固定・保護）', shapeOf(answers), shapeOf(fresh.getSheetByName('回答')))
 
 dayLabels.forEach((label) => {
   const sheet = book.getSheetByName(label)

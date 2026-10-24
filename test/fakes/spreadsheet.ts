@@ -21,6 +21,8 @@
 //     ここでは分からない（→ src/real-device-log.md）。
 //   - 範囲の外を getRange すると、本物と同じく例外を投げる。行や列を足せるのは insertColumnsAfter だけで、
 //     insertRows／insertColumns は持たない。
+//   - 表（テーブル）は、フォームが作った回答シートだけが持つ（tableWidth。form.ts の setDestination が立てる）。表の見出しを
+//     clearContent すると、空のセルに「列 N」が入る。実機で見た振る舞いだけを写す（表を外す口は SpreadsheetApp に無い）。
 //   - 行や列の大きさは、新しいスプレッドシートの既定（1000 行 26 列）から始まる。本物のシートの
 //     上限（セル数 1000 万）は持たない。
 //   - 読むだけのシート（readOnly）は、本物に無い道具である。書こうとしたらそこで落とす
@@ -84,6 +86,10 @@ export class FakeRange {
     this.writable()
     roundTrips.writes += 1
     this.positions().forEach((key) => this.sheet.cells.delete(key))
+    // 表（フォームが作った回答シート）の見出しの空のセルには、表が既定の名前を入れ直す（実機で見た: 2026-10-25）
+    if (this.sheet.tableWidth !== null && this.row === 1) {
+      for (let c = this.column; c < this.column + this.columnCount && c <= this.sheet.tableWidth; c++) this.sheet.cells.set(`1,${c}`, `列 ${c}`)
+    }
     return this
   }
   /** 書式だけを変える。値を運ばないので往復には数えない。 */
@@ -249,6 +255,8 @@ export class FakeSheet {
   declare maxRows: number
   declare maxColumns: number
   declare formUrl: string | null
+  /** 表（テーブル）になっているときの列数（1 列目から）。表でなければ null。SpreadsheetApp に表を外す口は無い（実機で見た）。 */
+  declare tableWidth: number | null
   declare readOnly: boolean
   /**
    * 1000 行 26 列は、新しいスプレッドシートの既定の大きさである。
@@ -260,7 +268,7 @@ export class FakeSheet {
       backgrounds: new Map(), fontColors: new Map(), fontWeights: new Map(), rightBorders: new Map(), bold: new Map(),
       boxes: new Set(), merges: new Set(), columnWidths: new Map(), metadata: [], borders: 0, protections: [],
       frozenRows: 0, frozenColumns: 0, maxRows: options.maxRows ?? 1000, maxColumns: options.maxColumns ?? 26,
-      formUrl: null, readOnly: options.readOnly ?? false,
+      formUrl: null, tableWidth: null, readOnly: options.readOnly ?? false,
     })
   }
   /** 読むだけのシートの状態を変えようとしたら落とす（ファイル先頭の注）。 */

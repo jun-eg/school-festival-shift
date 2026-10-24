@@ -6,13 +6,14 @@
  *
  * やることは 4 つで、条件入力の値は残す（そのまま来年の初期値になる → ADR tech-requirements-0015）。
  *   ① 回答シートとフォームの紐付けを外す（コピーで黙って複製されたフォームである → issue #260）
- *   ② 回答の行を消す（氏名・学籍番号を来年に渡さない）
+ *   ② 「回答」を作り直す（氏名・学籍番号を来年に渡さない。表のまま残さない）
  *   ③ 割り当て 4 枚・検証結果・指標を、テンプレートの形に戻す
  *   ④ 条件入力の 9〜10 行目（フォームの URL → issue #255）を空にする
  * 複製されたフォームそのものはゴミ箱に移さない。消すにはドライブのスコープが要るので、担当者の手でやる。
  */
 
-import { assignmentName, dividerColumn, dividerLine, formUrlBlock, gridLayouts, sectionWidth } from '../core/sheet-layout.ts'
+import { assignmentName, dividerColumn, dividerLine, formUrlBlock, gridLayouts, sectionWidth, sheetLayout } from '../core/sheet-layout.ts'
+import { buildSheet } from './build-template.ts'
 import { findLayout, findSheet, headerRowCount, seenGridKey } from './shell.ts'
 import type { Sheet, Spreadsheet } from './shell.ts'
 import type { Layout } from '../core/sheet-layout.ts'
@@ -47,7 +48,7 @@ export function clearedText(formUrl: string | null): string {
 export function clearForNextYearOn(spreadsheet: Spreadsheet): Cleared {
   const log: string[] = []
   const formUrl = unlinkAnswerForm(spreadsheet, log)
-  clearAnswers(spreadsheet, log)
+  rebuildAnswers(spreadsheet, log)
   gridLayouts(assignmentName).forEach((layout) => {
     clearGrid(findSheet(spreadsheet, layout.name), layout, log)
   })
@@ -83,22 +84,19 @@ function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): string | nul
 }
 
 /**
- * 回答の行を消し、毎年名前が変わる後ろ 4 列の見出し（今年の日付の題）も空ける — テンプレートと同じ形に戻す。
- * 頭 6 列の見出しは残す。来年「フォームを作る」を押すと、このシートはフォームが作るシートに置き換わる（→ build-form.ts）。
+ * 「回答」を作り直す — 回答の行（氏名・学籍番号）も、今年の日付の題の後ろ 4 列も消え、buildTemplate 直後と同じ形（見出し・保護・幅・並び）になる。
+ * フォームが作ったシートは表（テーブル）になっていて、SpreadsheetApp には表を外す口が無い。
+ * 見出しを clearContent しても、空けたセルに表が既定の名前（列 7〜列 10）を入れ直す（実機で見た: 2026-10-25）。だから消して、構成から作り直す。
+ * 紐付けを外した後に呼ぶ（→ clearForNextYearOn）。来年「フォームを作る」を押すと、このシートはフォームが作るシートに置き換わる（→ build-form.ts）。
  */
-function clearAnswers(spreadsheet: Spreadsheet, log: string[]): void {
+function rebuildAnswers(spreadsheet: Spreadsheet, log: string[]): void {
   const layout = findLayout('回答')
   const sheet = findSheet(spreadsheet, layout.name)
-  const section = layout.sections[0]
-  const headerRows = headerRowCount(layout)
-  const width = Math.max(sectionWidth(section), sheet.getLastColumn())
-  const lastRow = sheet.getLastRow()
+  const rows = Math.max(sheet.getLastRow() - headerRowCount(layout), 0)
 
-  if (lastRow > headerRows) {
-    sheet.getRange(headerRows + 1, 1, lastRow - headerRows, width).clearContent()
-  }
-  sheet.getRange(1, section.startColumn + section.columns.length, 1, width - section.columns.length).clearContent()
-  log.push(`「${layout.name}」の回答を ${Math.max(lastRow - headerRows, 0)} 行消した`)
+  spreadsheet.deleteSheet(sheet)
+  buildSheet(spreadsheet, layout, sheetLayout.indexOf(layout), [])
+  log.push(`「${layout.name}」の回答を ${rows} 行消した（表になっているので、シートを作り直した）`)
 }
 
 /**

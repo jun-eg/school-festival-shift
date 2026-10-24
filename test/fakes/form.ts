@@ -10,6 +10,7 @@
 //     本物のように回答を検めはしない。
 //   - setDestination は、回答先のスプレッドシート（books[id]）に「フォームの回答 1」を 1 枚足し、1 行目に
 //     「タイムスタンプ」と設問の題を並べる。本物は回答が来るまで列を足さないかもしれない（実機未確認）。
+//   - 回答シートは表（テーブル）になる（spreadsheet.ts の tableWidth）。実機でそうだった。
 //   - 回答シートの getFormUrl が返すのは、フォームの「編集用」URL にしてある。
 //     本物がどちらを返すかは確かめていない（→ src/real-device-log.md の項目 24）。
 //   - URL はフォームごとに違う（番号が付く）。本物は ID を含む長い URL である。
@@ -70,6 +71,7 @@ export class FakeForm {
     const header = ['タイムスタンプ', ...this.items.filter((item) => item.kind !== 'image').map((item) => item.title)]
     sheet.getRange(1, 1, 1, header.length).setValues([header])
     sheet.formUrl = this.getEditUrl()
+    sheet.tableWidth = header.length // フォームが作ったシートは表になる（実機で見た）
     this.linkedSheet = sheet
     return this
   }

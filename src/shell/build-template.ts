@@ -27,22 +27,7 @@ export function buildTemplateInto(spreadsheet: Spreadsheet): string[] {
   const log: string[] = []
 
   sheetLayout.forEach((layout, index) => {
-    let sheet = spreadsheet.getSheetByName(layout.name)
-    if (!sheet) {
-      sheet = spreadsheet.insertSheet(layout.name)
-      log.push(`シート「${layout.name}」を作った`)
-    }
-    widenTo(sheet, layout, log)
-    putHeaders(sheet, layout, log)
-    putInitialRows(sheet, layout, log)
-    putFormUrlBlock(sheet, layout, log)
-    putHandoverBlock(sheet, layout, log)
-    shapeColumns(sheet, layout, log)
-    sheet.setFrozenRows(layout.frozenRows)
-    sheet.setFrozenColumns(layout.frozenColumns || 0)
-    spreadsheet.setActiveSheet(sheet)
-    spreadsheet.moveActiveSheet(index + 1)
-    applyProtection(sheet, layout, log)
+    buildSheet(spreadsheet, layout, index, log)
   })
 
   removeDefaultSheet(spreadsheet, log)
@@ -54,6 +39,30 @@ export function buildTemplateInto(spreadsheet: Spreadsheet): string[] {
       `割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚）`,
   )
   return log
+}
+
+/**
+ * 構成の 1 枚を作る（無ければ作り、見出し・初期値・幅・固定・並び・保護を置く）。
+ * 来年用に空にするが「回答」を作り直すときにも使う（→ clear-for-next-year.ts）。
+ */
+export function buildSheet(spreadsheet: Spreadsheet, layout: Layout, index: number, log: string[]): Sheet {
+  let sheet = spreadsheet.getSheetByName(layout.name)
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(layout.name)
+    log.push(`シート「${layout.name}」を作った`)
+  }
+  widenTo(sheet, layout, log)
+  putHeaders(sheet, layout, log)
+  putInitialRows(sheet, layout, log)
+  putFormUrlBlock(sheet, layout, log)
+  putHandoverBlock(sheet, layout, log)
+  shapeColumns(sheet, layout, log)
+  sheet.setFrozenRows(layout.frozenRows)
+  sheet.setFrozenColumns(layout.frozenColumns || 0)
+  spreadsheet.setActiveSheet(sheet)
+  spreadsheet.moveActiveSheet(index + 1)
+  applyProtection(sheet, layout, log)
+  return sheet
 }
 
 /**
