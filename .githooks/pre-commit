@@ -1,0 +1,12 @@
+#!/bin/sh
+# pre-commit — commit の前に、repo の文書の検査を回す。
+#
+# 有効にする: git config core.hooksPath .githooks（手順は CONTRIBUTING.md）
+# 止まったときの直し方は docs/README.md の「古さの check」。
+# コードを置いたら、lint・型・テストもここに足す。
+
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+node scripts/リンクの検査.mjs
+node scripts/要約の検査.mjs
