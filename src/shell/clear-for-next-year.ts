@@ -60,14 +60,32 @@ export function clearForNextYearOn(spreadsheet: Spreadsheet): Cleared {
 }
 
 /**
+ * フォームに紐付いたシートの紐付けだけを外す（E2E の頭と終わりの後始末用 → shell/e2e.ts）。何も消さない。
+ * 「回答」だけでなく、全シートを見る — 「フォームを作る」が setDestination の後で落ちると、紐付いているのは
+ * 名前を付け替える前の「フォームの回答 1」で、「回答」は紐付いていない（→ build-form.ts）。
+ * 紐付いたシートが無ければ（空に戻した直後のシート 1 枚だけを含む）何もせず null を返す。
+ * 外したフォームの URL を返す（複数なら最初の 1 つ）。フォームが開けなければ、clearForNextYearOn と同じ文で止まる。
+ */
+export function unlinkAnswersOn(spreadsheet: Spreadsheet): string | null {
+  const urls = spreadsheet
+    .getSheets()
+    .map((sheet) => unlinkSheetForm(sheet, []))
+    .filter((url): url is string => url !== null)
+  return urls.length > 0 ? urls[0] : null
+}
+
+/**
  * 回答シートに紐付いたフォームから、回答先を外す（スコープは forms のままで足りる）。
  * フォームが開けないとき（もうゴミ箱にある・持ち主でない）は、手で外す場所を名指しして止まる。
  */
 function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): string | null {
-  const sheet = findSheet(spreadsheet, findLayout('回答').name)
+  return unlinkSheetForm(findSheet(spreadsheet, findLayout('回答').name), log)
+}
+
+function unlinkSheetForm(sheet: Sheet, log: string[]): string | null {
   const formUrl = sheet.getFormUrl()
   if (!formUrl) {
-    log.push('「回答」はフォームに紐付いていなかった')
+    log.push(`「${sheet.getName()}」はフォームに紐付いていなかった`)
     return null
   }
 
@@ -75,11 +93,11 @@ function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): string | nul
   try {
     form = FormApp.openByUrl(formUrl)
   } catch {
-    throw new Error(`「回答」シートに紐付いたフォームを開けませんでした（${formUrl}）。` + '「回答」タブの ▼ →「フォームのリンクを解除」を押してから、もう一度「来年用に空にする」を押してください')
+    throw new Error(`「${sheet.getName()}」シートに紐付いたフォームを開けませんでした（${formUrl}）。` + `「${sheet.getName()}」タブの ▼ →「フォームのリンクを解除」を押してから、もう一度「来年用に空にする」を押してください`)
   }
   form.removeDestination()
   SpreadsheetApp.flush()
-  log.push(`「回答」とフォームの紐付けを外した（${formUrl}）`)
+  log.push(`「${sheet.getName()}」とフォームの紐付けを外した（${formUrl}）`)
   return formUrl
 }
 

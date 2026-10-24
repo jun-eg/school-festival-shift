@@ -1,4 +1,4 @@
-// E2E の 2 本目 — buildTemplate → モック投入 → 構造検証 → 生成 → 画像 → フォームを作る → 来年用に空にする → フォームをゴミ箱へ、を 1 本の順で回す。
+// E2E の 2 本目 — buildTemplate → モック投入 → 構造検証 → 生成 → 画像 → フォームを作る → 来年用に空にする → もう一度フォームを作る → 紐付けを外してフォームをゴミ箱へ、を 1 本の順で回す。
 //
 //   使い方: npm run e2e（run.mjs が clasp push と、前の回に残ったフォームの片付けまでやる）
 //
@@ -298,7 +298,17 @@ describe('実機の 1 本の流れ', () => {
     assert.deepEqual(urls, [again.url, again.editUrl])
   })
 
-  test('最後のフォームをゴミ箱へ移した（Node 側の Drive API。スクリプトは Drive を掴まない）', async () => {
+  test('最後に「回答」の紐付けを外してから、フォームをゴミ箱へ移した（ゴミ箱へ移しても紐付けは外れない。紐付いたままだと次の回の頭で「回答」が消せない → #349）', async (t) => {
+    const cleared = await call('e2eClearForNextYear')
+    assert.ok(cleared.formUrl?.startsWith('https://docs.google.com/forms/'), '外したフォームの URL が返る（いま紐付いている 2 つ目のフォーム）')
+    assert.ok(cleared.log.some((line) => line.startsWith('「回答」とフォームの紐付けを外した')))
+    // 外した後は、もう一度外そうとしても何も無い（スクリプトが紐付いたシートを見ている）
+    assert.equal(await call('e2eUnlinkAnswers'), null, '「回答」はもうフォームに紐付いていない')
+    const unlinked = await api('GET', `https://forms.googleapis.com/v1/forms/${formFileId}`)
+    if (unlinked.ok) assert.equal(unlinked.json.linkedSheetId, undefined, 'フォームの回答先が外れた')
+    else t.diagnostic(`Forms API が読めなかった（HTTP ${unlinked.status}）。紐付けの有無はスクリプトの記録だけで見た`)
+    // 外した後の「回答」は buildTemplate 直後の形（作り直されている）
+    assert.deepEqual(await readSheet(id, '回答'), template['回答'])
     assert.equal(await trashForm(formFileId), 'trashed')
     forgetForm()
   })
