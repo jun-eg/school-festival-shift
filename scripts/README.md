@@ -325,6 +325,16 @@ node scripts/要約の検査.mjs --stamp docs/design-doc.md   # 見直した要�
 要約の長さの上限（成果物 40 行・ADR 1 本 10 行）も同時に見る。**規約の原本と止まったときの直し方は [`docs/README.md`](../docs/README.md)。**
 `--stamp` 以外は何も書き換えない。起こした経緯は [issue #316](https://github.com/jun-eg/school-festival-shift/issues/316)。
 
+## 秘密の検査
+
+```
+node scripts/秘密の検査.mjs      # ステージされた物を見る（pre-commit）
+```
+
+**これも repo の文書ではなく、commit しようとしている物を見る手である。** ステージされた物の**名前**（`.env` ・ `.clasprc.json` ・ `creds.json` など）と**中身**
+（Google のトークン・OAuth クライアントの秘密・秘密鍵の形、手元の `.env` に書いた E2E の ID そのもの）を見て、当たれば**ファイル名だけを挙げて**（値は出さない）1 で落ちる。
+`.gitignore` は `git add -f` で破れるので、ここでも止める。**検査は [`秘密の検査.test.mjs`](秘密の検査.test.mjs)（`npm test` が回す）。** 経緯は [`e2e/README.md`](../e2e/README.md)。
+
 ## いつ走らせるか
 
 **手で 1 コマンドである。CI にも hook にも乗せていない**（実装が入って CI ができたら、そのときに乗せる

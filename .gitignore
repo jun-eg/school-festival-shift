@@ -7,3 +7,13 @@
 # npm ci が作る依存と、npm run build が作る貼り物。リポジトリに入れない（→ build.mjs）
 node_modules/
 dist/
+
+# E2E（npm run e2e）の秘密情報と作業場所。リポジトリに入れない（→ e2e/README.md、中身は .githooks/pre-commit も止める）
+.env
+.env.*
+!.env.example
+.clasprc.json
+creds.json
+*-creds.json
+client_secret*.json
+.e2e/

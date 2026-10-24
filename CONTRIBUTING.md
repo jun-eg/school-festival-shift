@@ -31,6 +31,13 @@ npm test
 Apps Script に貼る物を作るのは `npm run build` で、`dist/` に出る（リポジトリには入れない）。
 **`npm test` は、先に型を検査し（`npm run typecheck` ＝ `tsc --noEmit`）、通ったら `src/**/*.test.ts` を全部回す。型が 1 件でも外れるか、検査が 1 本でも落ちたら終了コード 1 で止まる。**
 
+## 実機の E2E は任意である
+
+**手元の検査（`npm test`）と CI だけで回る。E2E（`npm run e2e`）は任意で、GCP プロジェクトも `clasp` のログインも要求しない。**
+**CI では回さず、`npm test` にも混ぜない。** やるなら、検証用のスプレッドシートに `buildTemplate` を実機で回し、手元の検査と同じ結果になるかを見る。
+**用意するもの・硬さ・止まる所は [`e2e/README.md`](e2e/README.md) が持つ。ここには写さない**（**二重に持つと片方が古くなる**）。
+**トークン・OAuth クライアントの JSON・`.env` は commit しない。** `.gitignore` が名指しし、pre-commit の `秘密の検査` が中身を止める。
+
 ## コードの中身は `src/README.md` を読む
 
 **スクリプトの構成・シートの定義・テンプレートの作り方・確かめ方の中身は、[`src/README.md`](src/README.md) が持つ。**

@@ -3,10 +3,12 @@
 #
 # 有効にする: git config core.hooksPath .githooks（手順は CONTRIBUTING.md）
 # 止まったときの直し方は docs/README.md の「古さの check」。
+# 秘密の検査は、トークン・鍵・E2E の ID の混ざりを止める（→ e2e/README.md）。
 # lint・型・テスト（npm test）は issue #310 でここに足す。
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
+node scripts/秘密の検査.mjs
 node scripts/リンクの検査.mjs
 node scripts/要約の検査.mjs
