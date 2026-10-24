@@ -302,7 +302,7 @@ describe('実機の 1 本の流れ', () => {
     const cleared = await call('e2eClearForNextYear')
     assert.ok(cleared.formUrl?.startsWith('https://docs.google.com/forms/'), '外したフォームの URL が返る（いま紐付いている 2 つ目のフォーム）')
     assert.ok(cleared.log.some((line) => line.startsWith('「回答」とフォームの紐付けを外した')))
-    // 外した後は、もう一度外そうとしても何も無い（スクリプトが「回答」の紐付けを見ている）
+    // 外した後は、もう一度外そうとしても何も無い（スクリプトが紐付いたシートを見ている）
     assert.equal(await call('e2eUnlinkAnswers'), null, '「回答」はもうフォームに紐付いていない')
     const unlinked = await api('GET', `https://forms.googleapis.com/v1/forms/${formFileId}`)
     if (unlinked.ok) assert.equal(unlinked.json.linkedSheetId, undefined, 'フォームの回答先が外れた')

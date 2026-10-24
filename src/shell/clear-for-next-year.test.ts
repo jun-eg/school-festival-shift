@@ -211,3 +211,13 @@ check('⑥ もう一度呼んでも止まらず、null（紐付いていない�
 const onlyOneSheet = new FakeSpreadsheet(['シート1'], { id: 'one-sheet', sheetOptions: { maxRows: 40 } })
 books['one-sheet'] = onlyOneSheet
 check('⑥ 「回答」が無い（空に戻した直後のシート 1 枚だけ）ときも止まらず、null', unlinkAnswersOn(asGas(onlyOneSheet)), null)
+
+// 「フォームを作る」が setDestination の後・名前の付け替えの前で落ちた形: 紐付いているのは「フォームの回答 1」で、「回答」は紐付いていない
+const halfBuilt = usedBook('half-built')
+const halfAnswers = halfBuilt.getSheetByName('回答')
+const halfUrl = halfAnswers.getFormUrl()
+halfAnswers.setName('フォームの回答 1')
+halfBuilt.insertSheet('回答')
+const halfForm = forms.filter((form) => form.linkedSheet === halfAnswers)[0]
+
+check('⑥ 「回答」が紐付いておらず「フォームの回答 1」が紐付いている形でも、紐付けが外れて URL が返る', [unlinkAnswersOn(asGas(halfBuilt)), halfAnswers.getFormUrl(), halfForm.linkedSheet], [halfUrl, null, null])

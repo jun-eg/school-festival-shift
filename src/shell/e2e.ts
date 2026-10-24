@@ -27,7 +27,7 @@ export function e2eClearForNextYear() {
   return clearForNextYearOn(SpreadsheetApp.getActive())
 }
 
-/** 「回答」とフォームの紐付けだけを外す。「回答」が無い・紐付いていなければ何もせず null を返す（npm run e2e の頭の後始末）。 */
+/** 紐付いたシート（「回答」か、付け替え前の「フォームの回答 1」）とフォームの紐付けだけを外す。紐付いたシートが無ければ何もせず null を返す（npm run e2e の頭の後始末）。 */
 export function e2eUnlinkAnswers() {
   return unlinkAnswersOn(SpreadsheetApp.getActive())
 }
