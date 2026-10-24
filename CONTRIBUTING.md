@@ -9,14 +9,14 @@
 
 ## commit の前に回る検査を有効にする
 
-**clone したら 1 回だけ**、git hooks の置き場をリポジトリの中に向ける。
+**clone したら `npm ci` を回し（hook が npm scripts を呼ぶ）、続けて 1 回だけ**、git hooks の置き場をリポジトリの中に向ける。
 
 ```
 git config core.hooksPath .githooks
 ```
 
-**これで commit のたびに [`.githooks/pre-commit`](.githooks/pre-commit) が走り、相対リンクの実在と要約の古さを見る**
-（中身は [`scripts/README.md`](scripts/README.md) の「リンクの検査」「要約の検査」）。**同じ検査が PR でも回る**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
+**これで commit のたびに [`.githooks/pre-commit`](.githooks/pre-commit) が走り、落ちる状態の commit は止まる**
+（何を回すかは hook を読む。写さない）。**同じ検査が PR でも回る**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
 **止まったときの直し方は [`docs/README.md`](docs/README.md) の「古さの check」。**
 
 ## コードを回すには、3 手で足りる

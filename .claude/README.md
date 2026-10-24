@@ -4,8 +4,9 @@
 **成果物の書き方の規約は混ぜない。** それは [`docs/agent/ADR/README.md`](../docs/agent/ADR/README.md) と [`skills/`](skills/) が持つ。
 **[`agents/`](agents/) は subagent の定義で、使い方は対になる skill が持つ**（`agents/issue-reviewer.md` ↔ `skills/issue-check/`、`agents/implementer.md`・`agents/pr-writer.md`・`agents/pr-reviewer.md` ↔ `skills/implement/`）。
 **人が読む要約・issue・PR 本文の書き方は [`docs/README.md`](../docs/README.md) が持つ。**
-**commit の直前に回る柵は [`.githooks/pre-commit`](../.githooks/pre-commit) が持つ**（何を止めるかはその中の 2 行を読む。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
+**commit の直前に回る柵は [`.githooks/pre-commit`](../.githooks/pre-commit) が持つ**（何を止めるかは hook を読む。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
 
+`settings.json` の `permissions.allow` には、確認ダイアログ無しで回す npm scripts（`npm test` など）を置いてある。
 何を止めているかは [`settings.json`](settings.json) と
 [`hooks/guard-bash.py`](hooks/guard-bash.py) の拒否メッセージを読む（**ここには写さない。二重に持つと片方が古くなる**）。
 なぜ止めるのかと、jq + grep 版と比べて python3 を採った経緯は
