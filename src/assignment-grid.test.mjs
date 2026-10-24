@@ -21,6 +21,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,14 +40,6 @@ const { dayLabels, assignmentColumns, checkKind, roleColors, fixedNote } = vm.ru
   '({ dayLabels, assignmentColumns, checkKind, roleColors, fixedNote })',
   context,
 )
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 function whyItStopped(work) {
   try {
@@ -451,21 +444,3 @@ check(
   [studentIdsOf('高木 琴音'), studentIdsOf('山田太郎'), studentIdsOf('学籍番号なし'), studentIdsOf('constructor')],
   [[], [], [], []],
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('敷き方の検査（src/assignment-grid.js）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-} else {
-  console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-  process.exitCode = 1
-}

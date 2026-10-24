@@ -18,6 +18,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.join(here, '..', 'data')
@@ -46,14 +47,6 @@ const { generationOrder, generationNotAimed, runExceptions, coreSteps, ruleRoles
   '({ generationOrder, generationNotAimed, runExceptions, coreSteps, ruleRoles, checkKind })',
   context,
 )
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 /** 止まることを見る。止まらなければ null が返る。 */
 function whyItStopped(work) {
@@ -895,15 +888,3 @@ check(
     .filter((kind) => [checkKind.violation, checkKind.unmet].indexOf(kind) === -1),
   [],
 )
-
-// ---- 出す -------------------------------------------------------------------
-
-console.log('\n生成する側の検査（src/generate.js／スプレッドシート無し）\n')
-passed.forEach((title) => console.log(`  OK   ${title}`))
-failed.forEach((one) => {
-  console.log(`  NG   ${one.title}`)
-  console.log(`         実測: ${JSON.stringify(one.actual)}`)
-  console.log(`         期待: ${JSON.stringify(one.expected)}`)
-})
-console.log(`\n結果: ${failed.length === 0 ? `全件一致（${passed.length} 件）` : `不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`}\n`)
-process.exit(failed.length === 0 ? 0 : 1)

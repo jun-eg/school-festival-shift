@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.dirname(here)
@@ -27,15 +28,6 @@ const {
 /** 名前でシート 1 枚の区画を引く（並びの番号だと、並びが動いたとき別の枚を見る）。 */
 function sheetSectionOf(name) {
   return sheetLayout.filter((layout) => layout.name === name)[0].sections[0]
-}
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  const same = JSON.stringify(actual) === JSON.stringify(expected)
-  if (same) passed.push(title)
-  else failed.push({ title, actual, expected })
 }
 
 // ---- ① 決めた形 ------------------------------------------------------------
@@ -232,21 +224,3 @@ check(
     ['検証結果', [[true, 9]]],
   ],
 )
-
-// ---- 結果 ------------------------------------------------------------------
-
-console.log('シート構成の検査（src/sheet-layout.js）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)

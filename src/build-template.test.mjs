@@ -22,121 +22,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { check } from '../test/check.mjs'
+import { FakeSpreadsheet, owner } from '../test/fakes/spreadsheet.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// ---- 偽のスプレッドシート ---------------------------------------------------
-
-class FakeRange {
-  constructor(sheet, row, column, rowCount, columnCount) {
-    Object.assign(this, { sheet, row, column, rowCount, columnCount })
-  }
-  positions() {
-    const keys = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      for (let c = this.column; c < this.column + this.columnCount; c++) keys.push(`${r},${c}`)
-    }
-    return keys
-  }
-  getValues() {
-    const table = []
-    for (let r = this.row; r < this.row + this.rowCount; r++) {
-      const row = []
-      for (let c = this.column; c < this.column + this.columnCount; c++) row.push(this.sheet.cells.get(`${r},${c}`) ?? '')
-      table.push(row)
-    }
-    return table
-  }
-  setValues(table) {
-    table.forEach((row, i) => row.forEach((value, j) => this.sheet.cells.set(`${this.row + i},${this.column + j}`, value)))
-    return this
-  }
-  setFontWeight(weight) {
-    this.positions().forEach((key) => this.sheet.bold.set(key, weight))
-    return this
-  }
-  setNote(note) {
-    this.positions().forEach((key) => this.sheet.notes.set(key, note))
-    return this
-  }
-  /** 見るのは、四方を囲う枠（→ issue #255）と、右だけの線（→ issue #245）である。 */
-  setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
-    if (top === true && left === true && bottom === true && right === true) {
-      this.sheet.boxes.add(`${this.row},${this.column},${this.rowCount},${this.columnCount} ${color} ${style}`)
-    } else if (right === true) {
-      this.positions().forEach((key) => this.sheet.rightBorders.set(key, `${color} ${style}`))
-    }
-    return this
-  }
-  merge() {
-    this.sheet.merges.add(`${this.row},${this.column},${this.rowCount},${this.columnCount}`)
-    return this
-  }
-}
-
-// 本物と同じく、かけた直後は共有された編集者も編集者に入っていて、ドメインにも開いている。
-// 持ち主と走らせている人は外れない（→ Protection.removeEditors）。
-const owner = 'owner@example.com'
-const sharedEditor = 'shared@example.com'
-
-class FakeProtection {
-  constructor(sheet) {
-    this.sheet = sheet
-    this.description = null
-    this.warningOnly = false
-    this.editors = [owner, sharedEditor]
-    this.domainEdit = true
-    this.unprotectedRanges = []
-  }
-  setDescription(description) { this.description = description; return this }
-  setWarningOnly(value) { this.warningOnly = value; return this }
-  getEditors() { return [...this.editors] }
-  removeEditors(users) { this.editors = this.editors.filter((user) => user === owner || !users.includes(user)); return this }
-  canDomainEdit() { return this.domainEdit }
-  setDomainEdit(value) { this.domainEdit = value; return this }
-  setUnprotectedRanges(ranges) { this.unprotectedRanges = ranges; return this }
-  remove() { this.sheet.protections = this.sheet.protections.filter((p) => p !== this) }
-}
-
-class FakeSheet {
-  // 1000 行 26 列は、新しいスプレッドシートの既定の大きさである
-  constructor(name) {
-    Object.assign(this, {
-      name, cells: new Map(), bold: new Map(), notes: new Map(), rightBorders: new Map(), boxes: new Set(), merges: new Set(), columnWidths: new Map(), protections: [],
-      frozenRows: 0, frozenColumns: 0, maxRows: 1000, maxColumns: 26,
-    })
-  }
-  getName() { return this.name }
-  getRange(row, column, rowCount = 1, columnCount = 1) { return new FakeRange(this, row, column, rowCount, columnCount) }
-  setFrozenRows(count) { this.frozenRows = count }
-  setFrozenColumns(count) { this.frozenColumns = count }
-  // 100 px は、新しいスプレッドシートの列の既定の幅である
-  getColumnWidth(column) { return this.columnWidths.get(column) ?? 100 }
-  setColumnWidth(column, width) { this.columnWidths.set(column, width) }
-  getMaxRows() { return this.maxRows }
-  getMaxColumns() { return this.maxColumns }
-  insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
-  getProtections() { return [...this.protections] }
-  protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
-  getLastRow() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[0])), 0) }
-  getLastColumn() { return [...this.cells.keys()].reduce((max, key) => Math.max(max, Number(key.split(',')[1])), 0) }
-}
-
-class FakeSpreadsheet {
-  constructor(names) {
-    this.sheets = names.map((name) => new FakeSheet(name))
-    this.activeSheet = this.sheets[0]
-  }
-  getSheets() { return [...this.sheets] }
-  getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
-  insertSheet(name) { const s = new FakeSheet(name); this.sheets.push(s); return s }
-  deleteSheet(sheet) { this.sheets = this.sheets.filter((s) => s !== sheet) }
-  setActiveSheet(sheet) { this.activeSheet = sheet }
-  moveActiveSheet(position) {
-    this.sheets = this.sheets.filter((s) => s !== this.activeSheet)
-    this.sheets.splice(position - 1, 0, this.activeSheet)
-  }
-}
+// 偽のスプレッドシートは test/fakes/spreadsheet.mjs が持つ。
 
 // ---- 読み込む ---------------------------------------------------------------
 
@@ -155,14 +46,6 @@ const { sheetLayout, protectionNote, gridProtectionNote, inputProtectionNote, se
 )
 
 // ---- 検査 -------------------------------------------------------------------
-
-const failed = []
-const passed = []
-
-function check(title, actual, expected) {
-  if (JSON.stringify(actual) === JSON.stringify(expected)) passed.push(title)
-  else failed.push({ title, actual, expected })
-}
 
 const book = new FakeSpreadsheet(['シート1'])
 buildTemplateInto(book)
@@ -420,21 +303,3 @@ check(
   [otherUrlStopped !== null && otherUrlStopped.includes('13 行目 3 列目'), bookWithOtherUrl.getSheetByName('条件入力').getRange(13, 3, 1, 1).getValues()],
   [true, [['https://example.com/other']]],
 )
-
-// ---- 結果 -------------------------------------------------------------------
-
-console.log('組み立ての検査（src/build-template.js／偽のスプレッドシートの上）')
-console.log('')
-for (const title of passed) console.log(`  OK   ${title}`)
-for (const { title, actual, expected } of failed) {
-  console.log(`  NG   ${title}`)
-  console.log(`         実測: ${JSON.stringify(actual)}`)
-  console.log(`         期待: ${JSON.stringify(expected)}`)
-}
-console.log('')
-if (failed.length === 0) {
-  console.log(`結果: 全件一致（${passed.length} 件）`)
-  process.exit(0)
-}
-console.log(`結果: 不一致 ${failed.length} 件 ／ 一致 ${passed.length} 件`)
-process.exit(1)
