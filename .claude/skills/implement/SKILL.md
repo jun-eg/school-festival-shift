@@ -99,9 +99,9 @@ sub-issue ごとに `state.sh` の結果で分ける。
 | 状態 | すること |
 | --- | --- |
 | `pr.state == "MERGED"` | 飛ばす。報告に「merge 済み」 |
-| `pr.state == "OPEN"` | その branch に `git switch` して `git pull`。PR コメントの `pr-reviewer n 周目` の最大値から周回を続け、直前の所見を前回の所見として pr-reviewer に渡す（手順 2-4 のレビューから）。直しが要るときは implementer を新しく立て、prompt に前回の所見と直し方を入れる |
+| `pr.state == "OPEN"` | その branch に `git switch` して `git pull`。PR コメントの `pr-reviewer n 周目` の最大値から周回を続け、直前の所見を前回の所見として pr-reviewer に渡す（手順 2-4 のレビューから）。直しが要るときは implementer を新しく立て、prompt に前回の所見と直し方を入れる。最大値が既に 3 で判定が「直しが要る」なら、周回を進めず人に返す |
 | `pr.state == "CLOSED"` | merge せず閉じた PR が最新。merge せず人に返す（閉じた PR がある） |
-| sub-issue の `state == "CLOSED"` で PR が MERGED でない | 飛ばして報告に「閉じている」 |
+| sub-issue の `state == "CLOSED"` で PR が MERGED でない | 飛ばして報告に「閉じている」。**この行が他の行より先に当たる**（人が手で閉じた issue は、PR が開いていても触らない） |
 | `pr == null`、`branch` あり | その branch に `git switch` して `git pull`。commit が無ければ 2-1 から、あれば 2-2 から |
 | 何も無い | `git switch <cushion>`、`git pull`、`git switch -c worktree-<sub番号>-<slug>` → 手順 2 を base = クッションで |
 
