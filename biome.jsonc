@@ -7,6 +7,7 @@
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
+    // 広めに取り、Biome の組み直しで長い行が縦に伸びすぎないようにする（折り返しの位置は Biome が決める）
     "lineWidth": 320
   },
   "javascript": {
