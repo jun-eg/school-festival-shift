@@ -1,0 +1,20 @@
+# エディタが違っても改行・字下げ・文字コードを揃える（issue #311）。
+# Biome が書式を直すのは biome.jsonc の includes にある ts・js・mjs だけ。ここは md・yml・html・json などを受け持つ。
+# 字下げは biome.jsonc の indentStyle・indentWidth と同じ（space・2）。変えるときは両方直す。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# md の行末の空白 2 つは改行の意味を持つことがあるので削らない
+[*.md]
+trim_trailing_whitespace = false
+
+# data/ の CSV は CRLF で置いてある（Excel の出力）。勝手に改行を変えない
+[*.csv]
+end_of_line = unset
