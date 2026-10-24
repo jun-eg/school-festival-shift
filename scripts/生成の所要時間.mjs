@@ -90,7 +90,7 @@ const 止まる人 = 希望
     try {
       expand([一人], 日)
       return false
-    } catch (例外) {
+    } catch {
       return true
     }
   })

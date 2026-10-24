@@ -16,7 +16,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { check } from '../../test/check.ts'
-import { answerSection, columnsOutsideWish, conditionSection, conditionTypes, dayAnswerColumns, defaultMinRun, inputTypes, slotMinutes, toCookLeaderGrades, toDays, toNeeds, toPlacementRule, toPrepCleanupRule, toType, toWish, toWishes, wishColumns } from './input-types.ts'
+import { answerSection, columnsOutsideWish, conditionSection, conditionTypes, dayAnswerColumns, defaultMinRun, inputTypes, slotMinutes, toCookLeaderGrades, toDays, toNeeds, toPlacementRule, toPrepCleanupRule, toType, toWish, wishColumns } from './input-types.ts'
 import { dayLabels, sectionWidth } from './sheet-layout.ts'
 import type { Row, Wish } from './types.ts'
 

@@ -9,7 +9,6 @@
  * SpreadsheetApp を掴まない（→ 6 の #8）。他のファイルの値を最上位で使わない（→ core.ts の同じ注意）。
  */
 
-import { build } from './core.ts'
 import { assignmentName, internalError, sectionColumnsText, sectionWidth, sheetLayout } from './sheet-layout.ts'
 import type { Section } from './sheet-layout.ts'
 import type { Cell, CookLeaderGrades, Day, DayTimes, Need, PlacementRule, PrepCleanupRule, Row, Slot, Wish } from './types.ts'

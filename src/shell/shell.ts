@@ -602,7 +602,7 @@ function readSeenGrid(sheet: Sheet): SeenGrid | null {
   try {
     const found = sheet.getDeveloperMetadata().filter((one) => one.getKey() === seenGridKey)
     return found.length > 0 ? JSON.parse(found[0].getValue() as string) : null
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -620,11 +620,11 @@ function keepSeenGrid(sheet: Sheet, seen: SeenGrid | null): void {
     if (found.length > 0) found[0].setValue(value)
     else sheet.addDeveloperMetadata(seenGridKey, value)
     found.slice(1).forEach((one) => one.remove())
-  } catch (error) {
+  } catch {
     found.forEach((one) => {
       try {
         one.remove()
-      } catch (ignored) {
+      } catch {
         /* 外せなくても止めない */
       }
     })

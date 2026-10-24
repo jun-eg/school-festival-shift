@@ -82,7 +82,7 @@ export function 判定の入力(文脈) {
       try {
         expand([一人], 日ごと)
         return false
-      } catch (例外) {
+      } catch {
         return true
       }
     })

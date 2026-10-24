@@ -15,7 +15,7 @@
 import { gridNamedColumns, missingDayText, roleColorOf } from './assignment-grid.ts'
 import { internalError } from './sheet-layout.ts'
 import type { Layout } from './sheet-layout.ts'
-import type { Cell, Day, Grid, Row } from './types.ts'
+import type { Day, Grid, Row } from './types.ts'
 
 /** 配る画像の表（→ distributionTable）。色は役割の色で、塗らない役割は null である。 */
 export type ImageTable = {

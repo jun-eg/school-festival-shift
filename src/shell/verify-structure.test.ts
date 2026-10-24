@@ -14,7 +14,7 @@
 // 崩れた状態で生成が走らないことは src/shell/shell.test.ts が見る。
 
 import { check } from '../../test/check.ts'
-import { FakeSheet, FakeSpreadsheet, asGas, gasGlobal, roundTrips } from '../../test/fakes/spreadsheet.ts'
+import { FakeSheet, FakeSpreadsheet, asGas, roundTrips } from '../../test/fakes/spreadsheet.ts'
 import { sectionRightEdge, sheetLayout } from '../core/sheet-layout.ts'
 import { breakageToText, checkStructure, nameBreakages } from './verify-structure.ts'
 

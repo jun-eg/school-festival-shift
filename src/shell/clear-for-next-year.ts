@@ -69,7 +69,7 @@ function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): string | nul
   let form: GoogleAppsScript.Forms.Form
   try {
     form = FormApp.openByUrl(formUrl)
-  } catch (error) {
+  } catch {
     throw new Error(`「回答」シートに紐付いたフォームを開けませんでした（${formUrl}）。` + '「回答」タブの ▼ →「フォームのリンクを解除」を押してから、もう一度「来年用に空にする」を押してください')
   }
   form.removeDestination()
