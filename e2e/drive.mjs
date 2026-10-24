@@ -1,8 +1,7 @@
 // 作ったフォームを Drive API でゴミ箱へ移す（スクリプトは Drive を掴まない → src/appsscript.json、#260）。
 //
-// フォームを作るのはスクリプトで、この OAuth クライアントが作ったファイルではない。
-// ゴミ箱へ移す（files.update）には、drive.file では足りず、drive のスコープが要る（→ e2e/README.md「用意するもの」の 3）。
-// 足りなければ、人が何をやり直すかを書いて止まる。黙って残さない。
+// フォームを作るのはスクリプトである。スクリプトが作ったフォームは、clasp のトークンの drive.file でゴミ箱へ移せた（2026-10-25）。
+// 移せなければ（403）、何を確かめるかを書いて止まる。黙って残さない。
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -13,7 +12,14 @@ import { readValues } from './sheets.mjs'
 /** 途中で落ちた回の、まだ捨てていないフォーム。作った直後に書き、捨てたら消す（.e2e/ は gitignore 済み）。 */
 export const leftoverFile = path.join(workDir, 'leftover-form.json')
 
-const driveScopeHint = 'フォームをゴミ箱へ移せない。drive のスコープが足りない。人が clasp login をやり直す: npx clasp login --creds <JSON のパス> --use-project-scopes --include-clasp-scopes --extra-scopes https://www.googleapis.com/auth/spreadsheets,https://www.googleapis.com/auth/drive（→ e2e/README.md）'
+const driveScopeHint = 'フォームをゴミ箱へ移せなかった（403）。フォームの持ち主と、clasp login のアカウントが検証用と同じかを確かめる（→ e2e/README.md）'
+
+/** ゴミ箱へ移す PATCH の返りの読み。404 は、読めた直後にもう無い（人が消した）ので、捨てた扱いにする。403 は移せないので止める。 */
+export function trashOutcome(status) {
+  if (status === 404) return 'gone'
+  if (status === 403) return 'denied'
+  return status >= 200 && status < 300 ? 'ok' : 'error'
+}
 
 /** 編集用の URL（…/forms/d/<ファイルの ID>/edit）からファイルの ID を取る。配る用の URL（…/forms/d/e/…）は別の ID なので、読まない。 */
 export function formFileIdOf(editUrl) {
@@ -28,7 +34,8 @@ export async function trashForm(fileId) {
   if (got.json.mimeType !== 'application/vnd.google-apps.form') throw new Error('ゴミ箱へ移そうとしたものがフォームではない。何もせずに止めた')
   if (got.json.trashed) return 'already'
   const moved = await api('PATCH', `https://www.googleapis.com/drive/v3/files/${fileId}?fields=trashed`, { trashed: true })
-  if (moved.status === 403 || moved.status === 404) throw new Error(driveScopeHint)
+  if (trashOutcome(moved.status) === 'gone') return 'gone'
+  if (trashOutcome(moved.status) === 'denied') throw new Error(driveScopeHint)
   if (!moved.ok) throw new Error(`フォームをゴミ箱へ移せない（HTTP ${moved.status}）`)
   const check = await api('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?fields=trashed`)
   if (!check.json.trashed) throw new Error('ゴミ箱へ移したはずのフォームが、まだゴミ箱に無い')

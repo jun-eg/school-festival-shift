@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { formFileIdOf } from './drive.mjs'
+import { formFileIdOf, trashOutcome } from './drive.mjs'
 
 test('編集用の URL からフォームのファイル ID を取る', () => {
   assert.equal(formFileIdOf('https://docs.google.com/forms/d/1AbC_-xyz/edit'), '1AbC_-xyz')
@@ -17,4 +17,8 @@ test('フォームの URL でないもの・空は null で、何も捨てない
   assert.equal(formFileIdOf(''), null)
   assert.equal(formFileIdOf(undefined), null)
   assert.equal(formFileIdOf('https://docs.google.com/spreadsheets/d/1AbC/edit'), null)
+})
+
+test('ゴミ箱へ移す返り: 2xx は移せた、404 はもう無い、403 は止める、ほかは失敗', () => {
+  assert.deepEqual([200, 404, 403, 500].map(trashOutcome), ['ok', 'gone', 'denied', 'error'])
 })
