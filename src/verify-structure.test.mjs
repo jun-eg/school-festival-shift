@@ -255,3 +255,22 @@ check(
   namedLines(bookWithInsertedColumn).filter((line) => !stopped.includes(line)),
   [],
 )
+
+// ---- ⑦ 読むだけの偽物の守り（偽物の側の検査） -------------------------------
+
+const guardedBook = emptyTemplate()
+const guardedSheet = guardedBook.getSheetByName('指標')
+check(
+  '⑦ 読むだけのシートは、列の追加・固定・保護・シートの増減のどれも落とす',
+  [
+    () => guardedSheet.insertColumnsAfter(1, 1),
+    () => guardedSheet.setFrozenRows(1),
+    () => guardedSheet.setColumnWidth(1, 10),
+    () => guardedSheet.protect(),
+    () => guardedSheet.addDeveloperMetadata('k', 'v'),
+    () => guardedSheet.getRangeList(['A1']).setFontColor('#000000'),
+    () => guardedBook.insertSheet('新しいシート'),
+    () => guardedBook.deleteSheet(guardedSheet),
+  ].map((work) => whyItStopped(work) !== null),
+  [true, true, true, true, true, true, true, true],
+)

@@ -24,7 +24,12 @@
 //   - 行や列の大きさは、新しいスプレッドシートの既定（1000 行 26 列）から始まる。本物のシートの
 //     上限（セル数 1000 万）は持たない。
 //   - 読むだけのシート（readOnly）は、本物に無い道具である。書こうとしたらそこで落とす
-//     （「黙って直さない」を道具の側で確かめるため）。
+//     （「黙って直さない」を道具の側で確かめるため）。落とす口は、範囲への書き込み（setValues／clearContent／
+//     書式／罫線／メモ／入力規則／merge）と、シートの状態を変える口（setName／setFrozenRows／setFrozenColumns／
+//     setColumnWidth／insertColumnsAfter／protect／addDeveloperMetadata／getRangeList の setFontColor・setFontWeight／
+//     getDeveloperMetadata の setValue・remove）である。FakeSpreadsheet は readOnly のシートを 1 枚でも持つと、
+//     insertSheet／deleteSheet／moveActiveSheet も落とす。読む口（getValues／getNotes／getRange など）と、
+//     検査が盤面を整える口（put／cut*／insertColumn／deleteRow／clear）は落とさない。
 
 /** 往復の数。検査が 0 に戻して、読み書きの数を比べる。検査 1 本（= 1 プロセス）につき 1 つである。 */
 export const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0, validations: 0 }
@@ -50,7 +55,7 @@ export class FakeRange {
   }
   /** 読むだけのシートに書こうとしたら落とす（本物に無い道具。ファイル先頭の注）。 */
   writable() {
-    if (this.sheet.readOnly) throw new Error(`偽のスプレッドシート: 読むだけのシート（${this.sheet.name}）に書こうとした`)
+    this.sheet.writable()
   }
   getValues() {
     roundTrips.reads += 1
@@ -222,8 +227,12 @@ export class FakeSheet {
       formUrl: null, readOnly: options.readOnly ?? false,
     })
   }
+  /** 読むだけのシートの状態を変えようとしたら落とす（ファイル先頭の注）。 */
+  writable() {
+    if (this.readOnly) throw new Error(`偽のスプレッドシート: 読むだけのシート（${this.name}）に書こうとした`)
+  }
   getName() { return this.name }
-  setName(name) { this.name = name; return this }
+  setName(name) { this.writable(); this.name = name; return this }
   getSheetId() { return this.id }
   getRange(row, column, rowCount = 1, columnCount = 1) {
     // 本物と同じく範囲外で例外を投げる
@@ -234,6 +243,7 @@ export class FakeSheet {
   getRangeList(a1s) {
     const sheet = this
     const each = (map, value) => {
+      sheet.writable()
       roundTrips.formats += 1
       a1s.forEach((a1) => {
         const { row, column } = fromA1(a1)
@@ -245,11 +255,11 @@ export class FakeSheet {
       setFontWeight(weight) { each('fontWeights', weight); return this },
     }
   }
-  setFrozenRows(count) { this.frozenRows = count }
-  setFrozenColumns(count) { this.frozenColumns = count }
+  setFrozenRows(count) { this.writable(); this.frozenRows = count }
+  setFrozenColumns(count) { this.writable(); this.frozenColumns = count }
   // 100 px は、新しいスプレッドシートの列の既定の幅である
   getColumnWidth(column) { return this.columnWidths.get(column) ?? 100 }
-  setColumnWidth(column, width) { this.columnWidths.set(column, width) }
+  setColumnWidth(column, width) { this.writable(); this.columnWidths.set(column, width) }
   getLastRow() {
     return [...this.cells.entries()]
       .filter(([, value]) => value !== '')
@@ -262,9 +272,9 @@ export class FakeSheet {
   }
   getMaxRows() { return Math.max(this.maxRows, this.getLastRow()) }
   getMaxColumns() { return Math.max(this.maxColumns, this.getLastColumn()) }
-  insertColumnsAfter(after, count) { this.maxColumns = Math.max(this.maxColumns, after + count) }
+  insertColumnsAfter(after, count) { this.writable(); this.maxColumns = Math.max(this.maxColumns, after + count) }
   getProtections() { return [...this.protections] }
-  protect() { const p = new FakeProtection(this); this.protections.push(p); return p }
+  protect() { this.writable(); const p = new FakeProtection(this); this.protections.push(p); return p }
   /** このシートに回答を送るフォームの URL。紐付いていなければ null。 */
   getFormUrl() { return this.formUrl }
   /** シートに置く見えない記録。鍵と値の組で、値は文字列である。 */
@@ -273,11 +283,12 @@ export class FakeSheet {
     return this.metadata.map((entry) => ({
       getKey() { return entry.key },
       getValue() { return entry.value },
-      setValue(value) { entry.value = String(value); return this },
-      remove() { sheet.metadata = sheet.metadata.filter((one) => one !== entry) },
+      setValue(value) { sheet.writable(); entry.value = String(value); return this },
+      remove() { sheet.writable(); sheet.metadata = sheet.metadata.filter((one) => one !== entry) },
     }))
   }
   addDeveloperMetadata(key, value) {
+    this.writable()
     this.metadata = this.metadata.concat([{ key, value: String(value) }])
     return this
   }
@@ -339,10 +350,15 @@ export class FakeSpreadsheet {
   getName() { return this.name }
   getSheets() { return [...this.sheets] }
   getSheetByName(name) { return this.sheets.find((s) => s.getName() === name) ?? null }
-  insertSheet(name) { const s = new FakeSheet(name, this.sheetOptions); this.sheets.push(s); return s }
-  deleteSheet(sheet) { this.sheets = this.sheets.filter((s) => s !== sheet) }
+  /** readOnly のシートを持つブックのシートの出し入れを落とす（ファイル先頭の注）。 */
+  writable() {
+    if (this.sheets.some((s) => s.readOnly)) throw new Error('偽のスプレッドシート: 読むだけのシートを持つブックのシートを増減しようとした')
+  }
+  insertSheet(name) { this.writable(); const s = new FakeSheet(name, this.sheetOptions); this.sheets.push(s); return s }
+  deleteSheet(sheet) { this.writable(); this.sheets = this.sheets.filter((s) => s !== sheet) }
   setActiveSheet(sheet) { this.activeSheet = sheet }
   moveActiveSheet(position) {
+    this.writable()
     this.sheets = this.sheets.filter((s) => s !== this.activeSheet)
     this.sheets.splice(position - 1, 0, this.activeSheet)
   }

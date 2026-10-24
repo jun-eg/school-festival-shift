@@ -6,8 +6,9 @@
 // it の中に式を置くと、盤面が先へ進んだ後に評価されてしまう。だから実測と期待は呼んだ時点で値にし、
 // it の中では比べるだけにする（見出しは it の名前になる）。
 //
-// 比べる前に JSON に通すのは、これまでの検査（JSON.stringify の一致）と同じ緩さを保つためである。
-// vm の文脈が作った配列とこちらの配列は prototype が別なので、そのままだと deepStrictEqual が落ちる。
+// 比べる前に JSON に通すのは、vm の文脈が作った配列とこちらの配列で prototype が別なので、そのままだと
+// deepStrictEqual が落ちるからである。それを消すのが目的で、副作用として undefined の項や関数は落ち、
+// オブジェクトの鍵の並びは見なくなる（JSON.stringify の一致だった前は、鍵の並びが違えば別だった）。
 
 import { it } from 'node:test'
 import assert from 'node:assert/strict'
