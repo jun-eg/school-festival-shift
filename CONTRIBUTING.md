@@ -50,8 +50,9 @@ Apps Script に貼る物を作るのは `npm run build` で、`dist/` に出る�
 **`dist/` は git に入れない。** 貼る前に毎回 `npm run build` を走らせる（`src/` の `.ts` を直接貼らない）。
 **差し替えの単位はタグである。** 貼った物がどの commit かを、あとで読めるようにするためである（→ [ADR dev-env-0001](docs/agent/ADR/dev-env/0001-配布はsrcの20ファイルではなくdistの4つになった.md)）。
 
-1. **`main` を最新にし、タグを打つ。** `git tag v<連番>`（例: `v3`）。**直前のタグは `git tag --sort=-version:refname` で見る**
+1. **`main` を最新にし、タグを打つ。** `git tag v<連番>`（例: `v3`）。**直前のタグは `git tag --sort=-version:refname` で見る**。続けて `git push origin v<連番>` で上げる。**上げていないタグは、引き継いだ側からはどの commit か引けない**
    - **タグの無い `dist/` を貼らない。** 打ち忘れると、`npm run build` の 1 行目の「版」がタグではなく短い SHA になる。それが出たら貼らずにタグを打ってからやり直す
+   - **版の末尾に `-dirty` が付いたら貼らない。** 追跡ファイルに commit していない変更がある印で、タグの指す commit と貼る物が食い違う。commit するか戻してからビルドし直す
 2. **`npm run build` を走らせる。** 1 行目の「版: v3」が、いま打ったタグであることを見る。`dist/` に 4 つ出る
 3. **テンプレートを開く**（`/copy` を外した URL。**`/copy` のまま開くと、コピーが 1 つできる**）。**拡張機能 → Apps Script** を開く
 4. **4 つを貼り替える**（名前の対応は [`src/README.md`](src/README.md) の「テンプレートの作り方」の手順 3）

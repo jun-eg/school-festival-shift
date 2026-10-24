@@ -36,15 +36,17 @@ export async function entryNames() {
 }
 
 /**
- * 貼る物に載せる版。HEAD に付いた git のタグ（複数ならバージョン順の最後）、無ければ短い SHA、git が使えなければ 'unknown'。
+ * 貼る物に載せる版。HEAD に付いた git のタグ（複数ならバージョン順の最後）、無ければ短い SHA（追跡ファイルに未 commit の変更があれば末尾に -dirty）、git が使えなければ 'unknown'。
  * タグの無い dist/ を貼らない決まりは CONTRIBUTING.md が持つ。ここはタグが無くても止まらず、SHA で版を名指しする。
  */
 export function resolveVersion(cwd = root) {
   const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   try {
     const tags = git('tag', '--points-at', 'HEAD', '--sort=version:refname').split('\n').filter(Boolean)
-    if (tags.length > 0) return tags[tags.length - 1]
-    return git('rev-parse', '--short', 'HEAD') || 'unknown'
+    const base = tags.length > 0 ? tags[tags.length - 1] : git('rev-parse', '--short', 'HEAD') || 'unknown'
+    // 追跡ファイルに commit していない変更があれば、タグの指す commit と貼る物が食い違う。印を付けて、貼らない決まりで止める。
+    const dirty = git('status', '--porcelain', '--untracked-files=no') !== ''
+    return dirty ? `${base}-dirty` : base
   } catch {
     return 'unknown'
   }

@@ -84,7 +84,7 @@ check(
   ],
 )
 check('① 一覧に足りない名前も、呼ばれていない名前も無い（トリガー・menuItems・HTML の呼び先・buildTemplate と一致する）', mismatch(listedNames, expectedNames), { notListed: [], notCalled: [] })
-check('① 一覧の名前はどれも関数で、メニューの 4 項目は一覧にある', [listedNames.filter((name) => typeof entryPoints[name] !== 'function'), menuItems.map((item) => item.functionName).filter((name) => listedNames.indexOf(name) === -1)], [[], []])
+check('① 一覧の名前はどれも関数で、メニューの 5 項目は一覧にある', [listedNames.filter((name) => typeof entryPoints[name] !== 'function'), menuItems.map((item) => item.functionName).filter((name) => listedNames.indexOf(name) === -1)], [[], []])
 
 // ---- ② main.gs の最上位の function ------------------------------------------
 
@@ -223,16 +223,25 @@ check('⑥ ビルドを通さない手元の実行では版は dev になる（�
 const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'shift-version-'))
 const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
 git('init', '-q')
-git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'first')
+fs.writeFileSync(path.join(repo, 'f.txt'), 'a')
+git('add', 'f.txt')
+git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'first')
 const shortSha = git('rev-parse', '--short', 'HEAD')
 const noTag = resolveVersion(repo)
 git('tag', 'v1')
 const oneTag = resolveVersion(repo)
 git('tag', 'v2')
 const twoTags = resolveVersion(repo)
+fs.writeFileSync(path.join(repo, 'f.txt'), 'b')
+const dirty = resolveVersion(repo)
+fs.writeFileSync(path.join(repo, 'f.txt'), 'a')
+const clean = resolveVersion(repo)
+fs.writeFileSync(path.join(repo, 'untracked.txt'), 'x')
+const untracked = resolveVersion(repo)
 git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'second')
 const afterTag = resolveVersion(repo)
 check('⑥ 版は、タグが無ければ短い SHA・あればそのタグ・複数ならバージョン順の最後・タグより進んだ commit では SHA に戻る', [noTag === shortSha, oneTag, twoTags, afterTag === git('rev-parse', '--short', 'HEAD'), afterTag === shortSha], [true, 'v1', 'v2', true, false])
+check('⑥ 追跡ファイルを書き換えると版に -dirty が付き、戻すと外れる（追跡していないファイルは数えない）', [dirty, clean, untracked], ['v2-dirty', 'v2', 'v2'])
 check('⑥ git の無い場所では止まらず unknown になる', resolveVersion(fs.mkdtempSync(path.join(os.tmpdir(), 'shift-nogit-'))), 'unknown')
 check('⑥ このリポジトリで resolveVersion は空でない版（タグか SHA）を返す', resolveVersion().length > 0, true)
 
