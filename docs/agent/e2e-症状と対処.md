@@ -14,7 +14,9 @@ ID・トークン・GCP プロジェクト ID の値はここに書かない（�
 | --- | --- |
 | `E2E を回せなかった: access token が取れない: …` | A（トークン切れ） |
 | `E2E を回せなかった: clasp push が失敗した: …`（`clasp push が失敗した。1 回だけやり直す` の後） | A（clasp 側のトークン切れ）か B |
-| テストの失敗に `buildTemplate が失敗した（HTTP 403）: …` などの `<関数名> が失敗した（HTTP <status>）: <本文>` | B（結び付け）か、A |
+| `E2E を回せなかった: e2eUnlinkAnswers が失敗した（HTTP <status>）: <本文>`（push の後の最初の呼び出し） | B（結び付け）か、A |
+| テストの失敗に `buildTemplate が失敗した（HTTP 403）: …` などの `<関数名> が失敗した（HTTP <status>）: <本文>` | B（結び付け）か、A（頭の `e2eUnlinkAnswers` を通った後） |
+| `別の npm run e2e が動いている（pid …。worktree をまたいで 1 本）。同時には回さない` ／ `ロックが取れない（…）` | F（同時実行のロック） |
 | 同じ行で `HTTP 200` 以外が 2 回続く／`The operation was aborted due to timeout`（推測: Node の `AbortSignal.timeout` の既定の文言） | C（180 秒） |
 | 1 回目だけ `reading from storage … NOT_FOUND` が出て、そのまま通る | D（初回の NOT_FOUND）。止まらない |
 | 続けて 2 回目を回したとき、頭（`resetSpreadsheet`）で落ちる | E（前の回の紐付けと一時シートの残り）。直した |
@@ -64,9 +66,9 @@ Execution API（`scripts.run`）は、**呼ぶ側の OAuth クライアントが
 ### 疑われる症状
 
 - 実装から引いた: `push` までは通る（`assertScriptBelongsToSandbox` が見るのは親のスプレッドシートで、GCP の結び付けは見ない。`clasp push` は Script API で、結び付けと関係なく通る見込み）
-- 実装から引いた: 最初の `scripts.run`（`build-template.e2e.mjs` の 1 回目の `buildTemplate`）で、`buildTemplate が失敗した（HTTP <status>）: <本文>` となり、**再試行しない**（5xx・429・`reading from storage`・`timed out`・`Service invoked too many times` 以外）
+- 実装から引いた: push の後の最初の `scripts.run` は `run.mjs` の頭の `e2eUnlinkAnswers`（#349）で、失敗すると外側の catch が `E2E を回せなかった: e2eUnlinkAnswers が失敗した（HTTP <status>）: <本文>` を出して止まる。これを通れば、次は `build-template.e2e.mjs` の 1 回目の `buildTemplate` で、`buildTemplate が失敗した（HTTP <status>）: <本文>` となる。どちらも**再試行しない**（5xx・429・`reading from storage`・`timed out`・`Service invoked too many times` 以外）
 - 推測: status は 403、本文は権限の不足を述べる文（`The caller does not have permission` 系）。404（`Requested entity was not found.`）の可能性もある。**実機で起こしていない。**実際の status と本文は、起きたらこの節に写す
-- 実装から引いた: テストは最初の呼び出しで落ち、続く検査は走らない
+- 実装から引いた: 止まった呼び出しの後の検査は走らない（`e2eUnlinkAnswers` で落ちればテストは始まらない）
 
 ### 切り分け方
 
@@ -150,7 +152,7 @@ Execution API（`scripts.run`）は、**呼ぶ側の OAuth クライアントが
 `<関数名> が失敗した（HTTP <status>）: …reading from storage … NOT_FOUND`（status は記録していない）が返る。
 `callFunction` はこの文言を一時的なものとして 5 秒後に 1 回だけやり直し、通る。止まらないので、人も Claude も何もしない。
 
-- **この再試行が C の「二重」を起こす心配は無い**: 実行が始まる前に落ちているので、1 回目は何も書いていない（最初の呼び出しは `buildTemplate` で、どのみち冪等である）
+- **この再試行が C の「二重」を起こす心配は無い**: 実行が始まる前に落ちているので、1 回目は何も書いていない（最初の呼び出しは `e2eUnlinkAnswers` で、紐付いたシートが無ければ何もせず `null` を返す。次の `buildTemplate` も冪等で、どちらも二重に走って困らない）
 - 2 回目でも同じ文言が出るなら、`clasp push` が届いていない（push 先のスクリプト ID が `.env` と合っているか）か、B（結び付け）を疑う。そのとき status が 404 なら、B の推測が当たっている可能性がある
 - 確かめていないこと: 1 回の再試行で通らなかった例があるか（見ていない）。NOT_FOUND の status の値
 
@@ -168,7 +170,7 @@ Execution API（`scripts.run`）は、**呼ぶ側の OAuth クライアントが
 **実機で見た（2026-10-25）。出力の文言は次のとおり。**
 
 - **日次上限**: 控えの回数が 100 に達していれば、呼ぶ前に上の文で止まり、`scripts.run` を打たない。
-- **控えは `~/.config/sfs-e2e/quota.json` に 1 つ**（#352 で直した。worktree をまたいで効く）。**日付は日本時間で、0 時に 0 へ戻る。** 別の worktree（352・351）から回した分が 1 つの控えに積まれた（日本時間 2026-10-25 で 34 → 50）。同時に回しても数え違えないよう、控えのそばの `quota.json.lock`（`~/.config/sfs-e2e/` の中）で排他にする（持ち主が落ちて残ったものは 10 秒で奪う）。**`npm run e2e` そのものの同時実行も、`~/.config/sfs-e2e/lock` で worktree をまたいで 1 本にする**（検証用スプレッドシートは 1 つしかない。生きている pid が持っていれば待たずに止まる → [`e2e/lock.mjs`](../../e2e/lock.mjs)）。上限は、Google 側の本物の上限ではなく、こちらの控えの数である。
+- **控えは `~/.config/sfs-e2e/quota.json` に 1 つ**（#352 で直した。worktree をまたいで効く）。**日付は日本時間で、0 時に 0 へ戻る。** 別の worktree（352・351）から回した分が 1 つの控えに積まれた（日本時間 2026-10-25 で 34 → 50）。同時に回しても数え違えないよう、控えのそばの `quota.json.lock`（`~/.config/sfs-e2e/` の中）で排他にする（持ち主が落ちて残ったものは 10 秒で奪う）。`npm run e2e` そのものは `~/.config/sfs-e2e/lock` で worktree をまたいで 1 本だけ回り、ほかが動いていれば `別の npm run e2e が動いている（pid …。worktree をまたいで 1 本）。同時には回さない`、取れなければ `ロックが取れない（…）` で止まる。**`npm run e2e` そのものの同時実行も、`~/.config/sfs-e2e/lock` で worktree をまたいで 1 本にする**（検証用スプレッドシートは 1 つしかない。生きている pid が持っていれば待たずに止まる → [`e2e/lock.mjs`](../../e2e/lock.mjs)）。上限は、Google 側の本物の上限ではなく、こちらの控えの数である。
 - **控えが上限に達したときの文**（`e2e/gas.mjs`）: `今日の scripts.run が上限（100 回）に達した。控えは worktree をまたいで 1 つで、日本時間の 0 時（明日の 0:00）に 0 へ戻るので、その後にやり直す（<控えのパス>）`。ロックが 30 秒取れないときは `控えのロックが取れない（<ロックのパス>）`。
 - **ゴミ箱へ移す**（`trashForm`）: フォームでないファイルを渡すと、`ゴミ箱へ移そうとしたものがフォームではない。何もせずに止めた` で止まり、PATCH は打たない。同じファイル（検証用スプレッドシート）へ書き込もうとすれば **403（reason: `appNotAuthorizedToFile`）**。`drive.file` のスコープは、このアプリが作った・開いたファイルにしか効かないためである。
 - **未確認**: 403 の案内文が出る経路は、スクリプトが作っていないフォームを用意しないと起こせず、まだ見ていない。
