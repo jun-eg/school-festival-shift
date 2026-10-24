@@ -14,6 +14,7 @@
 
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -73,8 +74,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const buffer = execFileSync('git', ['show', `:${name}`], { maxBuffer: 256 * 1024 * 1024 })
     return { path: name, text: buffer.includes(0) ? '' : buffer.toString('utf8') }
   })
-  const envFile = path.join(root, '.env')
-  const known = fs.existsSync(envFile) ? knownValues(fs.readFileSync(envFile, 'utf8')) : []
+  // e2e/env.mjs と同じ置き場: worktree の直下の .env、無ければ ~/.config/sfs-e2e/.env
+  const envFile = [path.join(root, '.env'), path.join(os.homedir(), '.config/sfs-e2e/.env')].find((file) => fs.existsSync(file))
+  const known = envFile ? knownValues(fs.readFileSync(envFile, 'utf8')) : []
+  if (!envFile) console.log('秘密の検査: .env がどちらにも無いので、E2E の ID は見ていない（トークン・鍵の形だけ見る）')
   const problems = scan(files, known)
   if (problems.length > 0) {
     console.error('秘密の検査: commit を止めた。トークン・鍵・E2E の ID は commit しない（→ e2e/README.md）')

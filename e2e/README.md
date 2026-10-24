@@ -9,11 +9,11 @@ npm run e2e
 
 ## 何が起きるか
 
-1. `.env` を読み、スプレッドシートの題名が `sfs-e2e` で始まることを確かめる（違えば何も書かずに止まる）
-2. `.e2e/dist/` に `npm run build` と同じ 4 つを出し、`.env` のスクリプト ID へ `clasp push` する。**push 先はそのスクリプトだけで、`.clasp.json` は読まない**。テンプレート（本番）には届かない
+1. `.env` を読み（環境変数では上書きできない）、スプレッドシートの題名が `sfs-e2e` で始まることを確かめる（違えば何も書かずに止まる）
+2. `.e2e/dist/` に `npm run build` と同じ 4 つを出し、`.env` のスクリプト ID へ `clasp push` する。**push 先はそのスクリプトだけで、`.clasp.json` は読まない**。push の前に Script API で、そのスクリプトの親（`parentId`）が `.env` のスプレッドシートと同じか確かめる。違えば何も push せずに止まるので、テンプレート（本番）のスクリプト ID を書き間違えても届かない
 3. スプレッドシートを Sheets API で**シート 1 枚の空に戻す**（実行の頭。前の実行の残骸は効かない）
 4. Apps Script Execution API（`scripts.run`、devMode）で `buildTemplate` を呼ぶ。**メニューの関数は呼ばない**（`getUi()` と toast で落ちる）
-5. 返り値と、Sheets API で読んだ構造（8 枚・保護・入力欄・幅・固定）を、[`src/core/sheet-layout.ts`](../src/core/sheet-layout.ts) の構成と `node:test` で突き合わせる。**手元の [`build-template.test.ts`](../src/shell/build-template.test.ts) の①②③⑥と同じ見方**である。2 回目の呼び出しで形が変わらないことも見る
+5. 返り値と、Sheets API で読んだ構造（8 枚・保護・入力欄・幅・固定）を、[`src/core/sheet-layout.ts`](../src/core/sheet-layout.ts) の構成と `node:test` で突き合わせる。**手元の [`build-template.test.ts`](../src/shell/build-template.test.ts) の①②③⑥と同じ見方**である（①②③と⑥の幅。太い線は [#308](https://github.com/jun-eg/school-festival-shift/issues/308)）。2 回目の呼び出しで形が変わらないことも見る
 
 **配布物のマニフェストは変えない。** 検証した範囲では、`executionApi` を足さなくても devMode の呼び出しは通る（初回の呼び出しだけ `reading from storage … NOT_FOUND` が返ることがあり、1 回の再試行で通る）。
 
@@ -32,7 +32,7 @@ npm run e2e
 1. **検証専用の GCP プロジェクト**を作り、Apps Script API ・ Sheets API ・ Drive API を有効にし、OAuth 同意画面（外部・テスト、テストユーザーは自分）とデスクトップの OAuth クライアントを用意する。JSON は**リポジトリの外**に置く
 2. **検証用スプレッドシートを 1 つ**作る（題名は `sfs-e2e` で始める）。拡張機能 → Apps Script を開き、**プロジェクトの設定 → Google Cloud Platform プロジェクトを、上の GCP プロジェクトの番号に変更する**（結び付けはエディタでしかできない）
 3. `npx clasp login --creds <JSON のパス> --use-project-scopes --include-clasp-scopes --extra-scopes https://www.googleapis.com/auth/spreadsheets` を通す（ブラウザで承認。トークンは `~/.clasprc.json`）
-4. [`.env.example`](../.env.example) を `.env` にコピーして、スプレッドシート ID ・スクリプト ID ・ GCP プロジェクトを埋める
+4. [`.env.example`](../.env.example) を `.env` にコピーして、スプレッドシート ID ・スクリプト ID ・ GCP プロジェクトを埋める。置き場は **worktree の直下**か、**`~/.config/sfs-e2e/.env`**（worktree をまたいで 1 つで済む。直下に無いときだけ読む）。環境変数では上書きできない
 
 **トークン（`~/.clasprc.json`）・ OAuth クライアントの JSON ・ `.env` は、表示・コピー・commit をしない。**
 

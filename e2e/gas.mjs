@@ -40,7 +40,8 @@ export async function callFunction(scriptId, functionName, parameters = []) {
     try {
       const res = await api('POST', `https://script.googleapis.com/v1/scripts/${scriptId}:run`, { function: functionName, parameters, devMode: true }, { timeoutMs: callTimeoutMs })
       if (res.ok && !res.json.error) return res.json.response?.result
-      const message = res.json.error?.message ?? JSON.stringify(res.json)
+      // スクリプト自身の例外は error.message が 'ScriptError' で、本文は details の errorMessage に入る
+      const message = res.json.error?.details?.[0]?.errorMessage ?? res.json.error?.message ?? JSON.stringify(res.json)
       // 反映の遅れで「reading from storage … NOT_FOUND」が返ることがある。実機で初回の呼び出しに出た。再試行で通る
       const transient = res.status >= 500 || res.status === 429 || /reading from storage|timed out|Service invoked too many times/i.test(message)
       lastError = new Error(`${functionName} が失敗した（HTTP ${res.status}）: ${message}`)

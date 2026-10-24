@@ -5,14 +5,14 @@
 // 硬さ:
 //   - 同時実行は 1 本（.e2e/lock。生きているプロセスが持っていれば、待たずに止まる）
 //   - scripts.run は 1 日 100 回まで（e2e/gas.mjs）。関数 1 回は 180 秒で切り、1 回だけ再試行する
-//   - push 先は .env の SFS_E2E_SCRIPT_ID だけ。.clasp.json は読まず、毎回 .e2e/clasp.json を書く。スプレッドシートの題名が sfs-e2e で始まらなければ、何も書かずに止まる（e2e/env.mjs）
+//   - push 先は .env の SFS_E2E_SCRIPT_ID だけ。.clasp.json は読まず、毎回 .e2e/clasp.json を書く。スプレッドシートの題名が sfs-e2e で始まらないか、スクリプトの親が検証用スプレッドシートでなければ、何も書かずに止まる（e2e/env.mjs）
 //   - 秘密（トークン・creds・.env）は .gitignore が名指しし、中身は .githooks/pre-commit が止める
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { build, resolveVersion } from '../build.mjs'
-import { assertSandbox, loadEnv, root, workDir } from './env.mjs'
+import { assertSandbox, assertScriptBelongsToSandbox, loadEnv, root, workDir } from './env.mjs'
 
 const lockFile = path.join(workDir, 'lock')
 const pushTimeoutMs = 120_000
@@ -25,11 +25,14 @@ function acquireLock() {
       return
     } catch {
       const holder = Number(fs.readFileSync(lockFile, 'utf8'))
-      let alive = true
-      try {
-        process.kill(holder, 0)
-      } catch (error) {
-        alive = error.code === 'EPERM'
+      // pid として読めない（空・壊れている）ロックは、書く前に落ちた跡とみなして奪う。process.kill(0) はプロセスグループへの送信で成功してしまう
+      let alive = Number.isInteger(holder) && holder > 0
+      if (alive) {
+        try {
+          process.kill(holder, 0)
+        } catch (error) {
+          alive = error.code === 'EPERM'
+        }
       }
       if (alive) throw new Error(`別の npm run e2e が動いている（pid ${holder}）。同時には回さない`)
       fs.rmSync(lockFile, { force: true })
@@ -65,6 +68,7 @@ try {
   acquireLock()
   try {
     console.log(`検証用スプレッドシート: ${await assertSandbox(env)}`)
+    await assertScriptBelongsToSandbox(env)
     await build(path.join(workDir, 'dist'))
     console.log(`版: ${resolveVersion()}`)
     pushToSandbox(env)
