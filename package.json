@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p src/ui/tsconfig.json && tsc -p tsconfig.test.json",
     "pretest": "npm run typecheck",
     "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"e2e/**/*.test.mjs\"",
+    "判定": "node scripts/前回の5時刻.mjs && node scripts/件数の検算.mjs && node scripts/M1①の判定.mjs && node scripts/M1②の判定.mjs && node scripts/生成の所要時間.mjs && node scripts/M2の判定.mjs && node scripts/まとまりと散らし.mjs && node scripts/M4の判定.mjs && node scripts/前回のシフト表.mjs",
     "e2e": "node e2e/run.mjs"
   },
   "devDependencies": {

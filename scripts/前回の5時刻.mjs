@@ -22,7 +22,7 @@ const 宣言 = JSON.parse(読む('scripts/前回の5時刻の宣言.json'))
 /** 5 時刻の並び。「日ごとの営業時刻」の列の順（→ 5-1 の #1）。 */
 export const 時刻の名 = ['準備開始', '調理開始', '調理終了', '片付け開始', '片付け終了']
 
-/** 帯の名と、その端に当たる時刻（→ 5-5・src/generate.js の prepCleanupBands）。 */
+/** 帯の名と、その端に当たる時刻（→ 5-5・src/core/generate.ts の prepCleanupBands）。 */
 const 帯 = [
   { 名: '準備', 始: '準備開始', 終: '調理開始' },
   { 名: '調理', 始: '調理開始', 終: '調理終了' },
@@ -103,7 +103,7 @@ function 一日の5時刻(日, 行) {
   }
 }
 
-/** その日の枠と帯ごとの枠数。刻み方は src/input-types.js の cutSlots と同じ。 */
+/** その日の枠と帯ごとの枠数。刻み方は src/core/input-types.ts の cutSlots と同じ。 */
 function 帯ごとの枠(時刻) {
   const 値 = {}
   時刻の名.forEach((名, at) => {
@@ -292,7 +292,7 @@ function 主処理() {
   })
 
   console.log('')
-  console.log('刻んだ枠と帯（枠の刻み方は src/input-types.js の cutSlots と同じである）')
+  console.log('刻んだ枠と帯（枠の刻み方は src/core/input-types.ts の cutSlots と同じである）')
   算出.forEach((一日) => {
     const 帯の内訳 = 帯.map((一つ) => `${一つ.名} ${一日.帯の枠[一つ.名]}`).join(' ／ ')
     console.log(`  ${一日.日}  全 ${一日.全枠} 枠 = ${帯の内訳}`)

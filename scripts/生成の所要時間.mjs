@@ -4,15 +4,15 @@
 //   使い方: node scripts/生成の所要時間.mjs
 //   宣言:   scripts/生成の所要時間の宣言.json（上限の秒と入力の置き方の原本）
 //
-// 測るのは src/core.js の build を 1 周する秒で、合格の線は 360 秒（Apps Script の上限 6 分 → 6-1 の #2）。
+// 測るのは src/core/core.ts の build を 1 周する秒で、合格の線は 360 秒（Apps Script の上限 6 分 → 6-1 の #2）。
 // src/ をそのまま走らせる（書き直したコードが速くても、実機で走るコードの答えにならない）。
 // 見るのは時間だけで、案の中身は M2 の判定が見る。
 // 読むだけ。中央値が上限を越えたら終了コード 1。
 
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 読み込む, 取り出す } from './判定の入力.mjs'
 import { 営業時刻の行, 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
@@ -22,13 +22,10 @@ const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 const 宣言 = JSON.parse(読む('scripts/生成の所要時間の宣言.json'))
 
 // ---- 実装を読む ------------------------------------------------------------
-// SpreadsheetApp は置かない（置かずに通ることは src/core.test.mjs が見ている）。
+// SpreadsheetApp は置かない（置かずに通ることは src/core/core.test.ts が見ている）。
 
-const 文脈 = vm.createContext({})
-for (const 相対 of 宣言.入力.実装) {
-  vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-}
-const { build, builtInSteps, takeIn, expand, toDays, formatDateTime, coreSteps } = vm.runInContext('({ build, builtInSteps, takeIn, expand, toDays, formatDateTime, coreSteps })', 文脈)
+const 文脈 = await 読み込む(宣言.入力.実装)
+const { build, builtInSteps, takeIn, expand, toDays, formatDateTime, coreSteps } = 取り出す(文脈, ['build', 'builtInSteps', 'takeIn', 'expand', 'toDays', 'formatDateTime', 'coreSteps'])
 
 // ---- 入力を組む ------------------------------------------------------------
 // 枠も需要も刻み直さない。宣言の行を型に通して、出てきたものをそのまま食わせる。

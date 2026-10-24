@@ -5,14 +5,14 @@
 //   宣言:   scripts/M1①の宣言.json（合格の線と営業時刻の置き方の原本）
 //
 // 数えるのは「型に乗らなかった行」で、合格の線は 0 行（→ docs/agent/tech-requirements.md 7 の M1 ①）。
-// 型は src/input-types.js をそのまま走らせる（書き直した型に乗っても答えにならない）。
-// 前回の記録が規則を満たすかは見ない（違反を数えるのは src/count-violations.js で、入力は生成した案）。
+// 型は src/core/input-types.ts をそのまま走らせる（書き直した型に乗っても答えにならない）。
+// 前回の記録が規則を満たすかは見ない（違反を数えるのは src/core/count-violations.ts で、入力は生成した案）。
 // 読むだけ。乗らなかった行が 1 行でもあれば終了コード 1。
 
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 読み込む, 取り出す } from './判定の入力.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
@@ -21,13 +21,10 @@ const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 const 宣言 = JSON.parse(読む('scripts/M1①の宣言.json'))
 
 // ---- 型を読む --------------------------------------------------------------
-// SpreadsheetApp は置かない（置かずに通ることは src/input-types.test.mjs が見ている）。
+// SpreadsheetApp は置かない（置かずに通ることは src/core/input-types.test.ts が見ている）。
 
-const 文脈 = vm.createContext({})
-for (const 相対 of 宣言.入力.型) {
-  vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-}
-const { toType, inputTypes, studentIdPattern } = vm.runInContext('({ toType, inputTypes, studentIdPattern })', 文脈)
+const 文脈 = await 読み込む(宣言.入力.型)
+const { toType, inputTypes, studentIdPattern } = 取り出す(文脈, ['toType', 'inputTypes', 'studentIdPattern'])
 
 // 型 #2 と #4 は同じ (日・時間帯・役割名・人数) の行なので、名指しの文が読みやすい #2 で通す。
 const 型 = {

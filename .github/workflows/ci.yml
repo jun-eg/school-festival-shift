@@ -39,6 +39,8 @@ jobs:
         run: npm test
       - name: ビルド
         run: npm run build
+      - name: 判定（M1〜M4 の判定と検算。要件定義書 7 の数字）
+        run: npm run 判定
 
   hooks:
     name: hooks

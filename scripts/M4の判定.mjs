@@ -13,15 +13,14 @@
 // 読むだけ。線を 1 つでも外したら終了コード 1。
 
 import path from 'node:path'
-import vm from 'node:vm'
-import { 読む, 判定の入力, 宣言 as M2の宣言 } from './判定の入力.mjs'
+import { 読む, 読み込む, 取り出す, 判定の入力, 宣言 as M2の宣言 } from './判定の入力.mjs'
 
 const 宣言 = JSON.parse(読む('scripts/M4の宣言.json'))
 const 境目 = JSON.parse(読む('scripts/件数の期待値.json')).境目
 
 // ---- 偽の器 ------------------------------------------------------------------
 // Google がやることのうち、この経路が通るところだけを真似る。
-// M1 ② の偽と違い、メモを持つ（手直しの印はセルのメモ → src/assignment-grid.js の fixedNote）。
+// M1 ② の偽と違い、メモを持つ（手直しの印はセルのメモ → src/core/assignment-grid.ts の fixedNote）。
 
 class 偽の範囲 {
   constructor(シート, 行, 列, 行数, 列数) {
@@ -104,6 +103,10 @@ class 偽の範囲 {
   setBorder() {
     return this
   }
+  // 名前の選択肢（→ shell の putNameDropdowns）。入力規則そのものは見ない。
+  setDataValidation() {
+    return this
+  }
   // 結合はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑧）。ここでは見ない。
   merge() {
     return this
@@ -122,7 +125,7 @@ class 偽の保護 {
     this.warningOnly = 値
     return this
   }
-  // 割り当ての 4 枚は「持ち主だけ」、条件入力は入力欄を外す（→ src/build-template.js の applyProtection ／ issue #234）。
+  // 割り当ての 4 枚は「持ち主だけ」、条件入力は入力欄を外す（→ src/shell/build-template.ts の applyProtection ／ issue #234）。
   // この手は保護の中身を見ないので、受けて捨てる。
   getEditors() {
     return []
@@ -218,7 +221,7 @@ class 偽のシート {
   getLastColumn() {
     return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[1])), 0)
   }
-  // 書き換えの控えを置く見えない記録（→ src/shell.js の keepSeenGrid）。
+  // 書き換えの控えを置く見えない記録（→ src/shell/shell.ts の keepSeenGrid）。
   getDeveloperMetadata() {
     const シート = this
     return (this.metadata ?? []).map((一つ) => ({
@@ -313,14 +316,32 @@ const 偽のUI = {
 }
 
 // ---- src を読む --------------------------------------------------------------
+// 偽の器は globalThis に置いてから import する（モジュールの中の SpreadsheetApp は、呼ぶ時に globalThis から引く）。
 
 let 帳 = null
 
-const 文脈 = vm.createContext({
+Object.assign(globalThis, {
   SpreadsheetApp: {
     ProtectionType: { SHEET: 'SHEET' },
     BorderStyle: { SOLID_THICK: 'SOLID_THICK' },
     flush() {},
+    newDataValidation() {
+      const 組み立て = {
+        requireValueInRange() {
+          return 組み立て
+        },
+        setAllowInvalid() {
+          return 組み立て
+        },
+        setHelpText() {
+          return 組み立て
+        },
+        build() {
+          return {}
+        },
+      }
+      return 組み立て
+    },
     getActive() {
       return 帳
     },
@@ -342,18 +363,14 @@ const 文脈 = vm.createContext({
       return 出力
     },
   },
-  console: { log() {} },
 })
-for (const 相対 of 宣言.入力.実装) {
-  vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-}
-const 取り出す = (名前) => vm.runInContext(`({ ${名前.join(', ')} })`, 文脈)
-const { menuItems, sheetLayout, gridLayouts, assignmentName, outputColumns, checkKind, isFixedNote, sectionWidth } = 取り出す(['menuItems', 'sheetLayout', 'gridLayouts', 'assignmentName', 'outputColumns', 'checkKind', 'isFixedNote', 'sectionWidth'])
+const 文脈 = await 読み込む(宣言.入力.実装)
+const { menuItems, sheetLayout, gridLayouts, assignmentName, outputColumns, checkKind, isFixedNote, sectionWidth } = 取り出す(文脈, ['menuItems', 'sheetLayout', 'gridLayouts', 'assignmentName', 'outputColumns', 'checkKind', 'isFixedNote', 'sectionWidth'])
 
-/** メニューを表示名で押す（→ menu.js の menuItems）。 */
+/** メニューを表示名で押す（→ menu.ts の menuItems）。 */
 function メニューを押す(表示名) {
   const 項目 = menuItems.filter((一つ) => 一つ.label === 表示名)[0]
-  if (!項目) throw new Error(`メニューに「${表示名}」が無い（src/menu.js の menuItems）`)
+  if (!項目) throw new Error(`メニューに「${表示名}」が無い（src/shell/menu.ts の menuItems）`)
   return 文脈[項目.functionName]()
 }
 
@@ -563,7 +580,7 @@ function 周を通す(周, 番号) {
   見たもの.手.push(`8 手直し（${選んだ.length} セル）`)
   見たもの.書き換えた後の違反 = 画面.一言[画面.一言.length - 1]
 
-  // 9 — メニュー「画像を書き出す」。ダイアログが描く中身を取りに来る（→ menu.js の exportImagesFromDialog）。
+  // 9 — メニュー「画像を書き出す」。ダイアログが描く中身を取りに来る（→ menu.ts の exportImagesFromDialog）。
   メニューを押す('画像を書き出す')
   const 画像 = 文脈.exportImagesFromDialog()
   見たもの.手.push('9 画像を書き出す')
