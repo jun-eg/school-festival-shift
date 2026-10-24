@@ -15,6 +15,11 @@ trim_trailing_whitespace = true
 [*.md]
 trim_trailing_whitespace = false
 
-# data/ の CSV は CRLF で置いてある（Excel の出力）。勝手に改行を変えない
+# data/ の CSV は CRLF・BOM 付きで置いてある（Excel の出力）。改行も文字コードも変えない
 [*.csv]
 end_of_line = unset
+charset = unset
+
+# guard-bash.py・guard-bash.test.py は 4 字下げ
+[*.py]
+indent_size = 4
