@@ -5,13 +5,16 @@ permissions.deny は前置一致なので `git push origin foo --force` のよ�
 フラグが後ろへ回った形と、`gh api ... -f body=@file` のように
 フラグがサブコマンド引数の後ろに来る形を拾えない。そこをここで止める。
 
-判断の背景は .claude/README.md、経緯は issue #73。
+main に向く merge・push は issue #320 で足した。`gh pr merge <N>` は base を gh に引いて判断する。
+
+判断の背景は .claude/README.md、経緯は issue #73 と #320。
 """
 
 import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 
 # git push で履歴を上書きする指定。`--force-with-lease=origin/main` のように値を付けた形も拾う
@@ -23,6 +26,13 @@ REBASE_ESCAPES = ("--abort", "--quit")
 # gh の `-f` / `--raw-field` はファイルを読まない
 GH_RAW_FIELD = re.compile(r"^(-f|--raw-field)$")
 GH_RAW_FIELD_INLINE = re.compile(r"^-f[A-Za-z_][A-Za-z0-9_.\[\]]*=@")
+# Claude が merge・push してはいけない branch
+PROTECTED = "main"
+# `gh pr merge` で値を取るオプション（番号を探すときに飛ばす）
+GH_MERGE_TAKES_VALUE = ("-R", "--repo", "-b", "--body", "-F", "--body-file", "-t", "--subject",
+                        "-m", "--match-head-commit", "-A", "--author-email")
+# REST で merge する形 `repos/o/r/pulls/12/merge`
+GH_API_MERGE = re.compile(r"(^|/)pulls/[0-9]+/merge$")
 
 MSG_FORCE = (
     "force-push は禁止（issue #73）。レビュー済みコミットが消えるとレビューコメントが行を見失う。"
@@ -34,6 +44,26 @@ MSG_REBASE = (
 )
 MSG_AMEND = "push 済みコミットの書き換えを避けるため `git commit --amend` は止めている（issue #73）。新しいコミットを積む。"
 MSG_RESET = "`git reset --hard` は作業を消すので止めている（issue #73）。`git restore` / `git revert` を使う。"
+MSG_PUSH_MAIN = (
+    f"`{PROTECTED}` への push は止めている（issue #320）。{PROTECTED} に入れるのは人が PR を merge するときだけ。"
+    "branch を push して PR を作る。"
+)
+MSG_MERGE_MAIN = (
+    f"`{PROTECTED}` 向けの PR は Claude が merge しない（issue #320）。人がレビューして merge する。"
+    f"Claude が merge してよいのは {PROTECTED} 以外の branch（クッション branch）向けの PR だけ。"
+)
+MSG_MERGE_NO_NUMBER = (
+    "`gh pr merge` は PR 番号を付けて打つ（issue #320）。番号が無いと今の branch の PR が対象になり、"
+    f"クッション branch の上で打つと {PROTECTED} 向けの PR が merge される。"
+)
+MSG_MERGE_UNRESOLVED = (
+    "`gh pr merge` の base を `gh pr view` で引けなかったので止めた（issue #320）。"
+    "番号・repo・ネットワークを確かめてから打ち直す。"
+)
+MSG_MERGE_REBASE = "`gh pr merge --rebase` は履歴を書き換えるので止めている（issue #73 / #320）。`--merge` を使う。"
+MSG_GH_API_MERGE = (
+    "REST で PR を merge する形は止めている（issue #320）。base の判定を通すため `gh pr merge <N> --merge` を使う。"
+)
 MSG_GH_RAW = (
     "`gh` の `-f` / `--raw-field` はファイルを読まず `@...` をそのまま文字列として送る（issue #73 で実際に事故った）。"
     "`-F body=@file` か `gh issue/pr ... --body-file file` を使う。"
@@ -84,6 +114,8 @@ def check_git(tokens):
             # `git push origin +main` / `+main:main` も強制更新
             if arg.startswith("+") and len(arg) > 1:
                 return MSG_FORCE
+        if any(pushes_protected(arg) for arg in args):
+            return MSG_PUSH_MAIN
     elif sub == "rebase":
         if not any(arg in REBASE_ESCAPES for arg in args):
             return MSG_REBASE
@@ -96,7 +128,67 @@ def check_git(tokens):
     return None
 
 
+def pushes_protected(refspec):
+    """`main` / `HEAD:main` / `refs/heads/main` / `:main` のように、送り先が守る branch に向く refspec か。"""
+    if refspec.startswith("-"):
+        return False
+    dst = refspec.split(":", 1)[1] if ":" in refspec else refspec
+    return dst in (PROTECTED, f"refs/heads/{PROTECTED}")
+
+
+def pr_base(number, repo):
+    """PR の base branch 名。引けなければ None（止める側に倒す）。"""
+    cmd = ["gh", "pr", "view", number, "--json", "baseRefName", "--jq", ".baseRefName"]
+    if repo:
+        cmd += ["--repo", repo]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip() or None
+
+
+def check_gh_pr_merge(args):
+    """`gh pr merge` の残り引数を見る。番号必須・--rebase 禁止・base が守る branch なら止める。"""
+    number = None
+    repo = None
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in ("--rebase", "-r"):
+            return MSG_MERGE_REBASE
+        if arg in ("-R", "--repo"):
+            repo = args[i + 1] if i + 1 < len(args) else None
+            i += 2
+            continue
+        if arg.startswith("--repo="):
+            repo = arg.split("=", 1)[1]
+        if arg in GH_MERGE_TAKES_VALUE:
+            i += 2
+            continue
+        if not arg.startswith("-") and number is None:
+            number = arg
+        i += 1
+    if number is None:
+        return MSG_MERGE_NO_NUMBER
+    base = pr_base(number, repo)
+    if base is None:
+        return MSG_MERGE_UNRESOLVED
+    if base == PROTECTED:
+        return MSG_MERGE_MAIN
+    return None
+
+
 def check_gh(tokens):
+    if len(tokens) >= 3 and tokens[1] == "pr" and tokens[2] == "merge":
+        reason = check_gh_pr_merge(tokens[3:])
+        if reason:
+            return reason
+    if len(tokens) >= 2 and tokens[1] == "api":
+        if any(GH_API_MERGE.search(t) for t in tokens[2:] if not t.startswith("-")):
+            return MSG_GH_API_MERGE
     for i, token in enumerate(tokens):
         if GH_RAW_FIELD.match(token):
             nxt = tokens[i + 1] if i + 1 < len(tokens) else ""

@@ -21,6 +21,12 @@
 `git rebase --abort` まで落ちてしまうためである。rebase の判断はフックが持ち、`--abort` と `--quit` だけ通す。
 **「deny に抜けがある」と思って足さないこと。**
 
+**`gh pr merge` も `deny` に入れていない。** Claude が merge してよいのは `main` 以外の branch（クッション branch）向けの PR だけで
+（[issue #320](https://github.com/jun-eg/school-festival-shift/issues/320)）、前置一致では PR の base を判定できない。
+フックが `gh pr view <N> --json baseRefName` で base を引き、`main` なら止める。引けなければ止める側に倒す。
+番号の無い `gh pr merge` と REST の `pulls/<N>/merge` も止める（base の判定を素通りさせない）。
+`main` への `git push` は refspec で見る。`git push origin main` だけは前置一致で拾えるので `deny` にもある。
+
 ## 例外：どうしても必要になったら
 
 `deny` もフックも**確認ダイアログを出さずに落とす**ので、「そのときだけ許可」ができない。
