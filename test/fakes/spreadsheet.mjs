@@ -29,7 +29,8 @@
 //     setColumnWidth／insertColumnsAfter／protect／addDeveloperMetadata／getRangeList の setFontColor・setFontWeight／
 //     getDeveloperMetadata の setValue・remove）である。FakeSpreadsheet は readOnly のシートを 1 枚でも持つと、
 //     insertSheet／deleteSheet／moveActiveSheet も落とす。読む口（getValues／getNotes／getRange など）と、
-//     検査が盤面を整える口（put／cut*／insertColumn／deleteRow／clear）は落とさない。
+//     検査が盤面を整える口（put／cut*／insertColumn／deleteRow／clear）と、
+//     ブックの状態を変えない setActiveSheet は落とさない。
 
 /** 往復の数。検査が 0 に戻して、読み書きの数を比べる。検査 1 本（= 1 プロセス）につき 1 つである。 */
 export const roundTrips = { reads: 0, writes: 0, formats: 0, notes: 0, validations: 0 }
