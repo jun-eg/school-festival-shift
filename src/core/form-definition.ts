@@ -32,9 +32,7 @@ export const formItemKind = {
 }
 
 /** 4-2. 希望時間 4 設問の正規表現。4 設問とも同じである（完全一致）。時は 0-23、分は 00-59。 */
-export const wishTimePattern =
-  '^(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d'
-  + '(?:,(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d)*$'
+export const wishTimePattern = '^(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d' + '(?:,(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d)*$'
 
 /**
  * 4-1. 希望時間 4 設問のラベル。学祭は例年この 4 日である（→ docs/agent/interviews/02-作る側.md）。
@@ -157,10 +155,7 @@ export const formItems: FormItem[] = [
  * 希望時間 4 設問の説明文。記録にあるのは例 3 つと営業時間だけなので、その 2 つを並べる入れ物である（→ 4-2）。
  */
 export function wishTimeDescription(item: FormItem): string {
-  return [
-    `営業時間は ${item.businessHours} です。出られる時間帯を「10:00-15:00」のように書いてください。`,
-    ...wishTimeExamples.map((example) => `${example.label} ${example.value}`),
-  ].join('\n')
+  return [`営業時間は ${item.businessHours} です。出られる時間帯を「10:00-15:00」のように書いてください。`, ...wishTimeExamples.map((example) => `${example.label} ${example.value}`)].join('\n')
 }
 
 /**
@@ -189,16 +184,10 @@ export function checkDaysForForm(days: Day[] | undefined): void {
   const labels = wishTimeLabels()
   const rows = (days || []).length
   if (rows === 0) {
-    throw new Error(
-      '条件入力の「日ごとの営業時刻」が空です。'
-        + `先に ${labels.length} 日分入れてから、もう一度「フォームを作る」を押してください`,
-    )
+    throw new Error('条件入力の「日ごとの営業時刻」が空です。' + `先に ${labels.length} 日分入れてから、もう一度「フォームを作る」を押してください`)
   }
   if (rows !== labels.length) {
-    throw new Error(
-      `条件入力の「日ごとの営業時刻」が ${rows} 行です。`
-        + `${labels.length} 行（上から ${labels.join('・')}）にしてください`,
-    )
+    throw new Error(`条件入力の「日ごとの営業時刻」が ${rows} 行です。` + `${labels.length} 行（上から ${labels.join('・')}）にしてください`)
   }
 }
 
@@ -222,7 +211,5 @@ function withoutLeadingZero(time: string): string {
 
 /** 入る側から数えた項目名（→ 5 の #3）。設問は 9 つだが、答える中身は 6 項目である。 */
 export function entrantItemNames() {
-  return formItems
-    .map((item) => item.entrantItem)
-    .filter((name, index, all) => name !== null && all.indexOf(name) === index)
+  return formItems.map((item) => item.entrantItem).filter((name, index, all) => name !== null && all.indexOf(name) === index)
 }

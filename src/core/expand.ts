@@ -15,7 +15,7 @@ import { showBlankValue, toMinutes } from './input-types.ts'
 import type { Candidate, Day, Slot, Wish } from './types.ts'
 
 /** 区間 1 つ（HH:MM の組）。 */
-export type Interval = { start: string, end: string }
+export type Interval = { start: string; end: string }
 
 /** 規則 1 の ② の区切り。 */
 export const intervalSeparator = ','
@@ -98,30 +98,28 @@ export function slotsWished(answer: string, day: Day, studentId: string): Slot[]
 export function cutIntervals(answer: string, day: Day, studentId: string): Interval[] {
   const intervals: Interval[] = []
 
-  String(answer).split(intervalSeparator).forEach((piece) => {
-    if (!wishIntervalPattern.test(piece)) {
-      throw new Error(
-        `${whereWished(studentId, day)}「${showBlankValue(piece)}」は、10:00-15:00 のような時間帯になっていません`,
-      )
-    }
+  String(answer)
+    .split(intervalSeparator)
+    .forEach((piece) => {
+      if (!wishIntervalPattern.test(piece)) {
+        throw new Error(`${whereWished(studentId, day)}「${showBlankValue(piece)}」は、10:00-15:00 のような時間帯になっていません`)
+      }
 
-    const at = piece.indexOf(intervalDash)
-    const interval = {
-      start: withLeadingZero(piece.slice(0, at)),
-      end: withLeadingZero(piece.slice(at + 1)),
-    }
+      const at = piece.indexOf(intervalDash)
+      const interval = {
+        start: withLeadingZero(piece.slice(0, at)),
+        end: withLeadingZero(piece.slice(at + 1)),
+      }
 
-    // 終日出れない。先頭の 0 を揃えてから見るので、`0:00-0:00` も落ちる。
-    if (`${interval.start}${intervalDash}${interval.end}` === allDayOff) return
+      // 終日出れない。先頭の 0 を揃えてから見るので、`0:00-0:00` も落ちる。
+      if (`${interval.start}${intervalDash}${interval.end}` === allDayOff) return
 
-    if (toMinutes(interval.end) <= toMinutes(interval.start)) {
-      throw new Error(
-        `${whereWished(studentId, day)}「${piece}」は、終わりの時刻が始まりより前です`,
-      )
-    }
+      if (toMinutes(interval.end) <= toMinutes(interval.start)) {
+        throw new Error(`${whereWished(studentId, day)}「${piece}」は、終わりの時刻が始まりより前です`)
+      }
 
-    intervals.push(interval)
-  })
+      intervals.push(interval)
+    })
 
   return intervals
 }
@@ -141,9 +139,7 @@ export function holdsSlot(interval: Interval, slot: Slot): boolean {
 export function checkDayCount(wish: Wish, days: Day[]): void {
   const answers = (wish.answers || []).length
   if (answers === days.length) return
-  throw new Error(
-    `条件入力の「日ごとの営業時刻」を ${answers} 日分入れてください（今: ${days.length} 行）`,
-  )
+  throw new Error(`条件入力の「日ごとの営業時刻」を ${answers} 日分入れてください（今: ${days.length} 行）`)
 }
 
 /** 崩れている場所を名指しする文の前半。 */

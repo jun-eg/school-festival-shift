@@ -8,18 +8,11 @@
  * 他のファイルの値をこのファイルの最上位で使わない（→ core.ts の同じ注意）。
  */
 
-import {
-  checkResultBackgrounds, fixedFromAssignmentGrid, fixedNote, friendsFromAnswers, fromAssignmentGrid,
-  gridBackgrounds, gridNotes, isFixedNote, missedEdits, namesFromAnswers, seenGrid, studentIdsFromAnswers,
-  toAssignmentGrid, violationCells,
-} from '../core/assignment-grid.ts'
+import { checkResultBackgrounds, fixedFromAssignmentGrid, fixedNote, friendsFromAnswers, fromAssignmentGrid, gridBackgrounds, gridNotes, isFixedNote, missedEdits, namesFromAnswers, seenGrid, studentIdsFromAnswers, toAssignmentGrid, violationCells } from '../core/assignment-grid.ts'
 import { build, outputNames, recount, sheetsNotRead } from '../core/core.ts'
 import { distributionImages } from '../core/distribution-image.ts'
 import { toDays } from '../core/input-types.ts'
-import {
-  assignmentName, candidateSeparator, checkKind, dividerColumn, dividerLine, fixedColumns, fixedName,
-  gridLayouts, internalError, outputColumns, sectionLastRow, sectionWidth, sheetLayout,
-} from '../core/sheet-layout.ts'
+import { assignmentName, candidateSeparator, checkKind, dividerColumn, dividerLine, fixedColumns, fixedName, gridLayouts, internalError, outputColumns, sectionLastRow, sectionWidth, sheetLayout } from '../core/sheet-layout.ts'
 import { checkStructure } from './verify-structure.ts'
 import type { SeenGrid } from '../core/assignment-grid.ts'
 import type { Layout, Section } from '../core/sheet-layout.ts'
@@ -33,16 +26,16 @@ export type Range = GoogleAppsScript.Spreadsheet.Range
 export type ReadGrid = Grid & { notes: string[][] }
 
 /** マス目 1 枚と、その構成。読んだもの（ReadGrid）も、敷いたもの（Grid）もこの形で持つ。 */
-export type GridOf<G extends Grid = Grid> = { layout: Layout, grid: G }
+export type GridOf<G extends Grid = Grid> = { layout: Layout; grid: G }
 
 /** マス目を敷くのに要る 4 つ（→ gridContext）。 */
-export type GridContext = { days: Day[], nameOf: ByStudentId | null, friendsOf?: ByStudentId, fixed?: Row[] }
+export type GridContext = { days: Day[]; nameOf: ByStudentId | null; friendsOf?: ByStudentId; fixed?: Row[] }
 
 /** 担当者に見せる一言と、見せておく秒数。 */
-export type Said = { text: string, seconds: number }
+export type Said = { text: string; seconds: number }
 
 /** 氏名から学籍番号を引けなかった人（→ fillStudentIds）。 */
-export type StudentIdFill = { ambiguous: string[], notFound: string[], failed?: string }
+export type StudentIdFill = { ambiguous: string[]; notFound: string[]; failed?: string }
 
 /** 殻がコアに渡す値の表現。コアはこの形の文字列と数値しか受け取らない（→ core.ts の checkRepresentation）。 */
 export const valueRepresentation = {
@@ -53,9 +46,7 @@ export const valueRepresentation = {
 
 /** 殻が読むシート。生成しか書かない 2 枚は読まない（→ core.ts の sheetsNotRead）。 */
 export function sheetsToRead(): string[] {
-  return sheetLayout
-    .filter((layout) => sheetsNotRead.indexOf(layout.name) === -1)
-    .map((layout) => layout.name)
+  return sheetLayout.filter((layout) => sheetsNotRead.indexOf(layout.name) === -1).map((layout) => layout.name)
 }
 
 /** 区画の見出しを置くシートは 2 行、置かないシートは 1 行が見出しである（→ build-template.ts）。 */
@@ -75,7 +66,7 @@ export function readInputs(spreadsheet: Spreadsheet): Inputs {
  * 前の周の列で止まる（→ 5-3）。
  * catchMissed のときは、取りこぼした書き換えに印を付けてから積む（→ markMissedEdits）。画像の書き出しは渡さない。
  */
-export function readInputsAndGrids(spreadsheet: Spreadsheet, forGeneration?: boolean, catchMissed?: boolean): { inputs: Inputs, grids: GridOf<ReadGrid>[] } {
+export function readInputsAndGrids(spreadsheet: Spreadsheet, forGeneration?: boolean, catchMissed?: boolean): { inputs: Inputs; grids: GridOf<ReadGrid>[] } {
   const inputs: Inputs = {}
   const grids: GridOf<ReadGrid>[] = []
 
@@ -92,7 +83,7 @@ export function readInputsAndGrids(spreadsheet: Spreadsheet, forGeneration?: boo
       return
     }
     layout.sections.forEach((section) => {
-      inputs[layout.hasSectionHeadings ? section.heading as string : name] = readSection(sheet, layout, section)
+      inputs[layout.hasSectionHeadings ? (section.heading as string) : name] = readSection(sheet, layout, section)
     })
   })
 
@@ -114,9 +105,7 @@ export function putGridsIntoInputs(inputs: Inputs, grids: GridOf<ReadGrid>[], fo
   grids.forEach((one) => {
     const day = days[one.layout.grid!.dayIndex]
     const fixed = one.layout.grid!.fixed
-    inputs[fixed] = inputs[fixed].concat(
-      fixedFromAssignmentGrid(one.grid.header, one.grid.rows, one.grid.notes, day, one.layout.name),
-    )
+    inputs[fixed] = inputs[fixed].concat(fixedFromAssignmentGrid(one.grid.header, one.grid.rows, one.grid.notes, day, one.layout.name))
     if (forGeneration) return
     const name = one.layout.grid!.of
     inputs[name] = inputs[name].concat(fromAssignmentGrid(one.grid.header, one.grid.rows, day, one.layout.name))
@@ -222,14 +211,8 @@ export function putNameDropdowns(spreadsheet: Spreadsheet, grids: GridOf[]): voi
   const answers = findSheet(spreadsheet, answerLayout.name)
   const answerHeaderRows = headerRowCount(answerLayout)
   const answerNameColumn = answerLayout.sections[0].startColumn + answerLayout.sections[0].columns.indexOf('氏名')
-  const candidates = answers.getRange(
-    answerHeaderRows + 1, answerNameColumn, Math.max(answers.getMaxRows() - answerHeaderRows, 1), 1,
-  )
-  const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(candidates, true)
-    .setAllowInvalid(false)
-    .setHelpText(nameDropdownHelp)
-    .build()
+  const candidates = answers.getRange(answerHeaderRows + 1, answerNameColumn, Math.max(answers.getMaxRows() - answerHeaderRows, 1), 1)
+  const rule = SpreadsheetApp.newDataValidation().requireValueInRange(candidates, true).setAllowInvalid(false).setHelpText(nameDropdownHelp).build()
 
   grids.forEach((one) => {
     const layout = one.layout
@@ -264,8 +247,7 @@ export function paintGrids(spreadsheet: Spreadsheet, grids: GridOf[], violations
     sheet.getRange(headerRows + 1, 1, maxRows - headerRows, width).clearFormat()
     const divider = dividerColumn(layout.sections[0])
     if (divider !== null) {
-      sheet.getRange(headerRows + 1, divider, maxRows - headerRows, 1)
-        .setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
+      sheet.getRange(headerRows + 1, divider, maxRows - headerRows, 1).setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
     }
     if (one.grid.rows.length > 0) {
       sheet.getRange(headerRows + 1, 1, one.grid.rows.length, width).setBackgrounds(gridBackgrounds(one.grid.rows, width))
@@ -350,17 +332,14 @@ export function writeGrids(spreadsheet: Spreadsheet, grids: Layout[], assignment
     // 印か名指しを載せる先がある人だけ行を残す。いまの枠に無い見出しの空のセルは載せない。
     const fixedToday = day
       ? fixed
-        .filter((row) => at(row, '日') === day.date)
-        .filter((row) => at(row, '役割') !== '' || day.slots.some((slot) => slot.start === at(row, '開始')))
-        .map((row) => String(at(row, '学籍番号')))
+          .filter((row) => at(row, '日') === day.date)
+          .filter((row) => at(row, '役割') !== '' || day.slots.some((slot) => slot.start === at(row, '開始')))
+          .map((row) => String(at(row, '学籍番号')))
       : []
     const grid = toAssignmentGrid(assignments, day, context.nameOf, fixedToday, context.friendsOf)
 
     if (grid.header.length > width) {
-      throw internalError(
-        `シート「${layout.name}」に ${grid.header.length - namedCount} 枠を敷こうとしたが、`
-          + `時刻の列は ${width - namedCount} 列しかない`,
-      )
+      throw internalError(`シート「${layout.name}」に ${grid.header.length - namedCount} 枠を敷こうとしたが、` + `時刻の列は ${width - namedCount} 列しかない`)
     }
 
     sheet.getRange(1, namedCount + 1, 1, width - namedCount).clearContent()
@@ -373,9 +352,7 @@ export function writeGrids(spreadsheet: Spreadsheet, grids: Layout[], assignment
     sheet.getRange(1, namedCount + 1, 1, width - namedCount).setHorizontalAlignment('left')
 
     if (grid.header.length > namedCount) {
-      sheet
-        .getRange(1, namedCount + 1, 1, grid.header.length - namedCount)
-        .setValues([grid.header.slice(namedCount)])
+      sheet.getRange(1, namedCount + 1, 1, grid.header.length - namedCount).setValues([grid.header.slice(namedCount)])
     }
     if (grid.rows.length > 0) {
       const written = sheet.getRange(headerRows + 1, 1, grid.rows.length, grid.header.length)
@@ -461,8 +438,7 @@ export function recountOnEdit(event: GoogleAppsScript.Events.SheetsOnEdit | null
     const unmet = kinds.filter((kind) => kind === checkKind.unmet).length
     // 違反のセルの印は色ではなく赤い太字である（→ paintGrids）。
     return withFillText({
-      text: `集計し直しました：違反 ${violations} 件／人数不足 ${unmet} 件`
-        + (violations === 0 ? '' : '（違反のセルは赤い太字です）'),
+      text: `集計し直しました：違反 ${violations} 件／人数不足 ${unmet} 件` + (violations === 0 ? '' : '（違反のセルは赤い太字です）'),
       seconds: 5,
     })
   } catch (error) {
@@ -499,9 +475,7 @@ export function fillStudentIds(spreadsheet: Spreadsheet, range: Range): StudentI
 
   const studentIds = sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).getValues()
   const names = sheet.getRange(top, nameColumn, bottom - top + 1, 1).getValues()
-  const waiting = names
-    .map((row, index) => ({ index: index, name: normalizeValue(row[0]) as string, studentId: normalizeValue(studentIds[index][0]) as string }))
-    .filter((one) => (one.name !== '' || one.studentId !== '') && (!studentIdsEdited || one.studentId === ''))
+  const waiting = names.map((row, index) => ({ index: index, name: normalizeValue(row[0]) as string, studentId: normalizeValue(studentIds[index][0]) as string })).filter((one) => (one.name !== '' || one.studentId !== '') && (!studentIdsEdited || one.studentId === ''))
   if (waiting.length === 0) return result
 
   // 回答を読むのは、氏名の入った行があるときだけである（氏名を消しただけなら要らない）。
@@ -512,9 +486,7 @@ export function fillStudentIds(spreadsheet: Spreadsheet, range: Range): StudentI
     if (one.name !== '') {
       if (!studentIdsOf) {
         const answerLayout = findLayout('回答')
-        studentIdsOf = studentIdsFromAnswers(
-          readSection(findSheet(spreadsheet, answerLayout.name), answerLayout, answerLayout.sections[0]),
-        )
+        studentIdsOf = studentIdsFromAnswers(readSection(findSheet(spreadsheet, answerLayout.name), answerLayout, answerLayout.sections[0]))
       }
       const found = studentIdsOf(one.name)
       if (found.indexOf(one.studentId.toUpperCase()) !== -1) return
@@ -541,10 +513,7 @@ export function studentIdFillText(filled: StudentIdFill): string {
   const quoted = (names: string[]) => names.map((name) => `「${name}」`).join('・')
   const texts: string[] = []
   if (filled.ambiguous.length > 0) {
-    texts.push(
-      `同じ氏名で異なる学籍番号の人が複数いたため、学籍番号を自動入力できませんでした（氏名${quoted(filled.ambiguous)}）。`
-        + '「回答」シートで確かめて、学籍番号を手で入れてください',
-    )
+    texts.push(`同じ氏名で異なる学籍番号の人が複数いたため、学籍番号を自動入力できませんでした（氏名${quoted(filled.ambiguous)}）。` + '「回答」シートで確かめて、学籍番号を手で入れてください')
   }
   if (filled.notFound.length > 0) {
     texts.push(`「回答」シートに同じ氏名が無いため、学籍番号を自動入力できませんでした（氏名${quoted(filled.notFound)}）`)
@@ -585,11 +554,13 @@ export function markFixedCells(range: Range): number {
   const slots = sheet.getRange(top, namedCount + 1, bottom - top + 1, width - namedCount)
   const values = slots.getValues()
   const before = slots.getNotes()
-  const after = values.map((row, rowIndex) => row.map((cell, column) => {
-    if (normalizeValue(cell) === '' || isFixedNote(before[rowIndex][column])) return before[rowIndex][column]
-    marked += 1
-    return fixedNote
-  }))
+  const after = values.map((row, rowIndex) =>
+    row.map((cell, column) => {
+      if (normalizeValue(cell) === '' || isFixedNote(before[rowIndex][column])) return before[rowIndex][column]
+      marked += 1
+      return fixedNote
+    }),
+  )
   slots.setNotes(after)
   return marked
 }
@@ -651,7 +622,11 @@ function keepSeenGrid(sheet: Sheet, seen: SeenGrid | null): void {
     found.slice(1).forEach((one) => one.remove())
   } catch (error) {
     found.forEach((one) => {
-      try { one.remove() } catch (ignored) { /* 外せなくても止めない */ }
+      try {
+        one.remove()
+      } catch (ignored) {
+        /* 外せなくても止めない */
+      }
     })
   }
 }

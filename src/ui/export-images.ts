@@ -77,10 +77,7 @@ function show(images: DistributionImage[]) {
     drawn++
   })
 
-  say(
-    drawn + ' 枚の画像を作成しました。保存して LINE ノートに貼ってください。'
-      + '保存が始まらないときは、画像を右クリック（スマホは長押し）で保存できます。',
-  )
+  say(drawn + ' 枚の画像を作成しました。保存して LINE ノートに貼ってください。' + '保存が始まらないときは、画像を右クリック（スマホは長押し）で保存できます。')
   if (drawn > 1) {
     saveAll.textContent = drawn + ' 枚まとめて保存'
     saveAll.hidden = false
@@ -89,7 +86,9 @@ function show(images: DistributionImage[]) {
 
 saveAll.addEventListener('click', function () {
   links.forEach(function (link, index) {
-    setTimeout(function () { link.click() }, index * 400)
+    setTimeout(function () {
+      link.click()
+    }, index * 400)
   })
 })
 

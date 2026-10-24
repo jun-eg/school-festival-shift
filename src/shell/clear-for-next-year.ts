@@ -12,20 +12,16 @@
  * 複製されたフォームそのものはゴミ箱に移さない。消すにはドライブのスコープが要るので、担当者の手でやる。
  */
 
-import {
-  assignmentName, dividerColumn, dividerLine, formUrlBlock, gridLayouts, sectionWidth,
-} from '../core/sheet-layout.ts'
+import { assignmentName, dividerColumn, dividerLine, formUrlBlock, gridLayouts, sectionWidth } from '../core/sheet-layout.ts'
 import { findLayout, findSheet, headerRowCount, seenGridKey } from './shell.ts'
 import type { Sheet, Spreadsheet } from './shell.ts'
 import type { Layout } from '../core/sheet-layout.ts'
 
 /** 空にした結果。formUrl はフォームに紐付いていたときだけ入る。 */
-export type Cleared = { formUrl: string | null, log: string[] }
+export type Cleared = { formUrl: string | null; log: string[] }
 
 /** 押したときに出す確認。元のファイルで押すと、今年の回答が消える。 */
-export const clearConfirmText = 'このファイルの回答・シフト表・検証結果・指標を消し、フォームとの紐付けを外します。'
-  + '条件入力の値は残ります。\n\n'
-  + '元のファイルではなく、「ファイル → コピーを作成」で作ったコピーで押していますか？'
+export const clearConfirmText = 'このファイルの回答・シフト表・検証結果・指標を消し、フォームとの紐付けを外します。' + '条件入力の値は残ります。\n\n' + '元のファイルではなく、「ファイル → コピーを作成」で作ったコピーで押していますか？'
 
 /** メニュー「来年用に空にする」の入口。確かめてから空にし、複製されたフォームの後始末を伝える。 */
 export function clearForNextYear(): void {
@@ -41,10 +37,7 @@ export function clearForNextYear(): void {
 export function clearedText(formUrl: string | null): string {
   const handover = '次の担当者には、このファイルを渡してください（受け取った人はコピーして使います）。'
   if (!formUrl) return handover
-  return 'このコピーと一緒に複製されたフォームの紐付けを外しました。'
-    + 'そのフォームは使わないので、Google ドライブでゴミ箱に移してください。\n'
-    + `${formUrl}\n\n`
-    + handover
+  return 'このコピーと一緒に複製されたフォームの紐付けを外しました。' + 'そのフォームは使わないので、Google ドライブでゴミ箱に移してください。\n' + `${formUrl}\n\n` + handover
 }
 
 /**
@@ -77,10 +70,7 @@ function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): string | nul
   try {
     form = FormApp.openByUrl(formUrl)
   } catch (error) {
-    throw new Error(
-      `「回答」シートに紐付いたフォームを開けませんでした（${formUrl}）。`
-        + '「回答」タブの ▼ →「フォームのリンクを解除」を押してから、もう一度「来年用に空にする」を押してください',
-    )
+    throw new Error(`「回答」シートに紐付いたフォームを開けませんでした（${formUrl}）。` + '「回答」タブの ▼ →「フォームのリンクを解除」を押してから、もう一度「来年用に空にする」を押してください')
   }
   form.removeDestination()
   SpreadsheetApp.flush()
@@ -128,11 +118,11 @@ function clearGrid(sheet: Sheet, layout: Layout, log: string[]): void {
     body.clearDataValidations()
     const divider = dividerColumn(section)
     if (divider !== null) {
-      sheet.getRange(headerRows + 1, divider, maxRows - headerRows, 1)
-        .setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
+      sheet.getRange(headerRows + 1, divider, maxRows - headerRows, 1).setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
     }
   }
-  sheet.getDeveloperMetadata()
+  sheet
+    .getDeveloperMetadata()
     .filter((one) => one.getKey() === seenGridKey)
     .forEach((one) => one.remove())
   log.push(`「${layout.name}」を空にした（${people} 行）`)

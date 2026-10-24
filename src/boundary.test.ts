@@ -21,9 +21,30 @@ const coreDir = path.join(srcDir, 'core')
 
 /** Apps Script が置くグローバル。console はブラウザにも Node にもあるので数えない。 */
 const gasGlobals = [
-  'SpreadsheetApp', 'FormApp', 'HtmlService', 'DriveApp', 'Utilities', 'PropertiesService', 'CacheService',
-  'ScriptApp', 'Session', 'LockService', 'UrlFetchApp', 'DocumentApp', 'SlidesApp', 'CardService', 'MailApp',
-  'GmailApp', 'CalendarApp', 'ContentService', 'Logger', 'Browser', 'Charts', 'Maps', 'XmlService', 'Jdbc',
+  'SpreadsheetApp',
+  'FormApp',
+  'HtmlService',
+  'DriveApp',
+  'Utilities',
+  'PropertiesService',
+  'CacheService',
+  'ScriptApp',
+  'Session',
+  'LockService',
+  'UrlFetchApp',
+  'DocumentApp',
+  'SlidesApp',
+  'CardService',
+  'MailApp',
+  'GmailApp',
+  'CalendarApp',
+  'ContentService',
+  'Logger',
+  'Browser',
+  'Charts',
+  'Maps',
+  'XmlService',
+  'Jdbc',
   // globalThis.SpreadsheetApp の形で掴むのも止める（. の後ろの名前は見えないので、globalThis そのものを止める）。
   'globalThis',
 ]
@@ -44,7 +65,10 @@ function gasGlobalsUsedIn(source) {
   return gasGlobals.filter((name) => used.has(name))
 }
 
-const coreFiles = fs.readdirSync(coreDir).filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts')).sort()
+const coreFiles = fs
+  .readdirSync(coreDir)
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+  .sort()
 const sources = Object.fromEntries(coreFiles.map((name) => [name, fs.readFileSync(path.join(coreDir, name), 'utf8')]))
 
 // ---- ① import が core/ の中だけを指す ---------------------------------------
@@ -55,11 +79,7 @@ check(
   [],
 )
 
-check(
-  '① src/core/ のファイルは 13 本（型の types.ts を足した）あり、import を読み取れている（検査が空振りしていない）',
-  [coreFiles.length, coreFiles.filter((name) => importSpecifiersIn(sources[name]).length > 0).length >= 8],
-  [13, true],
-)
+check('① src/core/ のファイルは 13 本（型の types.ts を足した）あり、import を読み取れている（検査が空振りしていない）', [coreFiles.length, coreFiles.filter((name) => importSpecifiersIn(sources[name]).length > 0).length >= 8], [13, true])
 
 // ---- ② Apps Script のグローバルを参照しない ---------------------------------
 
@@ -85,19 +105,11 @@ check(
 
 check(
   '③ core/ の中どうしの import と、コメント・文字列に書いた import は止まらない',
-  [
-    importsOutsideCore('core/a.ts', "import { build } from './core.ts'\n"),
-    importsOutsideCore('core/a.ts', "import { build } from '../core/core.ts'\n"),
-    importsOutsideCore('core/a.ts', "// import { run } from '../shell/shell.ts'\nconst text = \"import x from '../shell/shell.ts'\"\n"),
-  ],
+  [importsOutsideCore('core/a.ts', "import { build } from './core.ts'\n"), importsOutsideCore('core/a.ts', "import { build } from '../core/core.ts'\n"), importsOutsideCore('core/a.ts', "// import { run } from '../shell/shell.ts'\nconst text = \"import x from '../shell/shell.ts'\"\n")],
   [[], [], []],
 )
 
-check(
-  '③ パッケージの import は止まる',
-  importsOutsideCore('core/a.ts', "import fs from 'node:fs'\nimport x from 'left-pad'\n"),
-  ['node:fs', 'left-pad'],
-)
+check('③ パッケージの import は止まる', importsOutsideCore('core/a.ts', "import fs from 'node:fs'\nimport x from 'left-pad'\n"), ['node:fs', 'left-pad'])
 
 check(
   '③ Apps Script のグローバルの参照は止まり、コメントと文字列の中の名前は止まらない',

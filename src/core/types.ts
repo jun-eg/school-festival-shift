@@ -12,7 +12,7 @@ export type Cell = string | number
 export type Row = Cell[]
 
 /** 30 分枠 1 つ。時刻は HH:MM。 */
-export type Slot = { start: string, end: string }
+export type Slot = { start: string; end: string }
 
 /** 型 #1（枠）— 日ごとの営業時刻と、そこから刻んだ 30 分枠。 */
 export type Day = {
@@ -32,7 +32,7 @@ export type TimeKey = 'prepStart' | 'cookStart' | 'cookEnd' | 'cleanupStart' | '
 export type DayTimes = Omit<Day, 'slots'>
 
 /** 型 #2（役割と必要人数）・型 #4（委員会の指定枠）の 1 行。日・開始・終了は空でもよい。 */
-export type Need = { date: string, start: string, end: string, role: string, count: number }
+export type Need = { date: string; start: string; end: string; role: string; count: number }
 
 /** 型 #3（調理責任者の学年条件）— 学年の集合。 */
 export type CookLeaderGrades = string[]
@@ -44,7 +44,7 @@ export type PrepCleanupRule = { noonBoundary: string }
 export type PlacementRule = { minRun: number }
 
 /** 型 #6（希望）— 回答 1 件。answers は日ごとの回答 4 つ（位置のまま）。 */
-export type Wish = { studentId: string, grade: string, canCook: boolean, answers: string[] }
+export type Wish = { studentId: string; grade: string; canCook: boolean; answers: string[] }
 
 /** 条件入力の 6 区画を型に直したもの（→ core.ts の takeConditions）。キーは input-types.ts の key である。 */
 export type Conditions = {
@@ -57,7 +57,7 @@ export type Conditions = {
 }
 
 /** 展開する段の出力 — 1 人 1 日の候補の枠。 */
-export type Candidate = { studentId: string, date: string, slots: Slot[] }
+export type Candidate = { studentId: string; date: string; slots: Slot[] }
 
 /** コアが受け取る入力 — 入力の名前から行の配列への対応（→ core.ts の inputNames）。 */
 export type Inputs = Record<string, Row[]>
@@ -86,7 +86,7 @@ export type FixedLine = {
 }
 
 /** 中身の入っていない段の名指し（→ core.ts の coreSteps）。 */
-export type NotBuiltStep = { name: string, issue: number, writesTo: string | null, whatItDoes: string }
+export type NotBuiltStep = { name: string; issue: number; writesTo: string | null; whatItDoes: string }
 
 /** 段の関数。引数は段ごとに違う（→ core.ts の build）ので、ここでは束ねて持つ。 */
 export type StepFunction = (...args: any[]) => unknown[]
@@ -96,20 +96,20 @@ export type Steps = Record<string, StepFunction>
 
 /** コアが返す束（→ core.ts の build）。 */
 export type Output = {
-  '割り当て': Row[]
-  '検証結果': Row[]
-  '指標': Row[]
+  割り当て: Row[]
+  検証結果: Row[]
+  指標: Row[]
   notBuilt: NotBuiltStep[]
 }
 
 /** 割り当てのマス目 1 枚（→ assignment-grid.ts）。header は名前のある列の見出しと時刻、rows は人ごとの行。 */
-export type Grid = { header: Row, rows: Row[] }
+export type Grid = { header: Row; rows: Row[] }
 
 /** ダイアログから google.script.run で届く、選んだ画像（→ ui/form-picker.ts ／ shell/build-form.ts）。 */
-export type PickedRoster = { base64: string, mimeType: string, fileName: string }
+export type PickedRoster = { base64: string; mimeType: string; fileName: string }
 
 /** フォームを作った結果。ダイアログの成功ハンドラに渡る（→ ui/form-picker.ts の done）。 */
-export type BuiltForm = { url: string, editUrl: string, log: string[] }
+export type BuiltForm = { url: string; editUrl: string; log: string[] }
 
 /** 殻が読んだ回答から、学籍番号で引く関数。 */
 export type ByStudentId = (studentId: string) => string

@@ -20,16 +20,25 @@ const 宣言 = JSON.parse(読む('scripts/まとまりと散らしの宣言.json
 // ---- 実装を読む ------------------------------------------------------------
 
 const 文脈 = 実装の文脈()
-const {
-  build, takeConditions, takeIn, expand, sheetColumns,
-  allNeeds, requiredAt, rolesInOrder, roleSlotKey,
-  peopleToPlace, canStandAt, prepCleanupStaysPossible, prepCleanupNotBothBands, prepCleanupRoles,
-  noonBoundaryToPlaceBy, minRunSlotsToPlaceBy, runExceptions, slotMinutes,
-} = 取り出す(文脈, [
-  'build', 'takeConditions', 'takeIn', 'expand', 'sheetColumns',
-  'allNeeds', 'requiredAt', 'rolesInOrder', 'roleSlotKey',
-  'peopleToPlace', 'canStandAt', 'prepCleanupStaysPossible', 'prepCleanupNotBothBands', 'prepCleanupRoles',
-  'noonBoundaryToPlaceBy', 'minRunSlotsToPlaceBy', 'runExceptions', 'slotMinutes',
+const { build, takeConditions, takeIn, expand, sheetColumns, allNeeds, requiredAt, rolesInOrder, roleSlotKey, peopleToPlace, canStandAt, prepCleanupStaysPossible, prepCleanupNotBothBands, prepCleanupRoles, noonBoundaryToPlaceBy, minRunSlotsToPlaceBy, runExceptions, slotMinutes } = 取り出す(文脈, [
+  'build',
+  'takeConditions',
+  'takeIn',
+  'expand',
+  'sheetColumns',
+  'allNeeds',
+  'requiredAt',
+  'rolesInOrder',
+  'roleSlotKey',
+  'peopleToPlace',
+  'canStandAt',
+  'prepCleanupStaysPossible',
+  'prepCleanupNotBothBands',
+  'prepCleanupRoles',
+  'noonBoundaryToPlaceBy',
+  'minRunSlotsToPlaceBy',
+  'runExceptions',
+  'slotMinutes',
 ])
 
 // ---- 案を 1 つ組む ---------------------------------------------------------
@@ -65,7 +74,9 @@ const 枠の人数 = {}
 /** 置く前の人（→ src/generate.js）。「その日に置ける人」を見るのに使う。 */
 const 置く前の人 = peopleToPlace(候補, 希望)
 const 人を引く = {}
-置く前の人.forEach((一人) => { 人を引く[一人.studentId] = 一人 })
+置く前の人.forEach((一人) => {
+  人を引く[一人.studentId] = 一人
+})
 
 // ---- 塊を数える ------------------------------------------------------------
 
@@ -81,7 +92,10 @@ function 塊を切る(一日, 学籍番号) {
   一日.slots.forEach((枠, i) => {
     const 役割 = 置いた役割[`${一日.date} ${枠.start}-${枠.end} ${学籍番号}`]
     const 続き = いま && 役割 === いま.役割 && 隣り合う(一日.slots[i - 1], 枠)
-    if (続き) { いま.終わり = i; return }
+    if (続き) {
+      いま.終わり = i
+      return
+    }
     いま = 役割 ? { 学籍番号: 学籍番号, 役割: 役割, 始め: i, 終わり: i } : null
     if (いま) 塊.push(いま)
   })
@@ -126,7 +140,7 @@ function 中央(数の列) {
 }
 
 /** 枠の数を時間にする（枠の刻みは src/input-types.js が持つ）。 */
-const 時間で = (枠の数) => 枠の数 * slotMinutes / 60
+const 時間で = (枠の数) => (枠の数 * slotMinutes) / 60
 
 // ---- 散らしを数える --------------------------------------------------------
 
@@ -140,20 +154,20 @@ const 時間で = (枠の数) => 枠の数 * slotMinutes / 60
  * 混ぜると、準備・片付けしか無い日に「置けないはずの人が置かれている」が出る。
  */
 function その日に置けるか(一人, 一日) {
-  return 一日.slots.some((枠) => 役割の並び.some((役割) => {
-    if (requiredAt(需要, 一日, 枠, 役割).count === 0) return false
-    if (!canStandAt(一人, 一日, 枠, 役割, 条件)) return false
-    if (!prepCleanupNotBothBands(一人, 一日, 役割)) return false
-    if (prepCleanupRoles().indexOf(役割) !== -1) return true
-    return prepCleanupStaysPossible(一人, 一日, 枠, 境目)
-  }))
+  return 一日.slots.some((枠) =>
+    役割の並び.some((役割) => {
+      if (requiredAt(需要, 一日, 枠, 役割).count === 0) return false
+      if (!canStandAt(一人, 一日, 枠, 役割, 条件)) return false
+      if (!prepCleanupNotBothBands(一人, 一日, 役割)) return false
+      if (prepCleanupRoles().indexOf(役割) !== -1) return true
+      return prepCleanupStaysPossible(一人, 一日, 枠, 境目)
+    }),
+  )
 }
 
 /** 日 1 つぶんを数える。 */
 function 日ごとに数える(一日) {
-  const 候補枠を持つ人 = 置く前の人.filter((一人) => (
-    一日.slots.some((枠) => 一人.slots[`${一日.date} ${枠.start}-${枠.end}`])
-  ))
+  const 候補枠を持つ人 = 置く前の人.filter((一人) => 一日.slots.some((枠) => 一人.slots[`${一日.date} ${枠.start}-${枠.end}`]))
   const 置ける人 = 候補枠を持つ人.filter((一人) => その日に置けるか(一人, 一日))
 
   const 塊 = []
@@ -165,10 +179,12 @@ function 日ごとに数える(一日) {
     })
   })
 
-  const 短い塊 = 塊.filter((一つ) => 長さ(一つ) < まとまりの枠).map((一つ) => {
-    const 端 = [端の名前(一日, 一つ, 1), 端の名前(一日, 一つ, -1)]
-    return { 塊: 一つ, 端: 端, 名前が付かない: 端.some((名前) => 名前 === null) }
-  })
+  const 短い塊 = 塊
+    .filter((一つ) => 長さ(一つ) < まとまりの枠)
+    .map((一つ) => {
+      const 端 = [端の名前(一日, 一つ, 1), 端の名前(一日, 一つ, -1)]
+      return { 塊: 一つ, 端: 端, 名前が付かない: 端.some((名前) => 名前 === null) }
+    })
 
   const 置かれた人 = Object.keys(置かれた枠)
   const ひとりぶんの枠 = 置かれた人.map((学籍番号) => 置かれた枠[学籍番号])
@@ -201,10 +217,7 @@ const 名前が付かない短い塊 = 短い塊の全部.filter((一つ) => 一
 const 例外の内訳 = runExceptions.map((例外) => ({
   what: 例外.what,
   why: 例外.why,
-  件数: 短い塊の全部.filter((一つ) => (
-    !一つ.名前が付かない
-      && 例外の順位(一つ.端) === 例外.what
-  )).length,
+  件数: 短い塊の全部.filter((一つ) => !一つ.名前が付かない && 例外の順位(一つ.端) === 例外.what).length,
 }))
 
 function 例外の順位(端) {
@@ -215,14 +228,14 @@ function 例外の順位(端) {
 }
 
 const 実際 = {
-  '割り当ての行': 出力['割り当て'].length,
-  '塊': 日ごと.map((一日) => 一日.塊),
-  '最小の長さに届かない塊': 日ごと.map((一日) => 一日.短い塊.length),
+  割り当ての行: 出力['割り当て'].length,
+  塊: 日ごと.map((一日) => 一日.塊),
+  最小の長さに届かない塊: 日ごと.map((一日) => 一日.短い塊.length),
   '塊の中央（時間）': 日ごと.map((一日) => 時間で(一日.塊の中央)),
-  '候補枠を持つ人': 日ごと.map((一日) => 一日.候補枠を持つ人),
-  '置ける人': 日ごと.map((一日) => 一日.置ける人),
-  '置かれた人': 日ごと.map((一日) => 一日.置かれた人),
-  '置けるのに置かれない人': 日ごと.map((一日) => 一日.置けるのに置かれない人),
+  候補枠を持つ人: 日ごと.map((一日) => 一日.候補枠を持つ人),
+  置ける人: 日ごと.map((一日) => 一日.置ける人),
+  置かれた人: 日ごと.map((一日) => 一日.置かれた人),
+  置けるのに置かれない人: 日ごと.map((一日) => 一日.置けるのに置かれない人),
   '1 人あたりの中央（時間）': 日ごと.map((一日) => 時間で(一日.ひとりぶんの中央)),
   '1 人あたりの最大（時間）': 日ごと.map((一日) => 時間で(一日.ひとりぶんの最大)),
 }
@@ -231,9 +244,7 @@ const 外れた = Object.keys(実際).filter((名) => JSON.stringify(実際[名]
 
 // どの行もちょうど 1 つの塊に入るので、長さの合計は割り当ての行数と揃う（→ 宣言の「塊の切り方」）。
 // 揃わなければ数えた先が案と違うので、件数の合否より先に落ちる。
-const 塊の長さの合計 = 日ごと.reduce(
-  (合計, 一日) => 合計 + 一日.塊の長さ, 0,
-)
+const 塊の長さの合計 = 日ごと.reduce((合計, 一日) => 合計 + 一日.塊の長さ, 0)
 const 突き合わせ = [
   {
     何: '塊の長さの合計 ＝ 割り当ての行数（どの行もちょうど 1 つの塊に入る）',
@@ -268,11 +279,7 @@ function 主処理() {
   console.log('')
   console.log('塊（同じ人・同じ日で、隣り合う枠に同じ役割が続いた区間。1 件 = 1 つの持ち場）')
   日ごと.forEach((一日) => {
-    console.log(
-      `  ${一日.日}  塊 ${String(一日.塊).padStart(3)} 件`
-        + ` ／ ${時間で(まとまりの枠)} 時間に届かない ${String(一日.短い塊.length).padStart(3)} 件`
-        + ` ／ 中央 ${時間で(一日.塊の中央)}h ／ 最長 ${時間で(一日.塊の最長)}h`,
-    )
+    console.log(`  ${一日.日}  塊 ${String(一日.塊).padStart(3)} 件` + ` ／ ${時間で(まとまりの枠)} 時間に届かない ${String(一日.短い塊.length).padStart(3)} 件` + ` ／ 中央 ${時間で(一日.塊の中央)}h ／ 最長 ${時間で(一日.塊の最長)}h`)
   })
 
   console.log('')
@@ -281,34 +288,18 @@ function 主処理() {
     console.log(`  ・${一つ.what}: ${一つ.件数} 件`)
     console.log(`      ${一つ.why}`)
   })
-  console.log(
-    `  ${名前が付かない短い塊.length === 宣言.合格の線.名前が付かない短い塊 ? 'OK ' : 'NG '}`
-      + ` 例外に名前が付かない: ${名前が付かない短い塊.length} 件`
-      + `（線 ${宣言.合格の線.名前が付かない短い塊}）`,
-  )
+  console.log(`  ${名前が付かない短い塊.length === 宣言.合格の線.名前が付かない短い塊 ? 'OK ' : 'NG '}` + ` 例外に名前が付かない: ${名前が付かない短い塊.length} 件` + `（線 ${宣言.合格の線.名前が付かない短い塊}）`)
   名前が付かない短い塊.slice(0, 20).forEach((一つ) => {
     const 一日 = 条件.days.filter((日) => 日.date === 日付を引く(一つ))[0]
     const 枠 = 一日.slots[一つ.塊.始め]
-    console.log(
-      `      ・${一日.date} ${枠.start} ${一つ.塊.役割} ${一つ.塊.学籍番号}`
-        + ` … 端の名前 ${一つ.端.map((名前) => 名前 || '（無い）').join(' ／ ')}`,
-    )
+    console.log(`      ・${一日.date} ${枠.start} ${一つ.塊.役割} ${一つ.塊.学籍番号}` + ` … 端の名前 ${一つ.端.map((名前) => 名前 || '（無い）').join(' ／ ')}`)
   })
 
   console.log('')
   console.log('散らし（その日に候補枠を持つ人のうち、何人が置かれたか）')
   日ごと.forEach((一日) => {
-    console.log(
-      `  ${一日.日}  候補枠を持つ人 ${String(一日.候補枠を持つ人).padStart(2)}`
-        + ` ／ 置ける人 ${String(一日.置ける人).padStart(2)}`
-        + ` ／ 置かれた人 ${String(一日.置かれた人).padStart(2)}`
-        + ` ／ 1 人あたり 中央 ${時間で(一日.ひとりぶんの中央)}h・最大 ${時間で(一日.ひとりぶんの最大)}h`,
-    )
-    console.log(
-      `                  規則 3 で置けない人 ${一日.規則3で置けない人} 人`
-        + `（準備・片付けとの向きが合わない → 5-5）`
-        + ` ／ 置けるのに置かれない人 ${一日.置けるのに置かれない人} 人`,
-    )
+    console.log(`  ${一日.日}  候補枠を持つ人 ${String(一日.候補枠を持つ人).padStart(2)}` + ` ／ 置ける人 ${String(一日.置ける人).padStart(2)}` + ` ／ 置かれた人 ${String(一日.置かれた人).padStart(2)}` + ` ／ 1 人あたり 中央 ${時間で(一日.ひとりぶんの中央)}h・最大 ${時間で(一日.ひとりぶんの最大)}h`)
+    console.log(`                  規則 3 で置けない人 ${一日.規則3で置けない人} 人` + `（準備・片付けとの向きが合わない → 5-5）` + ` ／ 置けるのに置かれない人 ${一日.置けるのに置かれない人} 人`)
   })
 
   console.log('')
@@ -353,12 +344,7 @@ function 主処理() {
   }
 
   console.log('')
-  console.log(
-    `結果: 最小の長さに届かない塊 ${短い塊の全部.length} 件`
-      + `（うち例外に名前が付かない ${名前が付かない短い塊.length} 件・線 ${宣言.合格の線.名前が付かない短い塊}）`
-      + ` ／ 塊 ${日ごと.reduce((合計, 一日) => 合計 + 一日.塊, 0)} 件`
-      + ` ／ 割り当て ${出力['割り当て'].length} 行`,
-  )
+  console.log(`結果: 最小の長さに届かない塊 ${短い塊の全部.length} 件` + `（うち例外に名前が付かない ${名前が付かない短い塊.length} 件・線 ${宣言.合格の線.名前が付かない短い塊}）` + ` ／ 塊 ${日ごと.reduce((合計, 一日) => 合計 + 一日.塊, 0)} 件` + ` ／ 割り当て ${出力['割り当て'].length} 行`)
   console.log('      違反と未充足の合否はここで言わない（→ node scripts/M2の判定.mjs）')
   console.log('')
 

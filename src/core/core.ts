@@ -15,10 +15,7 @@ import { fairnessMetrics } from './fairness-metrics.ts'
 import { generate, nameFixedConflicts } from './generate.ts'
 import { conditionTypes, toType } from './input-types.ts'
 import { nameUnmet } from './name-unmet.ts'
-import {
-  assignmentName, assignmentSection, candidateSeparator, checkKind, fixedName, internalError, outputColumns,
-  sheetLayout,
-} from './sheet-layout.ts'
+import { assignmentName, assignmentSection, candidateSeparator, checkKind, fixedName, internalError, outputColumns, sheetLayout } from './sheet-layout.ts'
 import { takeIn } from './take-in.ts'
 import type { Section } from './sheet-layout.ts'
 import type { Candidate, Cell, Conditions, Inputs, NotBuiltStep, Output, Row, StepFunction, Steps, Wish } from './types.ts'
@@ -43,13 +40,13 @@ export const coreSteps: NotBuiltStep[] = [
  */
 export function builtInSteps(): Record<string, StepFunction> {
   return {
-    '取り込む': takeIn,
-    '展開する': expand,
-    '固定を照らす': nameFixedConflicts,
-    '生成する': generate,
-    '違反を数える': countViolations,
-    '未充足を名指しする': nameUnmet,
-    '指標を出す': fairnessMetrics,
+    取り込む: takeIn,
+    展開する: expand,
+    固定を照らす: nameFixedConflicts,
+    生成する: generate,
+    違反を数える: countViolations,
+    未充足を名指しする: nameUnmet,
+    指標を出す: fairnessMetrics,
   }
 }
 
@@ -74,19 +71,19 @@ export function inputNames(): string[] {
     if (sheetsNotRead.indexOf(layout.name) !== -1) return
     // マス目の 4 枚は、まとまって 2 つの入力になる。
     if (layout.grid) {
-      ;[layout.grid.of, layout.grid.fixed].forEach((name) => { if (names.indexOf(name) === -1) names.push(name) })
+      ;[layout.grid.of, layout.grid.fixed].forEach((name) => {
+        if (names.indexOf(name) === -1) names.push(name)
+      })
       return
     }
-    layout.sections.forEach((section) => names.push(layout.hasSectionHeadings ? section.heading as string : layout.name))
+    layout.sections.forEach((section) => names.push(layout.hasSectionHeadings ? (section.heading as string) : layout.name))
   })
   return names
 }
 
 /** 条件入力の 6 区画の名前。段に渡るのはここから直した型のほうである（→ takeConditions）。 */
 export function conditionNames(): string[] {
-  return sheetLayout
-    .filter((layout) => layout.name === '条件入力')[0]
-    .sections.map((section) => section.heading as string)
+  return sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.map((section) => section.heading as string)
 }
 
 /**
@@ -101,7 +98,9 @@ export function build(inputs: Inputs, steps?: Steps): Output {
   checkRepresentation(inputs)
   const stepsToCall = builtInSteps()
   const given: Steps = steps || {}
-  Object.keys(given).forEach((name) => { stepsToCall[name] = given[name] })
+  Object.keys(given).forEach((name) => {
+    stepsToCall[name] = given[name]
+  })
   const notBuilt: NotBuiltStep[] = []
 
   function callStep<T = Row>(name: string, args: unknown[]): T[] {
@@ -136,7 +135,7 @@ export function build(inputs: Inputs, steps?: Steps): Output {
   // 食い違った固定を先頭に置く。未充足は何十行も並ぶので、後ろだと目に入らない。
   // 候補から、その枠にもう置かれている人を外すので、割り当ても渡す（数え直しではマス目に書いてあるとおり）。
   const checks = withCandidates(fixConflicts.concat(violations, unmet), candidates, assignments)
-  const output = { '割り当て': assignments, '検証結果': checks, '指標': metrics }
+  const output = { 割り当て: assignments, 検証結果: checks, 指標: metrics }
   checkOutput(output)
   return { ...output, notBuilt: notBuilt }
 }
@@ -149,12 +148,14 @@ export function build(inputs: Inputs, steps?: Steps): Output {
  * 固定は照らさない（→ noFixedToCheck）。照らすと、同じ 1 セルが違反と食い違った固定の 2 行で出る。
  */
 export function recount(inputs: Inputs): Output {
-  return build(inputs, { '固定を照らす': noFixedToCheck, '生成する': keepAsPlaced(inputs[assignmentName]) })
+  return build(inputs, { 固定を照らす: noFixedToCheck, 生成する: keepAsPlaced(inputs[assignmentName]) })
 }
 
 /** 「生成する」の段の代わり。マス目に書いてあるとおり（placed）を、1 枠も足さず外さず返す。 */
 export function keepAsPlaced(placed: Row[]): StepFunction {
-  return function () { return placed }
+  return function () {
+    return placed
+  }
 }
 
 /** 「固定を照らす」の段の代わり。数え直しでは照らさない（→ recount の注意）。 */
@@ -207,7 +208,9 @@ export function withCandidates(rows: Row[], candidates: Candidate[] | undefined,
 /** 条件入力の 6 区画を 5-1 の型に直す（→ input-types.ts）。キーは型の側の名前である。 */
 export function takeConditions(inputs: Inputs): Conditions {
   const conditions: Record<string, unknown> = {}
-  conditionTypes().forEach((type) => { conditions[type.key] = toType(type, inputs[type.source]) })
+  conditionTypes().forEach((type) => {
+    conditions[type.key] = toType(type, inputs[type.source])
+  })
   return conditions as Conditions
 }
 
@@ -239,10 +242,7 @@ export function checkRepresentation(inputs: Inputs): void {
       row.forEach((cell, columnIndex) => {
         const type = typeof cell
         if (type === 'string' || type === 'number') return
-        throw internalError(
-          `「${name}」の ${rowIndex + 1} 行目 ${columnIndex + 1} 列目の表現が揃っていない。`
-            + `いま: ${type === 'object' ? Object.prototype.toString.call(cell) : type}（殻で文字列か数値に揃える）`,
-        )
+        throw internalError(`「${name}」の ${rowIndex + 1} 行目 ${columnIndex + 1} 列目の表現が揃っていない。` + `いま: ${type === 'object' ? Object.prototype.toString.call(cell) : type}（殻で文字列か数値に揃える）`)
       })
     })
   })
@@ -254,10 +254,7 @@ export function checkOutput(output: Record<string, Row[]>): void {
     const columns = sheetColumns(name)
     output[name].forEach((row, rowIndex) => {
       if (Array.isArray(row) && row.length === columns.length) return
-      throw internalError(
-        `「${name}」に返された ${rowIndex + 1} 行目の列数が構成と違う。`
-          + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${columns.length}（${columns.join(' / ')}）`,
-      )
+      throw internalError(`「${name}」に返された ${rowIndex + 1} 行目の列数が構成と違う。` + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${columns.length}（${columns.join(' / ')}）`)
     })
   })
 
@@ -265,9 +262,7 @@ export function checkOutput(output: Record<string, Row[]>): void {
   const allowedKinds: Cell[] = Object.values(checkKind)
   output['検証結果'].forEach((row, rowIndex) => {
     if (allowedKinds.indexOf(row[kindColumn]) !== -1) return
-    throw internalError(
-      `検証結果の ${rowIndex + 1} 行目の種別「${row[kindColumn]}」が決まった種別でない（${allowedKinds.join(' ／ ')} のどれか）`,
-    )
+    throw internalError(`検証結果の ${rowIndex + 1} 行目の種別「${row[kindColumn]}」が決まった種別でない（${allowedKinds.join(' ／ ')} のどれか）`)
   })
 }
 

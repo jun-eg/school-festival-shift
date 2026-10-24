@@ -36,15 +36,18 @@ function whyItStopped(work) {
 // ---- 材料 -------------------------------------------------------------------
 // 前回の 2025-11-01 と 2025-11-02 の 5 時刻。3・4 日目は空にして、描かない日が消えないかを見る。
 
-const days = toDays([
-  ['2025-11-01', '08:00', '10:00', '17:00', '17:00', '21:00'],
-  ['2025-11-02', '08:00', '10:00', '17:00', '17:00', '20:00'],
-  ['2025-11-03', '08:00', '10:00', '17:00', '17:00', '20:00'],
-  ['2025-11-04', '08:00', '08:30', '08:30', '08:30', '15:00'],
-], '日ごとの営業時刻')
+const days = toDays(
+  [
+    ['2025-11-01', '08:00', '10:00', '17:00', '17:00', '21:00'],
+    ['2025-11-02', '08:00', '10:00', '17:00', '17:00', '20:00'],
+    ['2025-11-03', '08:00', '10:00', '17:00', '17:00', '20:00'],
+    ['2025-11-04', '08:00', '08:30', '08:30', '08:30', '15:00'],
+  ],
+  '日ごとの営業時刻',
+)
 
 function assignment(date, start, end, role, studentId) {
-  const values = { '日': date, '開始': start, '終了': end, '役割': role, '学籍番号': studentId, '氏名': '' }
+  const values = { 日: date, 開始: start, 終了: end, 役割: role, 学籍番号: studentId, 氏名: '' }
   return assignmentColumns.map((name) => values[name])
 }
 
@@ -81,7 +84,11 @@ const images = distributionImages(grids, days)
 
 // ---- ① 前回の配布物と同じ形 -------------------------------------------------
 
-check('① 4 枚が日の順に並ぶ', images.map((image) => image.label), ['準備日', '学祭1日目', '学祭2日目', '片付け'])
+check(
+  '① 4 枚が日の順に並ぶ',
+  images.map((image) => image.label),
+  ['準備日', '学祭1日目', '学祭2日目', '片付け'],
+)
 check(
   '① ファイル名は前回の配布物の表題と同じ書き方である（`11月1日シフト表`）',
   images.map((image) => image.fileName),
@@ -93,11 +100,7 @@ check('① 列の見出しは枠の開始時刻である', images[1].times.slice
 
 const drawing = images[1].drawing!
 const headerTexts = drawing.texts.filter((text) => text.bold).map((text) => text.text)
-check(
-  '① 見出しは表題・名前の 1 列・時刻だけである（学籍番号の列も友達欄の列も描かない）',
-  headerTexts,
-  [images[1].title, '名前'].concat(images[1].times),
-)
+check('① 見出しは表題・名前の 1 列・時刻だけである（学籍番号の列も友達欄の列も描かない）', headerTexts, [images[1].title, '名前'].concat(images[1].times))
 check(
   '① 友達欄に書かれたことは、どの画像にも描かれない（→ issue #200）',
   images.flatMap((image) => (image.drawing ? image.drawing.texts : []).map((text) => text.text)).filter((text) => Object.values(friends).includes(text)),
@@ -118,23 +121,25 @@ function triplesOfGrid(grid) {
 }
 function triplesOfImage(image) {
   const triples: string[] = []
-  image.rows.forEach((row) => row.cells.forEach((cell, index) => {
-    if (cell.role !== '') triples.push(`${row.name} ${image.times[index]} ${cell.role}`)
-  }))
+  image.rows.forEach((row) =>
+    row.cells.forEach((cell, index) => {
+      if (cell.role !== '') triples.push(`${row.name} ${image.times[index]} ${cell.role}`)
+    }),
+  )
   return triples.sort()
 }
 
 images.forEach((image, index) => {
   check(`② ${image.label}: マス目と画像の（人・枠・役割）が 1 つも違わない`, triplesOfImage(image), triplesOfGrid(grids[index].grid))
 })
-check('② 記録どおり 7 セルが描かれる（色の無い役割名も落とさない）', images.reduce((sum, image) => sum + triplesOfImage(image).length, 0), 7)
+check(
+  '② 記録どおり 7 セルが描かれる（色の無い役割名も落とさない）',
+  images.reduce((sum, image) => sum + triplesOfImage(image).length, 0),
+  7,
+)
 
 const drawnRoles = drawing.texts.filter((text) => !text.bold).map((text) => text.text)
-check(
-  '② 描く文字に、役割名がセルの数だけ出る',
-  drawnRoles.filter((text) => !Object.values(names).includes(text)).sort(),
-  ['クリーンパトロール', '委員会の受付', '片付け', '調理', '調理責任者'].sort(),
-)
+check('② 描く文字に、役割名がセルの数だけ出る', drawnRoles.filter((text) => !Object.values(names).includes(text)).sort(), ['クリーンパトロール', '委員会の受付', '片付け', '調理', '調理責任者'].sort())
 
 // ---- ③ 学籍番号を描かない ---------------------------------------------------
 
@@ -148,29 +153,34 @@ check('③ 表の行が持つのは名前とセルだけである', Object.keys(
 
 // ---- ④ 落とす行と色 ---------------------------------------------------------
 
-check('④ 1 枠も入っていない人の行は描かない', images[1].rows.map((row) => row.name), ['たなか風蔵', '山本きた', '高木琴音'])
-check('④ 1 人も入っていない日は、描かずに空で返る（黙って落とさない）', images.map((image) => image.drawing === null), [false, false, true, true])
+check(
+  '④ 1 枠も入っていない人の行は描かない',
+  images[1].rows.map((row) => row.name),
+  ['たなか風蔵', '山本きた', '高木琴音'],
+)
+check(
+  '④ 1 人も入っていない日は、描かずに空で返る（黙って落とさない）',
+  images.map((image) => image.drawing === null),
+  [false, false, true, true],
+)
 
 const cookBox = drawing.boxes.filter((box) => box.fill === roleColorOf('調理'))
 check('④ セルの背景は役割の色である（調理 = 黄）', cookBox.length, 1)
-check('④ 表に無い役割名のセルは塗らない（白のまま）', images[1].rows[2].cells.filter((cell) => cell.role === '委員会の受付').map((cell) => cell.color), [null])
+check(
+  '④ 表に無い役割名のセルは塗らない（白のまま）',
+  images[1].rows[2].cells.filter((cell) => cell.role === '委員会の受付').map((cell) => cell.color),
+  [null],
+)
 
 // ---- ⑤ はみ出さない・決定的 -------------------------------------------------
 
-const inside = (image) => image.drawing.boxes.every((box) => box.x >= 0 && box.y >= 0 && box.x + box.w <= image.drawing.width && box.y + box.h <= image.drawing.height)
-  && image.drawing.texts.every((text) => text.x >= 0 && text.y >= 0 && text.x <= image.drawing.width && text.y <= image.drawing.height && text.maxWidth > 0)
-  && image.drawing.lines.every((line) => Math.max(line.x1, line.x2) <= image.drawing.width && Math.max(line.y1, line.y2) <= image.drawing.height)
+const inside = (image) =>
+  image.drawing.boxes.every((box) => box.x >= 0 && box.y >= 0 && box.x + box.w <= image.drawing.width && box.y + box.h <= image.drawing.height) &&
+  image.drawing.texts.every((text) => text.x >= 0 && text.y >= 0 && text.x <= image.drawing.width && text.y <= image.drawing.height && text.maxWidth > 0) &&
+  image.drawing.lines.every((line) => Math.max(line.x1, line.x2) <= image.drawing.width && Math.max(line.y1, line.y2) <= image.drawing.height)
 check('⑤ 箱も文字も線も、画像の中に収まる', images.filter((image) => image.drawing).every(inside), true)
-check(
-  '⑤ 名前の列は、いちばん長い名前が入る幅である',
-  drawing.texts.filter((text) => text.text === 'たなか風蔵')[0].maxWidth >= estimateTextWidth('たなか風蔵', imageMetrics.fontSize),
-  true,
-)
-check(
-  '⑤ 高さは 表題 ＋ 見出しの行 ＋ 人の行 で決まる',
-  drawing.height,
-  imageMetrics.padding * 2 + imageMetrics.titleSize + imageMetrics.titleGap + imageMetrics.rowHeight * (images[1].rows.length + 1),
-)
+check('⑤ 名前の列は、いちばん長い名前が入る幅である', drawing.texts.filter((text) => text.text === 'たなか風蔵')[0].maxWidth >= estimateTextWidth('たなか風蔵', imageMetrics.fontSize), true)
+check('⑤ 高さは 表題 ＋ 見出しの行 ＋ 人の行 で決まる', drawing.height, imageMetrics.padding * 2 + imageMetrics.titleSize + imageMetrics.titleGap + imageMetrics.rowHeight * (images[1].rows.length + 1))
 check('⑤ 同じ入力から同じ図形が出る', JSON.stringify(distributionImages(grids, days)), JSON.stringify(images))
 check('⑤ 画素は 2 倍で塗る（拡大して読まれる ◎ — 入る側 ACTION 6）', drawing.scale, 2)
 
@@ -180,8 +190,7 @@ const noName = asRead({ header: grids[1].grid.header, rows: [['EED2386071', '', 
 check(
   '⑥ 役割が入っているのに氏名が空なら、行と学籍番号を名指しして止まる',
   whyItStopped(() => distributionTable(noName.header, noName.rows, days[1], '学祭1日目')),
-  'シート「学祭1日目」の 2 行目（学籍番号「EED2386071」）の氏名が空のため、画像にできません。'
-    + '「回答」シートにその学籍番号があるかを確かめてから、メニューの「生成」を押してください',
+  'シート「学祭1日目」の 2 行目（学籍番号「EED2386071」）の氏名が空のため、画像にできません。' + '「回答」シートにその学籍番号があるかを確かめてから、メニューの「生成」を押してください',
 )
 
 const emptyGrids = layouts.map((layout, index) => ({ layout: layout, grid: asRead(toAssignmentGrid([], days[index], nameOf)) }))

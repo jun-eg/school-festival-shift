@@ -21,7 +21,6 @@ import type { Sheet, Spreadsheet } from './shell.ts'
 
 type Form = GoogleAppsScript.Forms.Form
 
-
 /** 回答先を向ける先のシート（構成は sheet-layout.ts）。 */
 const answerSheetName = '回答'
 
@@ -36,9 +35,7 @@ const businessHoursSectionName = '日ごとの営業時刻'
 
 /** 担当者が選んだ画像を受け取る画面。メニュー「フォームを作る」の中身である。 */
 export function openRosterPicker(): void {
-  const dialog = HtmlService.createHtmlOutputFromFile('form-picker')
-    .setWidth(460)
-    .setHeight(300)
+  const dialog = HtmlService.createHtmlOutputFromFile('form-picker').setWidth(460).setHeight(300)
   SpreadsheetApp.getUi().showModalDialog(dialog, '調理名簿の画像を選択')
 }
 
@@ -57,11 +54,7 @@ export function rosterImageFrom(picked: PickedRoster | null | undefined): Google
   if (!picked || !picked.base64) {
     throw new Error('調理名簿の画像を選んでください')
   }
-  return Utilities.newBlob(
-    Utilities.base64Decode(picked.base64),
-    picked.mimeType,
-    picked.fileName,
-  )
+  return Utilities.newBlob(Utilities.base64Decode(picked.base64), picked.mimeType, picked.fileName)
 }
 
 /**
@@ -79,15 +72,11 @@ export function buildFormOn(spreadsheet: Spreadsheet, rosterImage: GoogleAppsScr
   }
   if (templateSheet.getFormUrl()) {
     // 作り直さない。
-    throw new Error(
-      `このファイルにはもうフォームがあります（${templateSheet.getFormUrl()}）。` + clearFirstText,
-    )
+    throw new Error(`このファイルにはもうフォームがあります（${templateSheet.getFormUrl()}）。` + clearFirstText)
   }
   if (templateSheet.getLastRow() > 1) {
     // 回答を消さない（黙って直さない）。
-    throw new Error(
-      `「${layout.name}」シートにすでに ${templateSheet.getLastRow() - 1} 行あるため、フォームを作れません。` + clearFirstText,
-    )
+    throw new Error(`「${layout.name}」シートにすでに ${templateSheet.getLastRow() - 1} 行あるため、フォームを作れません。` + clearFirstText)
   }
 
   // ここまでで止まれば、フォームは 1 つも作られていない。
@@ -95,8 +84,11 @@ export function buildFormOn(spreadsheet: Spreadsheet, rosterImage: GoogleAppsScr
   const items = formItemsFor(days)
   const expectedHeader = answerHeaderOf(layout, items)
   log.push(
-    `設問の題と営業時間を「${businessHoursSectionName}」${days.length} 行から組んだ`
-      + `（${items.filter((item) => item.label).map((item) => `${item.title} ${item.businessHours}`).join(' / ')}）`,
+    `設問の題と営業時間を「${businessHoursSectionName}」${days.length} 行から組んだ` +
+      `（${items
+        .filter((item) => item.label)
+        .map((item) => `${item.title} ${item.businessHours}`)
+        .join(' / ')}）`,
   )
 
   const form = FormApp.create(spreadsheet.getName())
@@ -111,13 +103,14 @@ export function buildFormOn(spreadsheet: Spreadsheet, rosterImage: GoogleAppsScr
   // 回答シートを繋ぐ前に書く。繋ぐところで止まっても、できたフォームの URL は残る。
   writeFormUrls(spreadsheet, urls, log)
 
-  const created = spreadsheet
-    .getSheets()
-    .filter((sheet) => sheetIdsBefore.indexOf(sheet.getSheetId()) === -1)
+  const created = spreadsheet.getSheets().filter((sheet) => sheetIdsBefore.indexOf(sheet.getSheetId()) === -1)
   if (created.length !== 1) {
     throw internalError(
-      `フォームが作った回答シートが ${created.length} 枚ある（1 枚のはず）。`
-        + `いまあるシート: ${spreadsheet.getSheets().map((sheet) => sheet.getName()).join(' / ')}`,
+      `フォームが作った回答シートが ${created.length} 枚ある（1 枚のはず）。` +
+        `いまあるシート: ${spreadsheet
+          .getSheets()
+          .map((sheet) => sheet.getName())
+          .join(' / ')}`,
     )
   }
 
@@ -158,21 +151,14 @@ function readBusinessHours(spreadsheet: Spreadsheet) {
  */
 function answerHeaderOf(layout: Layout, items: FormItem[]): string[] {
   const section = layout.sections[0]
-  const header = [section.columns[0]].concat(
-    items.filter((item) => item.kind !== formItemKind.image).map((item) => item.title as string),
-  )
+  const header = [section.columns[0]].concat(items.filter((item) => item.kind !== formItemKind.image).map((item) => item.title as string))
 
   if (header.length !== sectionWidth(section)) {
-    throw internalError(
-      `設問が ${header.length - 1} つで、構成の「${layout.name}」の ${sectionWidth(section) - 1} 列と数が違う`,
-    )
+    throw internalError(`設問が ${header.length - 1} つで、構成の「${layout.name}」の ${sectionWidth(section) - 1} 列と数が違う`)
   }
   const named = header.slice(0, section.columns.length)
   if (named.join('\t') !== section.columns.join('\t')) {
-    throw internalError(
-      `構成の「${layout.name}」の列名と、設問の題が食い違っている。`
-        + `構成: ${section.columns.join(' / ')} ／ 設問: ${named.join(' / ')}`,
-    )
+    throw internalError(`構成の「${layout.name}」の列名と、設問の題が食い違っている。` + `構成: ${section.columns.join(' / ')} ／ 設問: ${named.join(' / ')}`)
   }
   return header
 }
@@ -181,12 +167,16 @@ function answerHeaderOf(layout: Layout, items: FormItem[]): string[] {
 function addFormItems(form: Form, items: FormItem[], rosterImage: GoogleAppsScript.Base.BlobSource, log: string[]): void {
   items.forEach((item) => {
     if (item.kind === formItemKind.text) {
-      const added = form.addTextItem().setTitle(item.title as string).setRequired(item.required)
+      const added = form
+        .addTextItem()
+        .setTitle(item.title as string)
+        .setRequired(item.required)
       if (item.pattern) added.setValidation(textValidationOf(item))
       return
     }
     if (item.kind === formItemKind.radio) {
-      form.addMultipleChoiceItem()
+      form
+        .addMultipleChoiceItem()
         .setTitle(item.title as string)
         .setChoiceValues(item.choices as string[])
         .setRequired(item.required)
@@ -194,7 +184,8 @@ function addFormItems(form: Form, items: FormItem[], rosterImage: GoogleAppsScri
     }
     if (item.kind === formItemKind.paragraph) {
       // 設問の setHelpText は説明文。エラーメッセージは検証の側の setHelpText である。
-      form.addParagraphTextItem()
+      form
+        .addParagraphTextItem()
         .setTitle(item.title as string)
         .setHelpText(wishTimeDescription(item))
         .setRequired(item.required)
@@ -202,7 +193,10 @@ function addFormItems(form: Form, items: FormItem[], rosterImage: GoogleAppsScri
       return
     }
     if (item.kind === formItemKind.image) {
-      form.addImageItem().setTitle(item.title as string).setImage(rosterImage)
+      form
+        .addImageItem()
+        .setTitle(item.title as string)
+        .setImage(rosterImage)
       return
     }
     throw internalError(`形式「${item.kind}」の作り方を決めていない`)
@@ -239,11 +233,7 @@ function linkAnswerSheet(spreadsheet: Spreadsheet, templateSheet: Sheet, respons
     .map((cell) => String(cell))
 
   if (header.join('\t') !== expectedHeader.join('\t')) {
-    throw internalError(
-      'フォームが作った回答シートの見出しが、いま置いた設問の題と違う。'
-        + `いま: ${header.join(' / ')} ／ 置いた題: ${expectedHeader.join(' / ')}。`
-        + '繋がずに止まる（黙って直さない）',
-    )
+    throw internalError('フォームが作った回答シートの見出しが、いま置いた設問の題と違う。' + `いま: ${header.join(' / ')} ／ 置いた題: ${expectedHeader.join(' / ')}。` + '繋がずに止まる（黙って直さない）')
   }
 
   spreadsheet.deleteSheet(templateSheet)

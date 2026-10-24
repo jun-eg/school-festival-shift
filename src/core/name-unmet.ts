@@ -15,13 +15,13 @@ import { checkKind, internalError } from './sheet-layout.ts'
 import type { Cell, Conditions, Day, Need, Placement, Row, Slot } from './types.ts'
 
 /** 需要の出どころ（→ unmetSources）。 */
-export type UnmetSource = { key: string, label: string, what: string }
+export type UnmetSource = { key: string; label: string; what: string }
 
 /** 出どころつきの需要 1 行（→ allNeeds）。 */
-export type HeldNeed = { source: UnmetSource, need: Need }
+export type HeldNeed = { source: UnmetSource; need: Need }
 
 /** 枠・役割ごとの必要人数と、その出どころの名前。 */
-export type RequiredAt = { count: number, sources: string[] }
+export type RequiredAt = { count: number; sources: string[] }
 
 /**
  * 未充足を数えるもと 2 つ（→ 5-4）。
@@ -36,8 +36,7 @@ export const unmetSources: UnmetSource[] = [
   {
     key: 'roleNeeds',
     label: '必要人数',
-    what: '(日・時間帯・役割名・人数) の行。時間帯を空けた行は、その役割の帯に効く'
-      + '（準備 → 準備帯 ／ 片付け → 片付け帯 ／ それ以外 → 調理帯。→ 5-1 の #2）',
+    what: '(日・時間帯・役割名・人数) の行。時間帯を空けた行は、その役割の帯に効く' + '（準備 → 準備帯 ／ 片付け → 片付け帯 ／ それ以外 → 調理帯。→ 5-1 の #2）',
   },
   {
     key: 'committeeNeeds',
@@ -102,7 +101,7 @@ export function allNeeds(conditions: Partial<Conditions> | undefined): HeldNeed[
  * 帯の実体は count-violations.ts の prepCleanupBands が持つ。
  * 「全枠」にすると、営業していない帯にまで店の役割の需要が立つ。
  */
-export function blankBandFor(day: Day, role: string): { from: string, to: string } {
+export function blankBandFor(day: Day, role: string): { from: string; to: string } {
   const band = prepCleanupBands().filter((one) => one.role === role)[0]
   if (band) return { from: day[band.from], to: day[band.to] }
   return { from: day.cookStart, to: day.cookEnd }
@@ -162,7 +161,9 @@ export function roleSlotKey(date: string, start: string, end: string, role: stri
 /** 需要に出てくる役割名を、出てきた順に並べる。書いた順のほうが条件入力と見比べやすい。 */
 export function rolesInOrder(needs: HeldNeed[]): string[] {
   const roles: string[] = []
-  needs.forEach((held) => { if (roles.indexOf(held.need.role) === -1) roles.push(held.need.role) })
+  needs.forEach((held) => {
+    if (roles.indexOf(held.need.role) === -1) roles.push(held.need.role)
+  })
   return roles
 }
 
@@ -174,10 +175,7 @@ export function checkEveryNeedLands(needs: HeldNeed[], days: Day[]): void {
   needs.forEach((held) => {
     const lands = days.some((day) => day.slots.some((slot) => needCovers(held.need, day, slot)))
     if (lands) return
-    throw new Error(
-      `条件入力「${sectionOf(held.source)}」の行（${describeNeed(held.need)}）が、営業時刻のどの時間にも当たりません。`
-        + '日付と時間を確かめてください',
-    )
+    throw new Error(`条件入力「${sectionOf(held.source)}」の行（${describeNeed(held.need)}）が、営業時刻のどの時間にも当たりません。` + '日付と時間を確かめてください')
   })
 }
 
@@ -197,16 +195,16 @@ export function sectionOf(source: UnmetSource): string {
 /** 未充足 1 件を、検証結果シートの行にする。枠の話なので学籍番号と氏名は空である。 */
 export function unmetRow(date: string, slot: Slot, role: string, required: RequiredAt, have: number): Row {
   const found: Record<string, Cell> = {
-    '種別': checkKind.unmet,
-    '日': date,
-    '開始': slot.start,
-    '終了': slot.end,
-    '役割': role,
-    '学籍番号': '',
-    '氏名': '',
-    '内容': `${required.sources.join(' ／ ')}: ${required.count} 人必要なところ ${have} 人です`,
-    'あと何人': required.count - have,
-    '候補': '', // 希望から入れられる人は build が入れる（→ core.ts の withCandidates）
+    種別: checkKind.unmet,
+    日: date,
+    開始: slot.start,
+    終了: slot.end,
+    役割: role,
+    学籍番号: '',
+    氏名: '',
+    内容: `${required.sources.join(' ／ ')}: ${required.count} 人必要なところ ${have} 人です`,
+    あと何人: required.count - have,
+    候補: '', // 希望から入れられる人は build が入れる（→ core.ts の withCandidates）
   }
   return sheetColumns('検証結果').map((name) => found[name])
 }

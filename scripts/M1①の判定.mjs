@@ -27,10 +27,7 @@ const 文脈 = vm.createContext({})
 for (const 相対 of 宣言.入力.型) {
   vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
 }
-const { toType, inputTypes, studentIdPattern } = vm.runInContext(
-  '({ toType, inputTypes, studentIdPattern })',
-  文脈,
-)
+const { toType, inputTypes, studentIdPattern } = vm.runInContext('({ toType, inputTypes, studentIdPattern })', 文脈)
 
 // 型 #2 と #4 は同じ (日・時間帯・役割名・人数) の行なので、名指しの文が読みやすい #2 で通す。
 const 型 = {
@@ -235,10 +232,7 @@ function 主処理() {
     console.log(`結果: 乗らなかった行 ${乗らなかった.length}（合格の線 ${宣言.合格の線.乗らなかった行} 行 ／ 判定した行 ${行.length}）`)
     return 0
   }
-  console.log(
-    `結果: 乗らなかった行 ${乗らなかった.length}（合格の線 ${宣言.合格の線.乗らなかった行} 行）`
-      + ` ／ 本文に載っていない値 ${欠け.length} 件`,
-  )
+  console.log(`結果: 乗らなかった行 ${乗らなかった.length}（合格の線 ${宣言.合格の線.乗らなかった行} 行）` + ` ／ 本文に載っていない値 ${欠け.length} 件`)
   return 1
 }
 

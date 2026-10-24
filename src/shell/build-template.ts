@@ -6,10 +6,7 @@
  * すでにあるシートの見出しが構成と違えば、上書きせずに名指しで止まる。
  */
 
-import {
-  assignmentName, dividerColumn, dividerLine, formUrlBlock, formUrlBorder, gridLayouts, handoverBlock,
-  protectionKind, sectionLastRow, sectionRightEdge, sectionWidth, sheetLayout, widthBaseColumn,
-} from '../core/sheet-layout.ts'
+import { assignmentName, dividerColumn, dividerLine, formUrlBlock, formUrlBorder, gridLayouts, handoverBlock, protectionKind, sectionLastRow, sectionRightEdge, sectionWidth, sheetLayout, widthBaseColumn } from '../core/sheet-layout.ts'
 import type { Layout } from '../core/sheet-layout.ts'
 import type { Cell } from '../core/types.ts'
 import type { Sheet, Spreadsheet } from './shell.ts'
@@ -52,9 +49,9 @@ export function buildTemplateInto(spreadsheet: Spreadsheet): string[] {
   spreadsheet.setActiveSheet(spreadsheet.getSheetByName(sheetLayout[0].name) as Sheet)
   const countOf = (kind: string) => sheetLayout.filter((c) => c.protect && c.protect.kind === kind).length
   log.push(
-    `${sheetLayout.length} 枚のうち保護したのは ${sheetLayout.filter((c) => c.protect).length} 枚である`
-    + `（${protectionKind.warningOnly} ${countOf(protectionKind.warningOnly)} 枚 ／ ${protectionKind.ownerOnly} ${countOf(protectionKind.ownerOnly)} 枚。`
-    + `割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚）`,
+    `${sheetLayout.length} 枚のうち保護したのは ${sheetLayout.filter((c) => c.protect).length} 枚である` +
+      `（${protectionKind.warningOnly} ${countOf(protectionKind.warningOnly)} 枚 ／ ${protectionKind.ownerOnly} ${countOf(protectionKind.ownerOnly)} 枚。` +
+      `割り当ては日ごとの ${gridLayouts(assignmentName).length} 枚）`,
   )
   return log
 }
@@ -82,7 +79,10 @@ function putHeaders(sheet: Sheet, layout: Layout, log: string[]): void {
   layout.sections.forEach((section) => {
     if (layout.hasSectionHeadings) {
       replaceValues(sheet, 1, section.startColumn, [section.heading as string], layout.name, log)
-      sheet.getRange(1, section.startColumn).setFontWeight('bold').setNote(section.note as string)
+      sheet
+        .getRange(1, section.startColumn)
+        .setFontWeight('bold')
+        .setNote(section.note as string)
     }
     replaceValues(sheet, columnNameRow, section.startColumn, section.columns, layout.name, log)
     const headingRange = sheet.getRange(columnNameRow, section.startColumn, 1, section.columns.length)
@@ -131,8 +131,7 @@ function putFormUrlBlock(sheet: Sheet, layout: Layout, log: string[]): void {
     sheet.getRange(row, block.labelColumn, 1, block.labelWidth).merge().setFontWeight('bold')
     sheet.getRange(row, block.urlColumn, 1, block.urlWidth).merge()
   })
-  sheet.getRange(block.row, block.labelColumn, block.rows.length, block.urlColumn + block.urlWidth - block.labelColumn)
-    .setBorder(true, true, true, true, null, null, formUrlBorder.color, SpreadsheetApp.BorderStyle[formUrlBorder.style])
+  sheet.getRange(block.row, block.labelColumn, block.rows.length, block.urlColumn + block.urlWidth - block.labelColumn).setBorder(true, true, true, true, null, null, formUrlBorder.color, SpreadsheetApp.BorderStyle[formUrlBorder.style])
 }
 
 /**
@@ -148,8 +147,7 @@ function putHandoverBlock(sheet: Sheet, layout: Layout, log: string[]): void {
   replaceValues(sheet, block.row, block.urlColumn, [block.url], layout.name, log)
   sheet.getRange(block.row, block.labelColumn, 1, block.labelWidth).merge().setFontWeight('bold')
   sheet.getRange(block.row, block.urlColumn, 1, block.urlWidth).merge()
-  sheet.getRange(block.row, block.labelColumn, 1, block.urlColumn + block.urlWidth - block.labelColumn)
-    .setBorder(true, true, true, true, null, null, formUrlBorder.color, SpreadsheetApp.BorderStyle[formUrlBorder.style])
+  sheet.getRange(block.row, block.labelColumn, 1, block.urlColumn + block.urlWidth - block.labelColumn).setBorder(true, true, true, true, null, null, formUrlBorder.color, SpreadsheetApp.BorderStyle[formUrlBorder.style])
 }
 
 /**
@@ -171,8 +169,7 @@ function shapeColumns(sheet: Sheet, layout: Layout, log: string[]): void {
 
     const divider = dividerColumn(section)
     if (divider === null) return
-    sheet.getRange(1, divider, sheet.getMaxRows(), 1)
-      .setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
+    sheet.getRange(1, divider, sheet.getMaxRows(), 1).setBorder(null, null, null, true, null, null, dividerLine.color, SpreadsheetApp.BorderStyle[dividerLine.style])
   })
 }
 
@@ -191,11 +188,7 @@ function replaceValues(sheet: Sheet, row: number, startColumn: number, values: C
     log.push(`「${sheetName}」の ${row} 行目 ${startColumn} 列目から見出しを置いた`)
     return
   }
-  throw new Error(
-    `「${sheetName}」の ${row} 行目 ${startColumn} 列目が構成と違う。`
-      + `いま: ${actual.join(' / ')} ／ 構成: ${wanted.join(' / ')}。`
-      + '中身を見てから決める（黙って直さない）',
-  )
+  throw new Error(`「${sheetName}」の ${row} 行目 ${startColumn} 列目が構成と違う。` + `いま: ${actual.join(' / ')} ／ 構成: ${wanted.join(' / ')}。` + '中身を見てから決める（黙って直さない）')
 }
 
 /**
@@ -204,9 +197,7 @@ function replaceValues(sheet: Sheet, row: number, startColumn: number, values: C
  * 「持ち主だけ」は編集者を全部外す（持ち主と、走らせている人は外れない）。
  */
 export function applyProtection(sheet: Sheet, layout: Layout, log: string[]): void {
-  sheet
-    .getProtections(SpreadsheetApp.ProtectionType.SHEET)
-    .forEach((existing) => existing.remove())
+  sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((existing) => existing.remove())
 
   if (!layout.protect) return
 
@@ -218,10 +209,7 @@ export function applyProtection(sheet: Sheet, layout: Layout, log: string[]): vo
     protection.setWarningOnly(true)
   }
   if (layout.protect.openInputs) protection.setUnprotectedRanges(inputRanges(sheet, layout))
-  log.push(
-    `シート「${layout.name}」に保護をかけた（${layout.protect.kind}`
-    + `${layout.protect.openInputs ? `。区画 ${layout.sections.length} つの入力欄は外した` : ''}）`,
-  )
+  log.push(`シート「${layout.name}」に保護をかけた（${layout.protect.kind}` + `${layout.protect.openInputs ? `。区画 ${layout.sections.length} つの入力欄は外した` : ''}）`)
 }
 
 /**
@@ -233,12 +221,7 @@ export function applyProtection(sheet: Sheet, layout: Layout, log: string[]): vo
  */
 function inputRanges(sheet: Sheet, layout: Layout) {
   const firstInputRow = (layout.hasSectionHeadings ? 2 : 1) + 1
-  return layout.sections.map((section) => sheet.getRange(
-    firstInputRow,
-    section.startColumn,
-    sectionLastRow(section, sheet.getMaxRows()) - firstInputRow + 1,
-    sectionWidth(section),
-  ))
+  return layout.sections.map((section) => sheet.getRange(firstInputRow, section.startColumn, sectionLastRow(section, sheet.getMaxRows()) - firstInputRow + 1, sectionWidth(section)))
 }
 
 /** 新しいスプレッドシートに最初からある空のシートを消す。中身があれば残して名指しする。 */

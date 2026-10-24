@@ -9,10 +9,7 @@
  */
 
 import { sheetColumns } from './core.ts'
-import {
-  cookLeaderGradesMissingText, cookRoles, isInBand, noonBoundaryMissingText, prepCleanupDetail, prepCleanupRoles,
-  ruleRoles, wishesByStudentId,
-} from './count-violations.ts'
+import { cookLeaderGradesMissingText, cookRoles, isInBand, noonBoundaryMissingText, prepCleanupDetail, prepCleanupRoles, ruleRoles, wishesByStudentId } from './count-violations.ts'
 import { placementItems, slotMinutes, toMinutes } from './input-types.ts'
 import { allNeeds, checkEveryNeedLands, requiredAt, roleSlotKey, rolesInOrder } from './name-unmet.ts'
 import { checkKind, fixedColumns, internalError } from './sheet-layout.ts'
@@ -37,14 +34,14 @@ export type Person = {
 export type Board = { placed: Record<string, number> }
 
 /** (日・枠・役割) 1 つ。able は置ける人。 */
-export type Unit = { day: Day, slot: Slot, slotIndex: number, role: string, required: number, able: Person[] }
+export type Unit = { day: Day; slot: Slot; slotIndex: number; role: string; required: number; able: Person[] }
 
 /** 店の役割の単位。並べ替えの鍵（dayIndex ・ roleIndex）を持つ。 */
-export type DemandUnit = Unit & { dayIndex: number, roleIndex: number }
+export type DemandUnit = Unit & { dayIndex: number; roleIndex: number }
 
 /** 手直しのうち、置けなかったものの名指し（→ placeFixed）。 */
 export type FixRef = Pick<FixedLine, 'date' | 'start' | 'role' | 'studentId' | 'slot'>
-export type NotPlaced = { fix: FixRef, why: string }
+export type NotPlaced = { fix: FixRef; why: string }
 
 /** 「隣に置けるか」の判定（→ placeRun）。 */
 export type CanTake = (person: Person, unit: Unit) => boolean
@@ -53,13 +50,11 @@ export type CanTake = (person: Person, unit: Unit) => boolean
 export const generationOrder = [
   {
     key: 'fixed',
-    what: '担当者の手直し（固定）を先に置く。条件を破る固定は置かず、名指しで返す（→ 5-3・placeFixed）。'
-      + '空のセルの手直しは、その人をその枠の候補から外す',
+    what: '担当者の手直し（固定）を先に置く。条件を破る固定は置かず、名指しで返す（→ 5-3・placeFixed）。' + '空のセルの手直しは、その人をその枠の候補から外す',
   },
   {
     key: 'fill',
-    what: '制約のきつい枠から順に、営業の役割を埋める（貪欲法 → 5-5 の「埋める順」）。'
-      + '1 人を採ったら、隣り合う枠へ「連続して入る最小の長さ」まで伸ばす（→ 5-5 の「まとまり」・placeRun）',
+    what: '制約のきつい枠から順に、営業の役割を埋める（貪欲法 → 5-5 の「埋める順」）。' + '1 人を採ったら、隣り合う枠へ「連続して入る最小の長さ」まで伸ばす（→ 5-5 の「まとまり」・placeRun）',
   },
   {
     key: 'swap',
@@ -79,20 +74,19 @@ export const generationOrder = [
 export const generationNotAimed = [
   {
     what: '規則 3 の ⑥（複数日で偏らせない）',
-    why: '上流の △ 5 が決まるまで、違反にも目的関数にも入れない（→ 5-4 の但し書き）。'
-      + '枠の中で誰を採るかの同点の順序は決めてあるが、均した量は測らず、順位も閾値も出さない（→ 5-5・5 の #7）。'
-      + '1 日の中の散らし（その日にまだ置いた枠が少ない人を先に採る → nextToPlace）は ⑥ を先取りしない'
-      + ' — 見ているのはその日だけで、日をまたいだ偏りは測らない（→ issue #215）',
+    why:
+      '上流の △ 5 が決まるまで、違反にも目的関数にも入れない（→ 5-4 の但し書き）。' +
+      '枠の中で誰を採るかの同点の順序は決めてあるが、均した量は測らず、順位も閾値も出さない（→ 5-5・5 の #7）。' +
+      '1 日の中の散らし（その日にまだ置いた枠が少ない人を先に採る → nextToPlace）は ⑥ を先取りしない' +
+      ' — 見ているのはその日だけで、日をまたいだ偏りは測らない（→ issue #215）',
   },
   {
     what: '1 日の上限（例: 中央の 1.5 倍まで）',
-    why: '上限を置くと、置けるのに置かない枠が出る（未充足が増える）。'
-      + 'どこで切るかは上流の △ 5 に触る（→ 9 の △ 5・issue #215 の「決まっていないこと」）',
+    why: '上限を置くと、置けるのに置かない枠が出る（未充足が増える）。' + 'どこで切るかは上流の △ 5 に触る（→ 9 の △ 5・issue #215 の「決まっていないこと」）',
   },
   {
     what: '前の周に機械が置いたセル',
-    why: '見るのは担当者が書き換えたセル（手直しの印 → assignment-grid.ts の fixedNote）だけである。'
-      + '前の周の案全体を初期解にすると、どこが人の意思でどこが機械の都合かが消える（→ 5-3 の却下した形）',
+    why: '見るのは担当者が書き換えたセル（手直しの印 → assignment-grid.ts の fixedNote）だけである。' + '前の周の案全体を初期解にすると、どこが人の意思でどこが機械の都合かが消える（→ 5-3 の却下した形）',
   },
   {
     what: '割り当ての 氏名',
@@ -118,20 +112,17 @@ export const runExceptions = [
   {
     key: 'demand',
     what: '需要の切れ目',
-    why: '隣の枠にその役割の需要が無い。委員会の指定が 30 分に乗らないことがある ◎'
-      + '（12:00-12:40 → 3 の境界値の表）。指定時間に人を欠かさない側が先である',
+    why: '隣の枠にその役割の需要が無い。委員会の指定が 30 分に乗らないことがある ◎' + '（12:00-12:40 → 3 の境界値の表）。指定時間に人を欠かさない側が先である',
   },
   {
     key: 'rule3',
     what: '規則 3 の端',
-    why: '伸ばすと、その人のその日の準備・片付けと向きが合わなくなる（→ 5-5 の「置かないほうに倒す所」）。'
-      + '3 段目が置く 1 枠も、規則 3 が決めるのは「入れるなら、どちらに入れるか」なのでここに入る',
+    why: '伸ばすと、その人のその日の準備・片付けと向きが合わなくなる（→ 5-5 の「置かないほうに倒す所」）。' + '3 段目が置く 1 枠も、規則 3 が決めるのは「入れるなら、どちらに入れるか」なのでここに入る',
   },
   {
     key: 'full',
     what: 'そこしか置けないとき',
-    why: '隣の枠は要る人数まで置いてある。まとまりのために超過を作らない。'
-      + '人数が足りない枠を埋めるほうが先である（→ 5 の #6）— まとまりを守って未充足を増やさない',
+    why: '隣の枠は要る人数まで置いてある。まとまりのために超過を作らない。' + '人数が足りない枠を埋めるほうが先である（→ 5 の #6）— まとまりを守って未充足を増やさない',
   },
 ]
 
@@ -153,7 +144,7 @@ export function generate(candidates: Candidate[] | undefined, conditions: Partia
  * 生成の本体。割り当ての行（rows）と、置けなかった手直し（notPlaced。{ fix, why } の配列）を返す。
  * 段の関数は行の配列しか返せないので、出口を generate と nameFixedConflicts に分けてある。
  */
-export function generatePlan(candidates: Candidate[] | undefined, conditions: Partial<Conditions>, wishes: Wish[] | undefined, fixed: Row[] | undefined): { rows: Row[], notPlaced: NotPlaced[] } {
+export function generatePlan(candidates: Candidate[] | undefined, conditions: Partial<Conditions>, wishes: Wish[] | undefined, fixed: Row[] | undefined): { rows: Row[]; notPlaced: NotPlaced[] } {
   const held = conditions || {}
   const days = held.days || []
   const needs = allNeeds(held) // → name-unmet.ts。必要人数と委員会の指定枠を 1 本に並べる
@@ -198,9 +189,7 @@ export function noonBoundaryToPlaceBy(conditions: Partial<Conditions>): string {
 export function minRunSlotsToPlaceBy(conditions: Partial<Conditions> | undefined): number {
   const minutes = conditions?.placementRule?.minRun
   if (minutes) return minutes / slotMinutes
-  throw internalError(
-    `条件入力の「置き方のルール」が型に乗っていない（空でも既定の ${placementItems.minRun} を持つはずである）`,
-  )
+  throw internalError(`条件入力の「置き方のルール」が型に乗っていない（空でも既定の ${placementItems.minRun} を持つはずである）`)
 }
 
 /**
@@ -233,7 +222,9 @@ export function peopleToPlace(candidates: Candidate[] | undefined, wishes: Wish[
       people.push(byStudentId[candidate.studentId])
     }
     const person = byStudentId[candidate.studentId]
-    ;(candidate.slots || []).forEach((slot) => { person.slots[whereKey(candidate.date, slot)] = true })
+    ;(candidate.slots || []).forEach((slot) => {
+      person.slots[whereKey(candidate.date, slot)] = true
+    })
   })
 
   return people
@@ -271,10 +262,7 @@ export function demandUnits(needs: HeldNeed[], days: Day[], people: Person[], co
     })
   })
 
-  units.sort((a, b) => (a.able.length - a.required) - (b.able.length - b.required)
-    || a.dayIndex - b.dayIndex
-    || a.slotIndex - b.slotIndex
-    || a.roleIndex - b.roleIndex)
+  units.sort((a, b) => a.able.length - a.required - (b.able.length - b.required) || a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex || a.roleIndex - b.roleIndex)
   return units
 }
 
@@ -336,8 +324,14 @@ export function dayStateOf(person: Person, day: Day, boundary: string, alsoAt?: 
   day.slots.forEach((slot) => {
     const role = person.at[whereKey(day.date, slot)]
     if (!role) return
-    if (role === ruleRoles.prep) { state.prep = true; return }
-    if (role === ruleRoles.cleanup) { state.cleanup = true; return }
+    if (role === ruleRoles.prep) {
+      state.prep = true
+      return
+    }
+    if (role === ruleRoles.cleanup) {
+      state.cleanup = true
+      return
+    }
     markHalfOfDay(state, slot, boundary)
   })
   if (alsoAt) markHalfOfDay(state, alsoAt, boundary)
@@ -355,9 +349,7 @@ export function markHalfOfDay(state: DayState, slot: Slot, boundary: string): vo
 
 /** その人が、その帯でまだ置ける枠（候補にあって、まだ置いていないもの）。並びはその日の枠の順である。 */
 export function freeBandSlots(person: Person, day: Day, role: string): Slot[] {
-  return (day.slots || []).filter((slot) => (
-    isInBand(day, slot, role) && person.slots[whereKey(day.date, slot)] && isFreeAt(person, day.date, slot)
-  ))
+  return (day.slots || []).filter((slot) => isInBand(day, slot, role) && person.slots[whereKey(day.date, slot)] && isFreeAt(person, day.date, slot))
 }
 
 /**
@@ -419,7 +411,7 @@ export function extendRun(board: Board, units: Unit[], person: Person, unit: Uni
  * 隣り合う枠。時刻が続いている枠だけが隣である。
  * 枠は帯ごとに刻むので、配列で隣でも時刻が飛ぶ所（帯の切れ目）がある（→ 5-1 の #1）。
  */
-export function nextRunSlot(day: Day, index: number, step: number): { slot: Slot, index: number } | null {
+export function nextRunSlot(day: Day, index: number, step: number): { slot: Slot; index: number } | null {
   const here = day.slots[index]
   const there = day.slots[index + step]
   if (!here || !there) return null
@@ -451,9 +443,7 @@ export function nextToPlace(unit: Unit, boundary: string): Person | null {
  * 採る側と、まとまりを伸ばす側（extendRun）が同じここを読む。
  */
 export function isOpenFor(person: Person, unit: Unit, boundary: string): boolean {
-  return isFreeAt(person, unit.day.date, unit.slot)
-    && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary, unit.role)
-    && prepCleanupNotBothBands(person, unit.day, unit.role)
+  return isFreeAt(person, unit.day.date, unit.slot) && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary, unit.role) && prepCleanupNotBothBands(person, unit.day, unit.role)
 }
 
 /**
@@ -507,9 +497,7 @@ export function takerFor(giving: Unit, mover: Person, boundary: string): Person 
 
 /** (日・枠・役割) の単位を引く。需要の無い役割には単位が無いので、見つからないことがある。 */
 export function unitAt(units: Unit[], date: string, slot: Slot, role: string): Unit | undefined {
-  return units.filter((unit) => (
-    unit.day.date === date && unit.slot.start === slot.start && unit.slot.end === slot.end && unit.role === role
-  ))[0]
+  return units.filter((unit) => unit.day.date === date && unit.slot.start === slot.start && unit.slot.end === slot.end && unit.role === role)[0]
 }
 
 /**
@@ -573,11 +561,7 @@ export function prepCleanupUnits(needs: HeldNeed[], days: Day[], people: Person[
  * 置ける人が尽きた枠は、未充足で残る。
  */
 export function fillPrepCleanupDemand(board: Board, units: Unit[], boundary: string, minRun: number): void {
-  const canTake: CanTake = (person, unit) => (
-    isFreeAt(person, unit.day.date, unit.slot)
-      && prepCleanupNotBothBands(person, unit.day, unit.role)
-      && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary, unit.role)
-  )
+  const canTake: CanTake = (person, unit) => isFreeAt(person, unit.day.date, unit.slot) && prepCleanupNotBothBands(person, unit.day, unit.role) && prepCleanupStaysPossible(person, unit.day, unit.slot, boundary, unit.role)
   units.forEach((unit) => {
     while (placedCount(board, unit.day.date, unit.slot, unit.role) < unit.required) {
       const ready = unit.able.filter((person) => canTake(person, unit))
@@ -607,9 +591,7 @@ export function prepOrCleanupFor(board: Board, needs: HeldNeed[], person: Person
 
 /** その帯のうち、まだ人数が足りていない枠（数え方は name-unmet.ts と同じ）。 */
 export function wantedBandSlots(board: Board, needs: HeldNeed[], person: Person, day: Day, role: string): Slot[] {
-  return freeBandSlots(person, day, role).filter((slot) => (
-    requiredAt(needs, day, slot, role).count > placedCount(board, day.date, slot, role)
-  ))
+  return freeBandSlots(person, day, role).filter((slot) => requiredAt(needs, day, slot, role).count > placedCount(board, day.date, slot, role))
 }
 
 /** 帯の中に置く。足りていない枠が 1 つでもあればそこを全部取り、無ければ帯の頭の 1 枠だけ取る。 */
@@ -632,7 +614,9 @@ export function placeInBand(board: Board, needs: HeldNeed[], person: Person, day
  */
 export function placeFixed(board: Board, people: Person[], fixed: Row[] | undefined, days: Day[], conditions: Partial<Conditions>, wishes: Wish[] | undefined, boundary: string): NotPlaced[] {
   const byStudentId: Record<string, Person> = {}
-  people.forEach((person) => { byStudentId[person.studentId] = person })
+  people.forEach((person) => {
+    byStudentId[person.studentId] = person
+  })
   const wishBy = wishesByStudentId(wishes) // → count-violations.ts
   const claimed: Record<string, boolean> = {}
   const notPlaced: NotPlaced[] = []
@@ -750,7 +734,7 @@ export function releaseFixesBreakingRule3(board: Board, people: Person[], days: 
       const misfit = state.morning && !state.afternoon ? ruleRoles.cleanup : ruleRoles.prep
       const isShop = (slot: Slot) => prepCleanupRoles().indexOf(person.at[whereKey(day.date, slot)]) === -1
       const tries = [
-        fixedSlots.filter((slot) => person.at[whereKey(day.date, slot)] === misfit && (state.morning !== state.afternoon)),
+        fixedSlots.filter((slot) => person.at[whereKey(day.date, slot)] === misfit && state.morning !== state.afternoon),
         fixedSlots.filter((slot) => isShop(slot) && toMinutes(slot.start) < toMinutes(boundary)),
         fixedSlots.filter((slot) => isShop(slot) && toMinutes(slot.end) > toMinutes(boundary)),
         fixedSlots.filter(isShop),
@@ -797,16 +781,16 @@ export function nameFixedConflicts(fixed: Row[] | undefined, candidates: Candida
 /** 置けなかった手直し 1 つを、検証結果の行にする。終了は、いまの枠に無ければ空である。 */
 export function fixedConflictRow(one: FixRef, why: string): Row {
   const found: Record<string, Cell> = {
-    '種別': checkKind.fixConflict,
-    '日': one.date,
-    '開始': one.start,
-    '終了': one.slot ? one.slot.end : '',
-    '役割': one.role,
-    '学籍番号': one.studentId,
-    '氏名': '',
-    '内容': why,
-    'あと何人': '',
-    '候補': '', // 希望から入れられる人は build が入れる（→ core.ts の withCandidates）
+    種別: checkKind.fixConflict,
+    日: one.date,
+    開始: one.start,
+    終了: one.slot ? one.slot.end : '',
+    役割: one.role,
+    学籍番号: one.studentId,
+    氏名: '',
+    内容: why,
+    あと何人: '',
+    候補: '', // 希望から入れられる人は build が入れる（→ core.ts の withCandidates）
   }
   return sheetColumns('検証結果').map((name) => found[name])
 }
@@ -875,7 +859,7 @@ export function assignmentRows(needs: HeldNeed[], days: Day[], people: Person[])
 
   days.forEach((day) => {
     day.slots.forEach((slot) => {
-      const here: { role: string, person: Person }[] = []
+      const here: { role: string; person: Person }[] = []
       people.forEach((person) => {
         const role = person.at[whereKey(day.date, slot)]
         if (role) here.push({ role: role, person: person })
@@ -897,12 +881,12 @@ export function roleRank(order: string[], role: string): number {
 /** 割り当て 1 件を行にする。氏名は型 #6 に無いので空である（→ 5-5）。 */
 export function assignmentRow(date: string, slot: Slot, role: string, studentId: string): Row {
   const found: Record<string, Cell> = {
-    '日': date,
-    '開始': slot.start,
-    '終了': slot.end,
-    '役割': role,
-    '学籍番号': studentId,
-    '氏名': '',
+    日: date,
+    開始: slot.start,
+    終了: slot.end,
+    役割: role,
+    学籍番号: studentId,
+    氏名: '',
   }
   return sheetColumns('割り当て').map((name) => found[name])
 }
