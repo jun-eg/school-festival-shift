@@ -82,7 +82,7 @@ const filesTouchingSpreadsheetApp = allSourceFiles
   .map((name) => path.basename(name))
   .sort()
 
-check('① SpreadsheetApp を掴むのは 5 ファイルだけである（コアの 8 つも、構造の検証も掴まない）', filesTouchingSpreadsheetApp, ['build-form.ts', 'build-template.ts', 'clear-for-next-year.ts', 'menu.ts', 'shell.ts'])
+check('① SpreadsheetApp を掴むのは 6 ファイルだけである（コアの 8 つも、構造の検証も掴まない。e2e.ts は E2E 用の口で getActive で包むだけ）', filesTouchingSpreadsheetApp, ['build-form.ts', 'build-template.ts', 'clear-for-next-year.ts', 'e2e.ts', 'menu.ts', 'shell.ts'])
 
 check('① コアを読むのに SpreadsheetApp が要らなかった（この検査が文脈に置いていない）', typeof build, 'function')
 

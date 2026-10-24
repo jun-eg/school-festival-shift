@@ -10,11 +10,13 @@
  *   - メニュー: menuItems の functionName（→ shell/menu.ts）
  *   - HTML: google.script.run が呼ぶ名前（→ ui/*.ts）
  *   - 手で実行する: buildTemplate（テンプレートを組むときにエディタから走らせる）
+ *   - E2E 用: e2eGenerate ／ e2eCheckStructure ／ e2eClearForNextYear（npm run e2e が Execution API で呼ぶ。メニューにも画面にも出さない → shell/e2e.ts）
  */
 
 import { createFormFromPicker } from './shell/build-form.ts'
 import { buildTemplate } from './shell/build-template.ts'
 import { clearForNextYear } from './shell/clear-for-next-year.ts'
+import { e2eCheckStructure, e2eClearForNextYear, e2eGenerate } from './shell/e2e.ts'
 import { createForm, exportImages, exportImagesFromDialog, onEdit, onOpen, runGeneration, showVersion } from './shell/menu.ts'
 
 export const entryPoints = {
@@ -32,4 +34,8 @@ export const entryPoints = {
   createFormFromPicker,
   // 手で実行する
   buildTemplate,
+  // E2E 用（メニューにも画面にも出さない）
+  e2eGenerate,
+  e2eCheckStructure,
+  e2eClearForNextYear,
 }

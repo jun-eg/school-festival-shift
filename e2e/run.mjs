@@ -12,6 +12,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { build, resolveVersion } from '../build.mjs'
+import { trashLeftoverForms } from './drive.mjs'
 import { assertSandbox, assertScriptBelongsToSandbox, loadEnv, root, workDir } from './env.mjs'
 
 const lockFile = path.join(workDir, 'lock')
@@ -69,10 +70,13 @@ try {
   try {
     console.log(`検証用スプレッドシート: ${await assertSandbox(env)}`)
     await assertScriptBelongsToSandbox(env)
+    // 前の回が途中で落ちて残したフォームを、空に戻す（= 条件入力の URL 欄が消える）より前に捨てる
+    const leftover = await trashLeftoverForms(env.SFS_E2E_SPREADSHEET_ID)
+    if (leftover > 0) console.log(`前の回に残ったフォームを ${leftover} 件ゴミ箱へ移した`)
     await build(path.join(workDir, 'dist'))
     console.log(`版: ${resolveVersion()}`)
     pushToSandbox(env)
-    const result = spawnSync(process.execPath, ['--test', '--test-reporter=spec', `--test-timeout=${10 * 60_000}`, path.join(root, 'e2e/build-template.e2e.mjs')], { cwd: root, stdio: 'inherit' })
+    const result = spawnSync(process.execPath, ['--test', '--test-reporter=spec', '--test-concurrency=1', `--test-timeout=${10 * 60_000}`, path.join(root, 'e2e/build-template.e2e.mjs'), path.join(root, 'e2e/pipeline.e2e.mjs')], { cwd: root, stdio: 'inherit' })
     exitCode = result.status ?? 1
   } finally {
     releaseLock()
