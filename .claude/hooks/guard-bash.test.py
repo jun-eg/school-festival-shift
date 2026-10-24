@@ -59,6 +59,15 @@ DENY = [
     "gh pr merge 99 --merge",
     "gh api -X PUT repos/o/r/pulls/12/merge",
     "gh api repos/o/r/pulls/34/merge -X PUT",
+    "git push origin :main",
+    "gh -R o/r pr merge 12 --merge",
+    "gh --repo o/r pr merge 12 --merge",
+    "gh --repo=o/r pr merge 12 --merge",
+    "gh pr merge 34 -rd",
+    "gh pr merge 34 -Ro/r --rebase",
+    "gh pr merge 34 -Rx/y --merge",
+    "gh -R x/y pr merge 34 --merge",
+    "gh pr merge 34 --merge --repo=x/y",
 ]
 
 # 通ってほしい形（止めすぎていないか）
@@ -70,6 +79,10 @@ ALLOW = [
     "git push origin HEAD",
     "gh pr merge 34 --merge",
     "gh pr merge 34 --merge --repo o/r",
+    "gh -R o/r pr merge 34 --merge",
+    "gh pr merge -m 34",
+    "gh pr merge 34 -md",
+    "gh pr merge -Ro/r 34 --merge",
     "gh pr view 12 --json baseRefName",
     "gh api repos/o/r/pulls/12",
     "gh pr checks 34 --watch",
@@ -90,7 +103,11 @@ ALLOW = [
 ]
 
 FAKE_GH = """#!/bin/sh
-# 偽の gh。`gh pr view <N> --json baseRefName --jq .baseRefName` にだけ答える
+# 偽の gh。`gh pr view <N> --json baseRefName --jq .baseRefName [--repo o/r]` にだけ答える。
+# repo が x/y なら番号に関わらず main（hook が repo を落とさず渡していることの確かめ）
+case "$*" in
+  *--repo\ x/y*) echo main; exit 0 ;;
+esac
 case "$3" in
   12) echo main ;;
   34) echo worktree-320-implement-skill ;;

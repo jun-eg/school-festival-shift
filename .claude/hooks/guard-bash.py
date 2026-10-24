@@ -16,6 +16,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 
 # git push で履歴を上書きする指定。`--force-with-lease=origin/main` のように値を付けた形も拾う
 FORCE_LONG = re.compile(r"^--force(-with-lease|-if-includes)?(=|$)")
@@ -28,9 +29,13 @@ GH_RAW_FIELD = re.compile(r"^(-f|--raw-field)$")
 GH_RAW_FIELD_INLINE = re.compile(r"^-f[A-Za-z_][A-Za-z0-9_.\[\]]*=@")
 # Claude が merge・push してはいけない branch
 PROTECTED = "main"
-# `gh pr merge` で値を取るオプション（番号を探すときに飛ばす）
+# `gh pr merge` で値を取るオプション（番号を探すときに飛ばす）。`-m` は `--merge` の短縮で値を取らない
 GH_MERGE_TAKES_VALUE = ("-R", "--repo", "-b", "--body", "-F", "--body-file", "-t", "--subject",
-                        "-m", "--match-head-commit", "-A", "--author-email")
+                        "--match-head-commit", "-A", "--author-email")
+# `-rd` のように束ねた短縮フラグ。`r` が混ざっていれば rebase
+GH_SHORT_BUNDLE = re.compile(r"^-[a-zA-Z]+$")
+# hook 全体の締切（settings.json の timeout 10 秒より短く）。gh を何回呼んでもこの中で終える
+DEADLINE = time.monotonic() + 8.0
 # REST で merge する形 `repos/o/r/pulls/12/merge`
 GH_API_MERGE = re.compile(r"(^|/)pulls/[0-9]+/merge$")
 
@@ -141,8 +146,11 @@ def pr_base(number, repo):
     cmd = ["gh", "pr", "view", number, "--json", "baseRefName", "--jq", ".baseRefName"]
     if repo:
         cmd += ["--repo", repo]
+    remaining = DEADLINE - time.monotonic()
+    if remaining <= 0:
+        return None
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=remaining)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if out.returncode != 0:
@@ -150,14 +158,38 @@ def pr_base(number, repo):
     return out.stdout.strip() or None
 
 
-def check_gh_pr_merge(args):
-    """`gh pr merge` の残り引数を見る。番号必須・--rebase 禁止・base が守る branch なら止める。"""
-    number = None
+def gh_subcommand(tokens):
+    """`gh -R o/r pr merge ...` のような前置きの repo 指定を飛ばして (サブコマンド列, repo) を返す。"""
     repo = None
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        if token in ("-R", "--repo"):
+            repo = tokens[i + 1] if i + 1 < len(tokens) else None
+            i += 2
+            continue
+        if token.startswith("--repo="):
+            repo = token.split("=", 1)[1]
+            i += 1
+            continue
+        if token.startswith("-R") and len(token) > 2:
+            repo = token[2:]
+            i += 1
+            continue
+        if token.startswith("-"):
+            i += 1
+            continue
+        return tokens[i:], repo
+    return [], repo
+
+
+def check_gh_pr_merge(args, repo):
+    """`gh pr merge` の残り引数を見る。番号必須・rebase 禁止・base が守る branch なら止める。"""
+    number = None
     i = 0
     while i < len(args):
         arg = args[i]
-        if arg in ("--rebase", "-r"):
+        if arg == "--rebase" or (GH_SHORT_BUNDLE.match(arg) and "r" in arg[1:]):
             return MSG_MERGE_REBASE
         if arg in ("-R", "--repo"):
             repo = args[i + 1] if i + 1 < len(args) else None
@@ -165,6 +197,12 @@ def check_gh_pr_merge(args):
             continue
         if arg.startswith("--repo="):
             repo = arg.split("=", 1)[1]
+            i += 1
+            continue
+        if arg.startswith("-R") and len(arg) > 2:
+            repo = arg[2:]
+            i += 1
+            continue
         if arg in GH_MERGE_TAKES_VALUE:
             i += 2
             continue
@@ -182,12 +220,13 @@ def check_gh_pr_merge(args):
 
 
 def check_gh(tokens):
-    if len(tokens) >= 3 and tokens[1] == "pr" and tokens[2] == "merge":
-        reason = check_gh_pr_merge(tokens[3:])
+    sub, repo = gh_subcommand(tokens)
+    if len(sub) >= 2 and sub[0] == "pr" and sub[1] == "merge":
+        reason = check_gh_pr_merge(sub[2:], repo)
         if reason:
             return reason
-    if len(tokens) >= 2 and tokens[1] == "api":
-        if any(GH_API_MERGE.search(t) for t in tokens[2:] if not t.startswith("-")):
+    if sub and sub[0] == "api":
+        if any(GH_API_MERGE.search(t) for t in sub[1:] if not t.startswith("-")):
             return MSG_GH_API_MERGE
     for i, token in enumerate(tokens):
         if GH_RAW_FIELD.match(token):
