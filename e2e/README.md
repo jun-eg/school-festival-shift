@@ -45,8 +45,8 @@ npm run e2e
 
 | | |
 | --- | --- |
-| 同時実行 1 本 | `.e2e/lock`（pid を持つ。生きていれば待たずに止まる。死んでいれば奪う） |
-| 日次クォータ | `scripts.run` は 1 日 100 回まで、再試行を含む（`.e2e/quota.json`、[`gas.mjs`](gas.mjs)）。Apps Script の日次の上限よりずっと下 |
+| 同時実行 1 本 | `~/.config/sfs-e2e/lock`（[`lock.mjs`](lock.mjs)。検証用スプレッドシートは 1 つなので worktree をまたいで 1 本。pid を持つ。生きていれば待たずに止まる。死んでいれば奪う） |
+| 日次クォータ | `scripts.run` は 1 日 100 回まで、再試行を含む。控えは worktree をまたいで 1 つ（`~/.config/sfs-e2e/quota.json`、[`gas.mjs`](gas.mjs)。worktree の直下の `.e2e/quota.json` は読まない）。日付は日本時間で区切り、0 時に 0 へ戻る。同時に回しても、読んで足して書く間をロックで守り数え落とさない。Apps Script の日次の上限よりずっと下 |
 | タイムアウトと再試行 | 関数 1 回は 180 秒で切る。通信の失敗・5xx・429・上記の一時的な失敗は 1 回だけ再試行。スクリプト自身の例外は再試行しない。`clasp push` も 1 回だけやり直す |
 | 前の回の残り | 頭で拾う: 紐付いたシートの紐付け（`e2eUnlinkAnswers`。外せなければそのシートのタブの ▼ →「フォームのリンクを解除」を名指しして止まる）／ 残ったフォーム（ゴミ箱へ）／ 一時シート `e2e-reset-tmp`（[`sheets.mjs`](sheets.mjs) の `resetSpreadsheet` が先に消す。それしか残っていなければ「シート1」に戻して使う）。空に戻す段（消す・名前を戻す）で落ちたら、足した一時シートを消してから止まる。検査は [`sheets.test.mjs`](sheets.test.mjs) |
 | 秘密が commit に混ざらない | ファイルは [`.gitignore`](../.gitignore) が名指し（`.env` ・ `.clasprc.json` ・ `creds.json` ・ `.e2e/`）。内容は [`.githooks/pre-commit`](../.githooks/pre-commit) の [`秘密の検査.mjs`](../scripts/秘密の検査.mjs) が止める |

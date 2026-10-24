@@ -1,5 +1,6 @@
 // 型だけを読む。サーバー側の関数が返す値の形（import type は変換で消える）。
 import type { BuiltForm } from '../core/types.ts'
+import { failureText } from './failure-text.ts'
 
 var button = document.getElementById('run') as HTMLButtonElement
 var state = document.getElementById('state') as HTMLElement
@@ -32,7 +33,7 @@ button.addEventListener('click', function () {
       .withSuccessHandler(done)
       .withFailureHandler(function (error) {
         button.disabled = false
-        say('フォームを作成できませんでした：' + error.message, true)
+        say('フォームを作成できませんでした：' + failureText(error), true)
       })
       .createFormFromPicker({
         base64: base64,

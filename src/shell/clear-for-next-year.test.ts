@@ -18,7 +18,7 @@ import { FakeSpreadsheet, asGas, gasGlobal } from '../../test/fakes/spreadsheet.
 import { createFormApp } from '../../test/fakes/form.ts'
 import { buildFormOn } from './build-form.ts'
 import { buildTemplateInto } from './build-template.ts'
-import { clearForNextYearOn, clearedText, unlinkAnswersOn } from './clear-for-next-year.ts'
+import { clearForNextYearOn, clearedHtml, clearedText, unlinkAnswersOn } from './clear-for-next-year.ts'
 import { dayLabels, formUrlBlock, sheetLayout } from '../core/sheet-layout.ts'
 
 // 偽のスプレッドシートは test/fakes/spreadsheet.ts、偽のフォームは test/fakes/form.ts が持つ。
@@ -194,7 +194,15 @@ check('⑤ 紐付いていないファイルでも止まらず、回答は消え
 // 2 回目（④ で作り直したフォームに紐付いている）も止まらない。
 check('⑤ 2 回押しても止まらない', twice, null)
 
-check('⑤ 終わりの文は、外したフォームをゴミ箱へ移すよう URL ごと名指しし、無ければその段を言わない', [clearedText('https://forms.example/1/edit').includes('https://forms.example/1/edit'), clearedText('https://forms.example/1/edit').includes('ゴミ箱'), clearedText(null).includes('ゴミ箱')], [true, true, false])
+const longUrl = 'https://docs.google.com/forms/d/1Spi4LtmkhKK1yABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd/edit'
+const withForm = clearedText(longUrl)
+check('⑤ 終わりの文は、外したフォームをゴミ箱へ移すよう URL ごと名指しし、題名の案内は無く、フォームが無ければその段を言わない', [withForm.includes(longUrl), withForm.includes('ゴミ箱'), withForm.includes('名前'), clearedText(null).includes('ゴミ箱')], [true, true, false, false])
+
+const html = clearedHtml(longUrl)
+check('⑤ 終わりの画面は、URL を別タブで開くリンクにし、折り返しを指定し、OK で閉じる', [html.includes(`<a href="${longUrl}" target="_blank"`), html.includes('overflow-wrap:anywhere'), html.includes('google.script.host.close()')], [true, true, true])
+const hostile = clearedHtml('https://x.example/?a=1&b=<script>alert("x")</script>')
+check('⑤ 終わりの画面の URL はエスケープされる', [hostile.includes('<script>alert'), hostile.includes('&lt;script&gt;'), hostile.includes('&amp;b=')], [false, true, true])
+check('⑤ フォームが無ければ、リンクを出さず引き継ぎの文だけ', [clearedHtml(null).includes('<a '), clearedHtml(null).includes('次の担当者')], [false, true])
 
 // ---- ⑥ 紐付けだけを外す口（npm run e2e の頭と終わり → shell/e2e.ts） -------------
 

@@ -1,5 +1,6 @@
 // 型だけを読む。ダイアログに渡る値の形はコアが決めている（import type は変換で消える）。
 import type { Drawing, DistributionImage } from '../core/distribution-image.ts'
+import { failureText } from './failure-text.ts'
 
 var state = document.getElementById('state') as HTMLElement
 var saveAll = document.getElementById('saveAll') as HTMLButtonElement
@@ -95,6 +96,6 @@ saveAll.addEventListener('click', function () {
 google.script.run
   .withSuccessHandler(show)
   .withFailureHandler(function (error) {
-    say('画像を作成できませんでした：' + error.message, true)
+    say('画像を作成できませんでした：' + failureText(error), true)
   })
   .exportImagesFromDialog()

@@ -21,6 +21,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build, renderHtml, renderMain, renderScript, resolveVersion } from '../build.mjs'
+import { envWithoutGit } from '../scripts/git-env.mjs'
 import { check } from '../test/check.ts'
 import { gasGlobal } from '../test/fakes/spreadsheet.ts'
 import { entryPoints } from './entry.ts'
@@ -224,7 +225,7 @@ check('⑥ 埋めた版は、メニューの「バージョン」（showVersion�
 check('⑥ ビルドを通さない手元の実行では版は dev になる（埋まっていないことが読める）', versionMessage(), 'このスクリプトの版: dev')
 
 const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'shift-version-'))
-const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: envWithoutGit() }).trim()
 git('init', '-q')
 fs.writeFileSync(path.join(repo, 'f.txt'), 'a')
 git('add', 'f.txt')

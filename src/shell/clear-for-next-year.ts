@@ -31,14 +31,44 @@ export function clearForNextYear(): void {
 
   const cleared = clearForNextYearOn(SpreadsheetApp.getActive())
   console.log(cleared.log.join('\n'))
-  ui.alert('来年用に空にしました', clearedText(cleared.formUrl), ui.ButtonSet.OK)
+  // ui.alert は折り返しを指定できず、ハイフンの無い URL はダイアログが横にはみ出す（実機で見た: 2026-10-25 ／ #351）。折り返せる HTML のダイアログで出す。
+  ui.showModalDialog(HtmlService.createHtmlOutput(clearedHtml(cleared.formUrl)).setWidth(480).setHeight(320), '来年用に空にしました')
 }
 
-/** 空にした後に伝える文。紐付いていたフォームがあれば、ゴミ箱に移すよう名指しする。 */
+/**
+ * 空にした後に伝える文。紐付いていたフォームがあれば、URL で名指ししてゴミ箱に移すよう伝える。
+ * 題名では名指ししない — ドライブのファイル名は題名と違い（「コピー 〜」が付く。頭は表示言語で変わる）、
+ * 本物の引き継ぎでは前年の担当者が使う元のフォームも同じ題名で並ぶ。URL なら取り違えない。
+ */
 export function clearedText(formUrl: string | null): string {
   const handover = '次の担当者には、このファイルを渡してください（受け取った人はコピーして使います）。'
   if (!formUrl) return handover
   return 'このコピーと一緒に複製されたフォームの紐付けを外しました。' + 'そのフォームは使わないので、Google ドライブでゴミ箱に移してください。\n' + `${formUrl}\n\n` + handover
+}
+
+/** HTML に埋める文字を逃がす。 */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+/**
+ * 終わりの画面の HTML（clearedText と同じ文）。URL は新しいタブで開くリンクにし、ハイフンの無い長い URL も折り返す（overflow-wrap: anywhere）。
+ * 文も URL もエスケープを必ず通す。OK で閉じるボタンを置く。
+ */
+export function clearedHtml(formUrl: string | null): string {
+  const url = formUrl ? escapeHtml(formUrl) : null
+  const body = escapeHtml(clearedText(formUrl))
+    .split('\n')
+    .map((line) => (url !== null && line === url ? `<a href="${url}" target="_blank" rel="noopener">${url}</a>` : line))
+    .join('<br>')
+  return (
+    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    'body{font-family:sans-serif;font-size:14px;margin:16px;overflow-wrap:anywhere;word-break:break-all}' +
+    '.text{margin-bottom:16px}' +
+    '</style></head><body><div class="text">' +
+    body +
+    '</div><button onclick="google.script.host.close()">OK</button></body></html>'
+  )
 }
 
 /**
