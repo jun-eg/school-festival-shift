@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <!--
+      「画像を書き出す」で出る画面（→ issue #157）。外から読み込むファイルは 0 個である（→ 6 の #5）。
+      下の script の src は、ビルドが src/ui/export-images.js の中身に差し替える（→ build.mjs）。出来上がりの HTML は外から読み込むものを持たない。
+      ここは塗るだけで、何をどこに描くかは distribution-image.js が図形の一覧で渡す（検査で形まで見るため）。
+    -->
+    <style>
+      body {
+        font-family: sans-serif;
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 16px;
+        color: #202124;
+      }
+      p { margin: 0 0 12px; }
+      .note { color: #5f6368; }
+      .stopped { color: #b3261e; white-space: pre-wrap; }
+      button { font-size: 13px; padding: 6px 16px; }
+      section { margin: 0 0 24px; }
+      h2 { font-size: 14px; margin: 0 0 4px; }
+      img { display: block; max-width: 100%; border: 1px solid #dadce0; margin: 4px 0; }
+    </style>
+  </head>
+  <body>
+    <p id="state" class="note">シフト表を読み込み中…</p>
+    <p><button id="saveAll" hidden></button></p>
+    <div id="images"></div>
+
+    <script src="export-images.js"></script>
+  </body>
+</html>
