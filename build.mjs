@@ -21,6 +21,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build as esbuild, buildSync } from 'esbuild'
+import { envWithoutGit } from './scripts/git-env.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const bundleName = 'shiftBundle'
@@ -40,7 +41,7 @@ export async function entryNames() {
  * タグの無い dist/ を貼らない決まりは CONTRIBUTING.md が持つ。ここはタグが無くても止まらず、SHA で版を名指しする。
  */
 export function resolveVersion(cwd = root) {
-  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: envWithoutGit() }).trim()
   try {
     const tags = git('tag', '--points-at', 'HEAD', '--sort=version:refname').split('\n').filter(Boolean)
     const base = tags.length > 0 ? tags[tags.length - 1] : git('rev-parse', '--short', 'HEAD') || 'unknown'

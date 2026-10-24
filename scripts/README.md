@@ -7,11 +7,12 @@
 （**書き直した型に乗っても、判定の答えにならない**）。
 **読み方は `import` である** — [`src/core/`](../src/core/)・[`src/shell/`](../src/shell/) の `.ts` を Node がそのまま読み、Google 側の器（`SpreadsheetApp` など）を偽にする手（M1②・M4）は `globalThis` に置いてから読む。
 
-**走らせる手そのものではないファイルが 2 本ある。**
+**走らせる手そのものではないファイルが 3 本ある。**
 
 | ファイル | 何を持つか |
 | --- | --- |
 | [`前回の5時刻.mjs`](前回の5時刻.mjs) | **5 時刻の算出**（手としても走るが、[`M2の判定.mjs`](M2の判定.mjs) などが中から呼ぶ） |
+| [`git-env.mjs`](git-env.mjs) | **git に渡す環境変数から `GIT_*` を落とす関数**（[`build.mjs`](../build.mjs) の版と [`src/entry.test.ts`](../src/entry.test.ts) の一時 repo が読む。外から渡された `GIT_DIR` で本物の repo の `core.bare` を書き換えないため。経緯は [issue #354](https://github.com/jun-eg/school-festival-shift/issues/354)。検査は [`git-env.test.mjs`](git-env.test.mjs)） |
 | [`判定の入力.mjs`](判定の入力.mjs) | **M2 と同じ入力を組む手**（[`M2の判定.mjs`](M2の判定.mjs) と [`まとまりと散らし.mjs`](まとまりと散らし.mjs) と [`M4の判定.mjs`](M4の判定.mjs) が読む）。**値を 1 つも持たない** — 置き方の原本は [`M2の宣言.json`](M2の宣言.json) である。**別々に入力を組むと、件数を並べて読めなくなる** |
 
 ## 前回の 5 時刻の算出
