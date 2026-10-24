@@ -3,3 +3,7 @@
 
 # worktree の置き場。作業ツリーそのものなので、リポジトリに入れない（→ CLAUDE.md）
 .claude/worktrees/
+
+# npm ci が作る依存と、npm run build が作る貼り物。リポジトリに入れない（→ build.mjs）
+node_modules/
+dist/

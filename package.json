@@ -6,6 +6,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test \"src/*.test.mjs\""
+    "build": "node build.mjs",
+    "test": "node --test \"src/**/*.test.mjs\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
