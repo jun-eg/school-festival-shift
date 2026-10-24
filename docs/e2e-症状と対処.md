@@ -1,6 +1,6 @@
 ---
 source: agent/e2e-症状と対処.md
-source-hash: c27c1602b0fcea28e8e38fc1834bc75951f5a636
+source-hash: f53a3e80491aa90612b7f5cbc1c22f8a78eee81e
 ---
 
 # E2E が実機で止まるときの要約 — 症状・切り分け・対処
@@ -17,7 +17,7 @@ A〜C は実機で起こしておらず、人が「確かめずに受け入れ�
 ## B. スクリプトと GCP プロジェクトの結び付けが外れる
 
 - 仕組み: `scripts.run` は、呼ぶ側のクライアントとスクリプトが同じ GCP プロジェクトでないと通らない。`.env` の GCP プロジェクトの欄はコードが使っていないので、事前には見つからない。
-- 症状: push までは通り、push の後の最初の `e2eUnlinkAnswers`（なければ次の `buildTemplate`）が `E2E を回せなかった: e2eUnlinkAnswers が失敗した（HTTP <status>）: <本文>` などで落ちて、再試行されない。status は 403 か 404 のはずだが推測で、本文も実機で見ていない。
+- 症状: push までは通り、push の後の最初の `e2eUnlinkAnswers`（通れば次の `buildTemplate`）が `E2E を回せなかった: e2eUnlinkAnswers が失敗した（HTTP <status>）: <本文>` などで落ちて、再試行されない。status は 403 か 404 のはずだが推測で、本文も実機で見ていない。
 - 対処: A でないことを見て、人がエディタの「プロジェクトの設定」で GCP プロジェクト番号を入れ直す（用意するもの 2）。そのあと Claude が回して通ることを見る。
 
 ## C. 呼び出しが 180 秒で切れる
@@ -39,7 +39,7 @@ push 直後の最初の呼び出し（`e2eUnlinkAnswers`）だけ返り、5 秒�
 ## F. Execution API と Drive の止まり方（実機で見た）
 
 - 日次上限: `今日の scripts.run が上限（100 回）に達した…` で呼ぶ前に止まる。存在しない関数は `Script function not found` で 1 回で止まる。
-- 控えは `~/.config/sfs-e2e/quota.json` に 1 つ（#352 で直した）。worktree をまたいで効き、日本時間の 0 時で 0 に戻る。同時に回すときの排他は、同じ場所の `quota.json.lock`。`npm run e2e` そのものは `~/.config/sfs-e2e/lock` で 1 本（止まる文は `別の npm run e2e が動いている（pid …）。同時には回さない`）。止まる文は `今日の scripts.run が上限（100 回）に達した。控えは worktree をまたいで 1 つで、日本時間の 0 時（明日の 0:00）に 0 へ戻るので、その後にやり直す（…）`。
+- 控えは `~/.config/sfs-e2e/quota.json` に 1 つ（#352 で直した）。worktree をまたいで効き、日本時間の 0 時で 0 に戻る。同時に回すときの排他は、同じ場所の `quota.json.lock`。`npm run e2e` そのものは `~/.config/sfs-e2e/lock` で 1 本（止まる文は `別の npm run e2e が動いている（pid …）。同時には回さない`）。控えが上限に達したときの文は `今日の scripts.run が上限（100 回）に達した。控えは worktree をまたいで 1 つで、日本時間の 0 時（明日の 0:00）に 0 へ戻るので、その後にやり直す（…）`。
 - ゴミ箱へ移す: フォームでないファイルは何もせず止まる。書き込みは 403（`appNotAuthorizedToFile`）。403 の案内文の経路は未確認。
 
 詳しくは [原本](agent/e2e-症状と対処.md)。メインの checkout で `must be run in a work tree` が出たら、[`CONTRIBUTING.md`](../CONTRIBUTING.md) の同名の節（[#354](https://github.com/jun-eg/school-festival-shift/issues/354)）。起こしていないのは、7 日で切れること・再ログインで戻ること・B の status と本文・180 秒で切れたときの重なり・Drive の 403 の案内文の経路。
