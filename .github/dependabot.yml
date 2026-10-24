@@ -1,0 +1,20 @@
+# 依存の更新を月 1 で PR にする（issue #311）。PR は CI の必須チェック（文書の検査・code・hooks）が通るまで merge できない。
+# PR の数を抑えるため、種類ごとに 1 本へまとめる（groups）。同時に開く PR は 1 本ずつ。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      npm:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ["*"]

@@ -34,6 +34,7 @@ npm test
 **`npm ci` が入れるのは開発者の道具（`devDependencies` の `esbuild` ・ `typescript` ・ 型の定義）だけで、担当者に要求するものは 0 のままである。**
 Apps Script に貼る物を作るのは `npm run build` で、`dist/` に出る（リポジトリには入れない）。
 **`npm test` は、先に型を検査し（`npm run typecheck` ＝ `tsc --noEmit`）、通ったら `src/**/*.test.ts` を全部回す。型が 1 件でも外れるか、検査が 1 本でも落ちたら終了コード 1 で止まる。**
+**Dependabot が月 1 で npm と Actions の更新 PR を 1 本ずつ作る**（`.github/dependabot.yml`）。**`.editorconfig` が md・yml・json などの改行と字下げ（space・2）を揃え、`.vscode/extensions.json` が Biome と EditorConfig の拡張を勧める。**
 
 ## 実機の E2E は任意である
 
