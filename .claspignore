@@ -1,5 +1,0 @@
-# Apps Script に上げないもの（手元で回す検査と、読み物）
-**/*.test.ts
-**/*.md
-**/.gitignore
-**/package.json

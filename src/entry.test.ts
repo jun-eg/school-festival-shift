@@ -4,24 +4,28 @@
 //
 //   使い方: node src/entry.test.ts
 //
-// 見るものは 5 つある（→ src/README.md「コアと殻の境目」、build.mjs）。
+// 見るものは 6 つある（→ src/README.md「コアと殻の境目」、build.mjs）。
 //   ① 一覧が、トリガー・menuItems・HTML の呼び先・手で実行する buildTemplate の和集合と一致する
 //   ② ビルドが出した main.gs の最上位の function が、一覧と一致する
-//   ③ 出した main.gs を読み込むと、メニュー「シフト」の 4 項目がそれぞれ最上位の関数を指す
+//   ③ 出した main.gs を読み込むと、メニュー「シフト」の 5 項目がそれぞれ最上位の関数を指す
 //   ④ ビルドが出した HTML は、外から読み込む script を持たず、src/ui/*.ts の中身がそのまま入っている
 //   ⑤ ①の突き合わせそのものが、食い違いを名指しする（偽の一覧で確かめる）
+//   ⑥ ビルドが版（タグ、無ければ短い SHA）を main.gs の定数に埋め、メニューの「バージョン」がそれを返す
 //
+// 実機のコピーから版が読めること（#331 に預ける）は実機が持つ。
 // 実機のエディタで buildTemplate が走ること、メニューが押せることは実機が持つ（→ src/real-device-log.md）。
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { build, renderHtml, renderScript } from '../build.mjs'
+import { build, renderHtml, renderMain, renderScript, resolveVersion } from '../build.mjs'
 import { check } from '../test/check.ts'
 import { gasGlobal } from '../test/fakes/spreadsheet.ts'
 import { entryPoints } from './entry.ts'
 import { menuItems } from './shell/menu.ts'
+import { versionMessage } from './shell/version.ts'
 
 const srcDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -125,20 +129,21 @@ fs.writeFileSync(loadable, `${main}\nexport { ${topLevelFunctions.join(', ')} }\
 const gas = await import(pathToFileURL(loadable).href)
 gas.onOpen()
 
-check('③ main.gs の onOpen は、メニュー「シフト」に 4 項目を出す（来年用に空にするは区切り線の下）', added, ['シフト', ...menuItems.flatMap((item) => ((item.separatorBefore ? ['---'] : []) as any[]).concat([{ label: item.label, functionName: item.functionName }])), 'shown'])
+check('③ main.gs の onOpen は、メニュー「シフト」に 5 項目を出す（来年用に空にするは区切り線の下）', added, ['シフト', ...menuItems.flatMap((item) => ((item.separatorBefore ? ['---'] : []) as any[]).concat([{ label: item.label, functionName: item.functionName }])), 'shown'])
 check(
-  '③ メニューの 4 項目の functionName は、どれも main.gs の最上位の関数である',
+  '③ メニューの 5 項目の functionName は、どれも main.gs の最上位の関数である',
   menuItems.map((item) => typeof gas[item.functionName]),
-  ['function', 'function', 'function', 'function'],
+  ['function', 'function', 'function', 'function', 'function'],
 )
 check(
-  '③ 4 項目の表示名と呼び先は、これまでと同じである（担当者の操作を増やさない）',
+  '③ 先頭の 4 項目の表示名と呼び先は、これまでと同じである（担当者の操作を増やさない。5 つ目の「バージョン」は末尾に足しただけ）',
   menuItems.map((item) => [item.label, item.functionName]),
   [
     ['フォームを作る', 'createForm'],
     ['生成', 'runGeneration'],
     ['画像を書き出す', 'exportImages'],
     ['来年用に空にする', 'clearForNextYear'],
+    ['バージョン', 'showVersion'],
   ],
 )
 
@@ -191,4 +196,45 @@ check(
   [['someServerFunction'], ['other'], [], ['f'], ['first', 'second']],
 )
 
+// ---- ⑥ 版 -------------------------------------------------------------------
+// 実機のコピーから読めること（メニューの「バージョン」を押す）は #331 に預ける。ここでは、Node の上で
+// 「ビルドが版を定数に埋める」「タグがあればタグ・無ければ短い SHA」「メニューの関数が版を出す」を見る。
+
+const embedded = await renderMain('v9-test')
+check('⑥ ビルドは、渡された版を main.gs の定数 buildVersion に埋める（別の版を渡すと、その版になる）', [/buildVersion = [^\n]*"v9-test"/.test(embedded), /buildVersion = [^\n]*"v8-other"/.test(await renderMain('v8-other'))], [true, true])
+
+const toasts: any[] = []
+gasGlobal.SpreadsheetApp = {
+  getActive() {
+    return {
+      toast(...args) {
+        toasts.push(args)
+      },
+    }
+  },
+}
+const versionLoadable = path.join(outdir, 'version-loadable.mjs')
+fs.writeFileSync(versionLoadable, `${embedded}\nexport { showVersion }\n`)
+const versioned = await import(pathToFileURL(versionLoadable).href)
+versioned.showVersion()
+check('⑥ 埋めた版は、メニューの「バージョン」（showVersion）が画面に出す', toasts, [['このスクリプトの版: v9-test', 'シフト', 10]])
+check('⑥ ビルドを通さない手元の実行では版は dev になる（埋まっていないことが読める）', versionMessage(), 'このスクリプトの版: dev')
+
+const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'shift-version-'))
+const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+git('init', '-q')
+git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'first')
+const shortSha = git('rev-parse', '--short', 'HEAD')
+const noTag = resolveVersion(repo)
+git('tag', 'v1')
+const oneTag = resolveVersion(repo)
+git('tag', 'v2')
+const twoTags = resolveVersion(repo)
+git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'second')
+const afterTag = resolveVersion(repo)
+check('⑥ 版は、タグが無ければ短い SHA・あればそのタグ・複数ならバージョン順の最後・タグより進んだ commit では SHA に戻る', [noTag === shortSha, oneTag, twoTags, afterTag === git('rev-parse', '--short', 'HEAD'), afterTag === shortSha], [true, 'v1', 'v2', true, false])
+check('⑥ git の無い場所では止まらず unknown になる', resolveVersion(fs.mkdtempSync(path.join(os.tmpdir(), 'shift-nogit-'))), 'unknown')
+check('⑥ このリポジトリで resolveVersion は空でない版（タグか SHA）を返す', resolveVersion().length > 0, true)
+
+fs.rmSync(repo, { recursive: true, force: true })
 fs.rmSync(outdir, { recursive: true, force: true })

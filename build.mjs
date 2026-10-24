@@ -12,8 +12,11 @@
 // iife の中の関数は Apps Script から名前で引けないので、src/entry.js が並べた名前ぶんの function 宣言を
 // main.gs の最上位に足す（本体は iife の中の同じ名前の関数を呼ぶだけである）。
 //
+// 版（HEAD のタグ、無ければ短い SHA）は src/shell/version.ts の定数として main.gs に埋まる（define）。
+//
 // target は es2019 である。Apps Script の V8 に合わせて落としてあり、tsconfig.json の lib（es2019）と揃えている。
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -32,8 +35,23 @@ export async function entryNames() {
   return Object.keys(entry.entryPoints)
 }
 
-/** dist/main.gs の中身。 */
-export async function renderMain() {
+/**
+ * 貼る物に載せる版。HEAD に付いた git のタグ（複数ならバージョン順の最後）、無ければ短い SHA、git が使えなければ 'unknown'。
+ * タグの無い dist/ を貼らない決まりは CONTRIBUTING.md が持つ。ここはタグが無くても止まらず、SHA で版を名指しする。
+ */
+export function resolveVersion(cwd = root) {
+  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  try {
+    const tags = git('tag', '--points-at', 'HEAD', '--sort=version:refname').split('\n').filter(Boolean)
+    if (tags.length > 0) return tags[tags.length - 1]
+    return git('rev-parse', '--short', 'HEAD') || 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** dist/main.gs の中身。version は src/shell/version.ts の buildVersion として埋まる。 */
+export async function renderMain(version = resolveVersion()) {
   const names = await entryNames()
   const result = await esbuild({
     entryPoints: [path.join(root, 'src/entry.ts')],
@@ -43,6 +61,7 @@ export async function renderMain() {
     target,
     charset: 'utf8',
     write: false,
+    define: { __BUILD_VERSION__: JSON.stringify(version) },
     banner: { js: '// src/ から npm run build で作ったファイル。ここを直さず、src/ を直す。' },
     footer: {
       js: names
@@ -75,9 +94,9 @@ export function renderHtml(name) {
 }
 
 /** 4 つを outdir に出す。 */
-export async function build(outdir = path.join(root, 'dist')) {
+export async function build(outdir = path.join(root, 'dist'), version = resolveVersion()) {
   fs.mkdirSync(outdir, { recursive: true })
-  fs.writeFileSync(path.join(outdir, 'main.gs'), await renderMain())
+  fs.writeFileSync(path.join(outdir, 'main.gs'), await renderMain(version))
   for (const name of htmlNames) fs.writeFileSync(path.join(outdir, `${name}.html`), renderHtml(name))
   fs.copyFileSync(path.join(root, 'src/appsscript.json'), path.join(outdir, 'appsscript.json'))
   return outdir
@@ -85,5 +104,6 @@ export async function build(outdir = path.join(root, 'dist')) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const outdir = await build()
+  console.log(`版: ${resolveVersion()}`)
   console.log(`${path.relative(root, outdir)}/ に 4 つ出した: main.gs ／ ${htmlNames.map((n) => `${n}.html`).join(' ／ ')} ／ appsscript.json`)
 }

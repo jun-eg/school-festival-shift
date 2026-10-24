@@ -10,6 +10,7 @@
 
 import { openRosterPicker } from './build-form.ts'
 import { checkKind, outputColumns } from '../core/sheet-layout.ts'
+import { versionMessage } from './version.ts'
 import { distributionImagesOn, recountOnEdit, runOnActiveSpreadsheet } from './shell.ts'
 
 const menuName = 'シフト'
@@ -20,6 +21,8 @@ export const menuItems = [
   { label: '画像を書き出す', functionName: 'exportImages' },
   // 回答を消す項目なので、区切り線の下に離して置く（押し間違えても、押す前に確認が出る）。
   { label: '来年用に空にする', functionName: 'clearForNextYear', separatorBefore: true },
+  // 押さなくても困らない項目。引き継ぎで「これはどの版か」と聞かれたときに読む（→ version.ts）。
+  { label: 'バージョン', functionName: 'showVersion', separatorBefore: true },
 ]
 
 export function onOpen() {
@@ -76,4 +79,9 @@ export function exportImages() {
 /** export-images.html から呼ばれる入口。返すのは日ごとの描く中身である。 */
 export function exportImagesFromDialog() {
   return distributionImagesOn(SpreadsheetApp.getActive())
+}
+
+/** このスクリプトの版を、画面の隅に出す（→ version.ts）。 */
+export function showVersion() {
+  SpreadsheetApp.getActive().toast(versionMessage(), menuName, 10)
 }
