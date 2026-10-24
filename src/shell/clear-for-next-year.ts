@@ -18,8 +18,11 @@ import { findLayout, findSheet, headerRowCount, seenGridKey } from './shell.ts'
 import type { Sheet, Spreadsheet } from './shell.ts'
 import type { Layout } from '../core/sheet-layout.ts'
 
-/** 空にした結果。formUrl はフォームに紐付いていたときだけ入る。 */
-export type Cleared = { formUrl: string | null; log: string[] }
+/** 空にした結果。formUrl ・ formTitle はフォームに紐付いていたときだけ入る（title は外す前に読む）。 */
+export type Cleared = { formUrl: string | null; formTitle: string | null; log: string[] }
+
+/** 外したフォーム 1 つ。 */
+type Unlinked = { url: string; title: string }
 
 /** 押したときに出す確認。元のファイルで押すと、今年の回答が消える。 */
 export const clearConfirmText = 'このファイルの回答・シフト表・検証結果・指標を消し、フォームとの紐付けを外します。' + '条件入力の値は残ります。\n\n' + '元のファイルではなく、「ファイル → コピーを作成」で作ったコピーで押していますか？'
@@ -31,14 +34,24 @@ export function clearForNextYear(): void {
 
   const cleared = clearForNextYearOn(SpreadsheetApp.getActive())
   console.log(cleared.log.join('\n'))
-  ui.alert('来年用に空にしました', clearedText(cleared.formUrl), ui.ButtonSet.OK)
+  ui.alert('来年用に空にしました', clearedText(cleared.formTitle), ui.ButtonSet.OK)
 }
 
-/** 空にした後に伝える文。紐付いていたフォームがあれば、ゴミ箱に移すよう名指しする。 */
-export function clearedText(formUrl: string | null): string {
+/**
+ * 空にした後に伝える文。紐付いていたフォームがあれば、ゴミ箱に移すよう名指しする。
+ * 名指しは URL でなく題名にする — ui.alert は折り返しを指定できず、ハイフンの無い URL はダイアログを横にスクロールさせる（実機で見た: 2026-10-25 ／ #351）。
+ * 題名はドライブのファイル名であり、ドライブの検索で見つかる。毎年同じ名前かもしれないので、種類（フォーム）と「いま外したもの」であることも添える。
+ */
+export function clearedText(formTitle: string | null): string {
   const handover = '次の担当者には、このファイルを渡してください（受け取った人はコピーして使います）。'
-  if (!formUrl) return handover
-  return 'このコピーと一緒に複製されたフォームの紐付けを外しました。' + 'そのフォームは使わないので、Google ドライブでゴミ箱に移してください。\n' + `${formUrl}\n\n` + handover
+  if (formTitle === null) return handover
+  return (
+    'このコピーと一緒に複製されたフォームの紐付けを外しました。' +
+    'そのフォームは使わないので、Google ドライブでゴミ箱に移してください。\n' +
+    `フォームの名前: 「${formTitle}」\n` +
+    '（ドライブで名前を検索し、種類がフォームのものを選びます。同じ名前のスプレッドシートは、このファイルや元のファイルなので残します。）\n\n' +
+    handover
+  )
 }
 
 /**
@@ -47,7 +60,7 @@ export function clearedText(formUrl: string | null): string {
  */
 export function clearForNextYearOn(spreadsheet: Spreadsheet): Cleared {
   const log: string[] = []
-  const formUrl = unlinkAnswerForm(spreadsheet, log)
+  const unlinked = unlinkAnswerForm(spreadsheet, log)
   rebuildAnswers(spreadsheet, log)
   gridLayouts(assignmentName).forEach((layout) => {
     clearGrid(findSheet(spreadsheet, layout.name), layout, log)
@@ -56,7 +69,7 @@ export function clearForNextYearOn(spreadsheet: Spreadsheet): Cleared {
     clearOutput(spreadsheet, findLayout(name), log)
   })
   clearFormUrls(spreadsheet, log)
-  return { formUrl: formUrl, log: log }
+  return { formUrl: unlinked ? unlinked.url : null, formTitle: unlinked ? unlinked.title : null, log: log }
 }
 
 /**
@@ -70,7 +83,8 @@ export function unlinkAnswersOn(spreadsheet: Spreadsheet): string | null {
   const urls = spreadsheet
     .getSheets()
     .map((sheet) => unlinkSheetForm(sheet, []))
-    .filter((url): url is string => url !== null)
+    .filter((one): one is Unlinked => one !== null)
+    .map((one) => one.url)
   return urls.length > 0 ? urls[0] : null
 }
 
@@ -78,11 +92,11 @@ export function unlinkAnswersOn(spreadsheet: Spreadsheet): string | null {
  * 回答シートに紐付いたフォームから、回答先を外す（スコープは forms のままで足りる）。
  * フォームが開けないとき（もうゴミ箱にある・持ち主でない）は、手で外す場所を名指しして止まる。
  */
-function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): string | null {
+function unlinkAnswerForm(spreadsheet: Spreadsheet, log: string[]): Unlinked | null {
   return unlinkSheetForm(findSheet(spreadsheet, findLayout('回答').name), log)
 }
 
-function unlinkSheetForm(sheet: Sheet, log: string[]): string | null {
+function unlinkSheetForm(sheet: Sheet, log: string[]): Unlinked | null {
   const formUrl = sheet.getFormUrl()
   if (!formUrl) {
     log.push(`「${sheet.getName()}」はフォームに紐付いていなかった`)
@@ -95,10 +109,11 @@ function unlinkSheetForm(sheet: Sheet, log: string[]): string | null {
   } catch {
     throw new Error(`「${sheet.getName()}」シートに紐付いたフォームを開けませんでした（${formUrl}）。` + `「${sheet.getName()}」タブの ▼ →「フォームのリンクを解除」を押してから、もう一度「来年用に空にする」を押してください`)
   }
+  const title = form.getTitle()
   form.removeDestination()
   SpreadsheetApp.flush()
   log.push(`「${sheet.getName()}」とフォームの紐付けを外した（${formUrl}）`)
-  return formUrl
+  return { url: formUrl, title: title }
 }
 
 /**

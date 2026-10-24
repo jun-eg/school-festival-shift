@@ -194,7 +194,14 @@ check('⑤ 紐付いていないファイルでも止まらず、回答は消え
 // 2 回目（④ で作り直したフォームに紐付いている）も止まらない。
 check('⑤ 2 回押しても止まらない', twice, null)
 
-check('⑤ 終わりの文は、外したフォームをゴミ箱へ移すよう URL ごと名指しし、無ければその段を言わない', [clearedText('https://forms.example/1/edit').includes('https://forms.example/1/edit'), clearedText('https://forms.example/1/edit').includes('ゴミ箱'), clearedText(null).includes('ゴミ箱')], [true, true, false])
+const withForm = clearedText('シフト希望 2025')
+check('⑤ 終わりの文は、外したフォームをゴミ箱へ移すよう題名で名指しし、無ければその段を言わない', [withForm.includes('「シフト希望 2025」'), withForm.includes('ゴミ箱'), clearedText(null).includes('ゴミ箱')], [true, true, false])
+check('⑤ 終わりの文に URL を入れない（ui.alert は折り返せず、ハイフンの無い URL ではみ出す → #351）', [/https?:\/\//.test(withForm), cleared.formTitle === forms[0].getTitle(), unlinkedResult.formTitle], [false, true, null])
+check(
+  '⑤ 終わりの文の 1 行は、ハイフンも空白も無い長い続きを持たない（ダイアログに収まる形）',
+  withForm.split('\n').every((line) => !/[A-Za-z0-9_]{30,}/.test(line)),
+  true,
+)
 
 // ---- ⑥ 紐付けだけを外す口（npm run e2e の頭と終わり → shell/e2e.ts） -------------
 

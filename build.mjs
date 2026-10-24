@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { build as esbuild, transformSync } from 'esbuild'
+import { build as esbuild, buildSync } from 'esbuild'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const bundleName = 'shiftBundle'
@@ -75,14 +75,13 @@ export async function renderMain(version = resolveVersion()) {
 }
 
 /**
- * ダイアログの script 1 本。src/ui/X.ts の型を剥がして JS にする。
+ * ダイアログの script 1 本。src/ui/X.ts の型を剥がし、import した src/ui/ の中の値（failure-text.ts）を 1 本にまとめて JS にする。
  * 関数 1 つにくるむ（format: iife）のは、tsc が ES モジュールとして見る .ts（import type を持つ）を、
  * ページに置く普通の script に戻すためである。最上位の var がページのグローバルに漏れることもなくなる。
  */
 export function renderScript(file) {
-  const source = fs.readFileSync(path.join(root, 'src/ui', file), 'utf8')
-  const result = transformSync(source, { loader: 'ts', format: 'iife', target, charset: 'utf8' })
-  return result.code.replace(/\n$/, '')
+  const result = buildSync({ entryPoints: [path.join(root, 'src/ui', file)], bundle: true, write: false, format: 'iife', target, charset: 'utf8' })
+  return result.outputFiles[0].text.replace(/\n$/, '')
 }
 
 /** HTML 1 枚の中身。<script src="X.ts"></script> を、src/ui/X.ts を変換した中身を入れた <script> に差し替える。 */

@@ -61,6 +61,7 @@ export class FakeForm {
   addParagraphTextItem() { return this.add('paragraph') }
   addMultipleChoiceItem() { return this.add('radio') }
   addImageItem() { return this.add('image') }
+  getTitle() { return this.title }
   getPublishedUrl() { return `https://forms.example/${this.number}/viewform` }
   getEditUrl() { return `https://forms.example/${this.number}/edit` }
   setDestination(type, id) {
