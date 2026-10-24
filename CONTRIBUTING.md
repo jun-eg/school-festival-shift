@@ -23,6 +23,18 @@ git config core.hooksPath .githooks
 差分があるときだけ `claude -p --agent test-diff-reviewer` が差分を読み、検査を消す・緩める変更に根拠（同じ push の実装の変更、issue の「決めたこと」）が無ければ止める。
 **`claude`（Claude Code）が PATH に要る。** 無ければ入れ方を出して止まる。**人が承知で抜けるのは `git push --no-verify` だけ**（Claude には [`guard-bash`](.claude/README.md) が打たせない）。CI では回さない。
 
+### メインの checkout で「must be run in a work tree」が出たとき
+
+**メインの checkout の `.git/config` に `bare = true` が書かれている**（検査の中の `git init` が、外から渡された `GIT_DIR` を引き継いだ跡。[issue #354](https://github.com/jun-eg/school-festival-shift/issues/354)）。
+**メインの checkout で次を打つと直る。**
+
+```
+git --git-dir=.git config core.bare false
+```
+
+**検査・ビルドの git は [`scripts/git-env.mjs`](scripts/git-env.mjs) で `GIT_*` を落として呼ぶ。** pre-commit は終わりに `core.bare` が `true` なら止まり、同じ直し方を言う。
+**本物の repo を読むのが目的の検査（要約の検査・秘密の検査・pre-push）は落とさない。**
+
 ## コードを回すには、3 手で足りる
 
 ```
