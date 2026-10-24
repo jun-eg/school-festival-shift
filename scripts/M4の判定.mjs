@@ -37,11 +37,13 @@ class 偽の範囲 {
     return 表
   }
   置く(地図, 表) {
-    表.forEach((一行, i) => 一行.forEach((値, j) => {
-      const 鍵 = `${this.行 + i},${this.列 + j}`
-      if (値 === '' || 値 === null) 地図.delete(鍵)
-      else 地図.set(鍵, 値)
-    }))
+    表.forEach((一行, i) => {
+      一行.forEach((値, j) => {
+        const 鍵 = `${this.行 + i},${this.列 + j}`
+        if (値 === '' || 値 === null) 地図.delete(鍵)
+        else 地図.set(鍵, 値)
+      })
+    })
     return this
   }
   消す(地図) {
@@ -50,39 +52,93 @@ class 偽の範囲 {
     }
     return this
   }
-  getValues() { return this.表(this.シート.cells) }
-  setValues(表) { return this.置く(this.シート.cells, 表) }
-  clearContent() { return this.消す(this.シート.cells) }
-  getNotes() { return this.表(this.シート.notes) }
-  setNotes(表) { return this.置く(this.シート.notes, 表) }
-  clearNote() { return this.消す(this.シート.notes) }
-  getSheet() { return this.シート }
-  getRow() { return this.行 }
-  getColumn() { return this.列 }
-  getLastRow() { return this.行 + this.行数 - 1 }
-  getLastColumn() { return this.列 + this.列数 - 1 }
+  getValues() {
+    return this.表(this.シート.cells)
+  }
+  setValues(表) {
+    return this.置く(this.シート.cells, 表)
+  }
+  clearContent() {
+    return this.消す(this.シート.cells)
+  }
+  getNotes() {
+    return this.表(this.シート.notes)
+  }
+  setNotes(表) {
+    return this.置く(this.シート.notes, 表)
+  }
+  clearNote() {
+    return this.消す(this.シート.notes)
+  }
+  getSheet() {
+    return this.シート
+  }
+  getRow() {
+    return this.行
+  }
+  getColumn() {
+    return this.列
+  }
+  getLastRow() {
+    return this.行 + this.行数 - 1
+  }
+  getLastColumn() {
+    return this.列 + this.列数 - 1
+  }
   // 書式は値もメモも動かさないので捨てる。
-  setFontWeight() { return this }
-  setNote() { return this }
-  setHorizontalAlignment() { return this }
-  clearFormat() { return this }
-  setBackgrounds() { return this }
-  setBorder() { return this }
+  setFontWeight() {
+    return this
+  }
+  setNote() {
+    return this
+  }
+  setHorizontalAlignment() {
+    return this
+  }
+  clearFormat() {
+    return this
+  }
+  setBackgrounds() {
+    return this
+  }
+  setBorder() {
+    return this
+  }
   // 結合はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑧）。ここでは見ない。
-  merge() { return this }
+  merge() {
+    return this
+  }
 }
 
 class 偽の保護 {
-  constructor(シート) { Object.assign(this, { シート, description: null, warningOnly: false }) }
-  setDescription(文) { this.description = 文; return this }
-  setWarningOnly(値) { this.warningOnly = 値; return this }
+  constructor(シート) {
+    Object.assign(this, { シート, description: null, warningOnly: false })
+  }
+  setDescription(文) {
+    this.description = 文
+    return this
+  }
+  setWarningOnly(値) {
+    this.warningOnly = 値
+    return this
+  }
   // 割り当ての 4 枚は「持ち主だけ」、条件入力は入力欄を外す（→ src/build-template.js の applyProtection ／ issue #234）。
   // この手は保護の中身を見ないので、受けて捨てる。
-  getEditors() { return [] }
-  removeEditors() { return this }
-  canDomainEdit() { return false }
-  setUnprotectedRanges() { return this }
-  remove() { this.シート.protections = this.シート.protections.filter((p) => p !== this) }
+  getEditors() {
+    return []
+  }
+  removeEditors() {
+    return this
+  }
+  canDomainEdit() {
+    return false
+  }
+  setUnprotectedRanges() {
+    return this
+  }
+  remove() {
+    this.シート.protections = this.シート.protections.filter((p) => p !== this)
+  }
 }
 
 let 次のシート番号 = 1
@@ -91,39 +147,100 @@ class 偽のシート {
   // 1000 行 26 列は新しいスプレッドシートの既定の大きさ
   constructor(name) {
     Object.assign(this, {
-      name, id: 次のシート番号++, cells: new Map(), notes: new Map(), protections: [],
-      frozenRows: 0, frozenColumns: 0, maxRows: 1000, maxColumns: 26,
+      name,
+      id: 次のシート番号++,
+      cells: new Map(),
+      notes: new Map(),
+      protections: [],
+      frozenRows: 0,
+      frozenColumns: 0,
+      maxRows: 1000,
+      maxColumns: 26,
     })
   }
-  getName() { return this.name }
-  setName(name) { this.name = name; return this }
-  getSheetId() { return this.id }
-  getRange(行, 列, 行数 = 1, 列数 = 1) { return new 偽の範囲(this, 行, 列, 行数, 列数) }
-  getRangeList() { return { setFontColor() { return this }, setFontWeight() { return this } } }
-  setFrozenRows(数) { this.frozenRows = 数 }
-  setFrozenColumns(数) { this.frozenColumns = 数 }
+  getName() {
+    return this.name
+  }
+  setName(name) {
+    this.name = name
+    return this
+  }
+  getSheetId() {
+    return this.id
+  }
+  getRange(行, 列, 行数 = 1, 列数 = 1) {
+    return new 偽の範囲(this, 行, 列, 行数, 列数)
+  }
+  getRangeList() {
+    return {
+      setFontColor() {
+        return this
+      },
+      setFontWeight() {
+        return this
+      },
+    }
+  }
+  setFrozenRows(数) {
+    this.frozenRows = 数
+  }
+  setFrozenColumns(数) {
+    this.frozenColumns = 数
+  }
   // 列の幅も値を動かさないので捨てる（→ issue #245）。
-  getColumnWidth() { return 100 }
+  getColumnWidth() {
+    return 100
+  }
   setColumnWidth() {}
-  insertColumnsAfter(後ろ, 数) { this.maxColumns = Math.max(this.maxColumns, 後ろ + 数) }
-  getProtections() { return [...this.protections] }
-  protect() { const p = new 偽の保護(this); this.protections.push(p); return p }
-  getFormUrl() { return null }
-  getMaxRows() { return this.maxRows }
-  getMaxColumns() { return this.maxColumns }
-  getLastRow() { return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[0])), 0) }
-  getLastColumn() { return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[1])), 0) }
+  insertColumnsAfter(後ろ, 数) {
+    this.maxColumns = Math.max(this.maxColumns, 後ろ + 数)
+  }
+  getProtections() {
+    return [...this.protections]
+  }
+  protect() {
+    const p = new 偽の保護(this)
+    this.protections.push(p)
+    return p
+  }
+  getFormUrl() {
+    return null
+  }
+  getMaxRows() {
+    return this.maxRows
+  }
+  getMaxColumns() {
+    return this.maxColumns
+  }
+  getLastRow() {
+    return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[0])), 0)
+  }
+  getLastColumn() {
+    return [...this.cells.keys()].reduce((最大, 鍵) => Math.max(最大, Number(鍵.split(',')[1])), 0)
+  }
   // 書き換えの控えを置く見えない記録（→ src/shell.js の keepSeenGrid）。
   getDeveloperMetadata() {
     const シート = this
     return (this.metadata ?? []).map((一つ) => ({
-      getKey() { return 一つ.key },
-      getValue() { return 一つ.value },
-      setValue(値) { 一つ.value = String(値); return this },
-      remove() { シート.metadata = シート.metadata.filter((他) => 他 !== 一つ) },
+      getKey() {
+        return 一つ.key
+      },
+      getValue() {
+        return 一つ.value
+      },
+      setValue(値) {
+        一つ.value = String(値)
+        return this
+      },
+      remove() {
+        シート.metadata = シート.metadata.filter((他) => 他 !== 一つ)
+      },
     }))
   }
-  addDeveloperMetadata(key, value) { this.metadata = [...(this.metadata ?? []), { key, value: String(value) }]; return this }
+  addDeveloperMetadata(key, value) {
+    this.metadata = [...(this.metadata ?? []), { key, value: String(value) }]
+    return this
+  }
 }
 
 // ---- 担当者に向いた口を見張る ------------------------------------------------
@@ -136,28 +253,63 @@ class 偽のスプレッドシート {
     Object.assign(this, { sheets: 名前たち.map((n) => new 偽のシート(n)), id: 'this-spreadsheet', name: '学祭シフト' })
     this.activeSheet = this.sheets[0]
   }
-  getId() { return this.id }
-  getName() { return this.name }
-  getSheets() { return [...this.sheets] }
-  getSheetByName(名前) { return this.sheets.filter((s) => s.getName() === 名前)[0] ?? null }
-  insertSheet(名前) { const s = new 偽のシート(名前); this.sheets.push(s); return s }
-  deleteSheet(シート) { this.sheets = this.sheets.filter((s) => s !== シート) }
-  setActiveSheet(シート) { this.activeSheet = シート }
+  getId() {
+    return this.id
+  }
+  getName() {
+    return this.name
+  }
+  getSheets() {
+    return [...this.sheets]
+  }
+  getSheetByName(名前) {
+    return this.sheets.filter((s) => s.getName() === 名前)[0] ?? null
+  }
+  insertSheet(名前) {
+    const s = new 偽のシート(名前)
+    this.sheets.push(s)
+    return s
+  }
+  deleteSheet(シート) {
+    this.sheets = this.sheets.filter((s) => s !== シート)
+  }
+  setActiveSheet(シート) {
+    this.activeSheet = シート
+  }
   moveActiveSheet(位置) {
     this.sheets = this.sheets.filter((s) => s !== this.activeSheet)
     this.sheets.splice(位置 - 1, 0, this.activeSheet)
   }
-  toast(文) { 画面.一言.push(String(文)) }
+  toast(文) {
+    画面.一言.push(String(文))
+  }
 }
 
 const 偽のUI = {
   createMenu() {
-    const 組み立て = { addItem() { return 組み立て }, addSeparator() { return 組み立て }, addToUi() { return 組み立て } }
+    const 組み立て = {
+      addItem() {
+        return 組み立て
+      },
+      addSeparator() {
+        return 組み立て
+      },
+      addToUi() {
+        return 組み立て
+      },
+    }
     return 組み立て
   },
-  showModalDialog(中身, 題) { 画面.ダイアログ.push({ 題, ファイル: 中身.ファイル }) },
-  alert(文) { 画面.一覧に無い操作.push(`確認の画面（alert）: ${文}`) },
-  prompt(文) { 画面.一覧に無い操作.push(`入力を求める画面（prompt）: ${文}`); return { getResponseText: () => '' } },
+  showModalDialog(中身, 題) {
+    画面.ダイアログ.push({ 題, ファイル: 中身.ファイル })
+  },
+  alert(文) {
+    画面.一覧に無い操作.push(`確認の画面（alert）: ${文}`)
+  },
+  prompt(文) {
+    画面.一覧に無い操作.push(`入力を求める画面（prompt）: ${文}`)
+    return { getResponseText: () => '' }
+  },
 }
 
 // ---- src を読む --------------------------------------------------------------
@@ -169,12 +321,24 @@ const 文脈 = vm.createContext({
     ProtectionType: { SHEET: 'SHEET' },
     BorderStyle: { SOLID_THICK: 'SOLID_THICK' },
     flush() {},
-    getActive() { return 帳 },
-    getUi() { return 偽のUI },
+    getActive() {
+      return 帳
+    },
+    getUi() {
+      return 偽のUI
+    },
   },
   HtmlService: {
     createHtmlOutputFromFile(名前) {
-      const 出力 = { ファイル: 名前, setWidth() { return 出力 }, setHeight() { return 出力 } }
+      const 出力 = {
+        ファイル: 名前,
+        setWidth() {
+          return 出力
+        },
+        setHeight() {
+          return 出力
+        },
+      }
       return 出力
     },
   },
@@ -184,11 +348,7 @@ for (const 相対 of 宣言.入力.実装) {
   vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
 }
 const 取り出す = (名前) => vm.runInContext(`({ ${名前.join(', ')} })`, 文脈)
-const {
-  menuItems, sheetLayout, gridLayouts, assignmentName, outputColumns, checkKind, isFixedNote, sectionWidth,
-} = 取り出す([
-  'menuItems', 'sheetLayout', 'gridLayouts', 'assignmentName', 'outputColumns', 'checkKind', 'isFixedNote', 'sectionWidth',
-])
+const { menuItems, sheetLayout, gridLayouts, assignmentName, outputColumns, checkKind, isFixedNote, sectionWidth } = 取り出す(['menuItems', 'sheetLayout', 'gridLayouts', 'assignmentName', 'outputColumns', 'checkKind', 'isFixedNote', 'sectionWidth'])
 
 /** メニューを表示名で押す（→ menu.js の menuItems）。 */
 function メニューを押す(表示名) {
@@ -215,9 +375,9 @@ function 境目の時刻(値) {
 }
 
 const 回答の範囲 = {
-  '締切まで': (行) => String(行[0]) < 境目の時刻(境目.締切.値),
-  '配布まで': (行) => String(行[0]) < 境目の時刻(境目.配布.値),
-  '全行': () => true,
+  締切まで: (行) => String(行[0]) < 境目の時刻(境目.締切.値),
+  配布まで: (行) => String(行[0]) < 境目の時刻(境目.配布.値),
+  全行: () => true,
 }
 
 /** 条件入力の 6 区画を区画の位置に入れる（初回の前に済んでいるので数えない）。 */
@@ -236,7 +396,9 @@ function 回答を積む(範囲) {
   const シート = 帳.getSheetByName('回答')
   const 積んである = Math.max(シート.getLastRow() - 1, 0)
   const 積む = 一式.入力.回答.filter(回答の範囲[範囲]).slice(積んである)
-  積む.forEach((行, i) => シート.getRange(2 + 積んである + i, 1, 1, 行.length).setValues([行]))
+  積む.forEach((行, i) => {
+    シート.getRange(2 + 積んである + i, 1, 1, 行.length).setValues([行])
+  })
   return 積む
 }
 
@@ -263,8 +425,14 @@ function マス目を読む() {
     値.forEach((一行, i) => {
       for (let c = 名前の列; c < 幅 && 見出し[c] !== ''; c++) {
         セル.push({
-          シート: 構成.name, 学籍番号: String(一行[0]), 氏名: String(一行[1]), 時刻: 見出し[c],
-          値: String(一行[c] ?? ''), メモ: String(メモ[i][c] ?? ''), 行: 2 + i, 列: c + 1,
+          シート: 構成.name,
+          学籍番号: String(一行[0]),
+          氏名: String(一行[1]),
+          時刻: 見出し[c],
+          値: String(一行[c] ?? ''),
+          メモ: String(メモ[i][c] ?? ''),
+          行: 2 + i,
+          列: c + 1,
         })
       }
     })
@@ -276,7 +444,7 @@ const セルの鍵 = (セル) => `${セル.シート}|${セル.学籍番号}|${�
 
 // ---- 担当者の手 --------------------------------------------------------------
 
-const 回す先 = { '会計': '呼び込み', '呼び込み': '列整理', '列整理': '会計' }
+const 回す先 = { 会計: '呼び込み', 呼び込み: '列整理', 列整理: '会計' }
 
 /** セル 1 つを書き換え、onEdit を 1 回走らせる（→ 宣言の「1 手とは」）。 */
 function セルを書き換える(セル, 新しい値) {
@@ -288,7 +456,9 @@ function セルを書き換える(セル, 新しい値) {
 
 /** 宣言の「手直しの選び方」で選ぶ。印の無い、役割の入ったセルだけに番号を振る。 */
 function 手直しを選ぶ() {
-  const 候補 = マス目を読む().flatMap((一枚) => 一枚.セル).filter((セル) => セル.値 !== '' && !isFixedNote(セル.メモ))
+  const 候補 = マス目を読む()
+    .flatMap((一枚) => 一枚.セル)
+    .filter((セル) => セル.値 !== '' && !isFixedNote(セル.メモ))
   const 選んだ = []
   候補.forEach((セル, 番号) => {
     if (番号 % 7 === 0) 選んだ.push({ セル, 新しい値: 回す先[セル.値] ?? セル.値 })
@@ -333,7 +503,9 @@ function 周を通す(周, 番号) {
   const 届いた人 = [...new Set(見たもの.届いた回答.map((行) => String(行[1]).toUpperCase()))]
 
   // 生成の前の印を写す（→ 戻ったセルの相手）。
-  const 前の印 = マス目を読む().flatMap((一枚) => 一枚.セル).filter((セル) => isFixedNote(セル.メモ))
+  const 前の印 = マス目を読む()
+    .flatMap((一枚) => 一枚.セル)
+    .filter((セル) => isFixedNote(セル.メモ))
 
   // 7 — メニュー「生成」。
   const 始め = process.hrtime.bigint()
@@ -343,8 +515,7 @@ function 周を通す(周, 番号) {
   見たもの.生成の一言 = 画面.一言[画面.一言.length - 1]
 
   const 検証結果 = 帳.getSheetByName('検証結果')
-  const 検証結果の行 = 検証結果.getLastRow() > 1
-    ? 検証結果.getRange(2, 1, 検証結果.getLastRow() - 1, 検証結果の列.length).getValues() : []
+  const 検証結果の行 = 検証結果.getLastRow() > 1 ? 検証結果.getRange(2, 1, 検証結果.getLastRow() - 1, 検証結果の列.length).getValues() : []
   見たもの.違反 = 検証結果の行.filter((行) => 列の値(行, '種別') === checkKind.violation).length
   見たもの.未充足 = 検証結果の行.filter((行) => 列の値(行, '種別') === checkKind.unmet).length
   const 食い違い = 検証結果の行.filter((行) => 列の値(行, '種別') === checkKind.fixConflict)
@@ -352,16 +523,18 @@ function 周を通す(周, 番号) {
 
   // 届いた回答の人が指標に出ているか（1 枠も置かれない人も 0 で並ぶ）。
   const 指標 = 帳.getSheetByName('指標')
-  const 指標の人 = new Set(
-    (指標.getLastRow() > 1 ? 指標.getRange(2, 1, 指標.getLastRow() - 1, 1).getValues() : []).map((行) => String(行[0])),
-  )
+  const 指標の人 = new Set((指標.getLastRow() > 1 ? 指標.getRange(2, 1, 指標.getLastRow() - 1, 1).getValues() : []).map((行) => String(行[0])))
   見たもの.出てこない人 = 届いた人.filter((人) => !指標の人.has(人))
   if (見たもの.出てこない人.length > 0) {
     見たもの.一覧に無い操作.push(`届いた回答を読ませ直す（生成の結果に出てこない: ${見たもの.出てこない人.join(' / ')}）`)
   }
 
   // 戻ったセル — 生成の前に印のあったセルを、後のマス目で（シート・学籍番号・時刻）で引く。
-  const 後 = new Map(マス目を読む().flatMap((一枚) => 一枚.セル).map((セル) => [セルの鍵(セル), セル]))
+  const 後 = new Map(
+    マス目を読む()
+      .flatMap((一枚) => 一枚.セル)
+      .map((セル) => [セルの鍵(セル), セル]),
+  )
   const 名指し = new Set(食い違い.map((行) => `${列の値(行, '日')}|${列の値(行, '開始')}|${列の値(行, '学籍番号')}`))
   const 日付 = 一式.入力['日ごとの営業時刻'].map((行) => 行[0])
   const シートの日付 = Object.fromEntries(マス目の構成.map((構成) => [構成.name, 日付[構成.grid.dayIndex]]))
@@ -383,7 +556,9 @@ function 周を通す(周, 番号) {
     見たもの.狙い = 狙う手直しを選ぶ()
     if (見たもの.狙い.選んだ) 選んだ.push(見たもの.狙い.選んだ)
   }
-  選んだ.forEach((一つ) => セルを書き換える(一つ.セル, 一つ.新しい値))
+  選んだ.forEach((一つ) => {
+    セルを書き換える(一つ.セル, 一つ.新しい値)
+  })
   見たもの.手直し = 選んだ.length
   見たもの.手.push(`8 手直し（${選んだ.length} セル）`)
   見たもの.書き換えた後の違反 = 画面.一言[画面.一言.length - 1]
@@ -397,7 +572,9 @@ function 周を通す(周, 番号) {
   // 一覧に無い操作 — 画面・条件入力・フォーム。
   const 開いた画面 = 画面.ダイアログ.slice(画面の前.ダイアログ)
   if (開いた画面.length !== 1) 見たもの.一覧に無い操作.push(`開いた画面が ${開いた画面.length} 枚（開いてよいのは「画像を書き出す」の 1 枚）`)
-  画面.一覧に無い操作.slice(画面の前.一覧に無い操作).forEach((一つ) => 見たもの.一覧に無い操作.push(一つ))
+  画面.一覧に無い操作.slice(画面の前.一覧に無い操作).forEach((一つ) => {
+    見たもの.一覧に無い操作.push(一つ)
+  })
   if (条件入力の写し() !== 条件入力の前) 見たもの.一覧に無い操作.push('条件入力が周の中で動いた（入れ直しに当たる）')
   if ((画面.フォームを作った ?? 0) !== フォームを作った前) 見たもの.一覧に無い操作.push('フォームを作り直した')
   if (見たもの.粒度.差分 > 0) 見たもの.一覧に無い操作.push('画像がこの周のマス目を描いていない（描き直す手が要る）')
@@ -412,13 +589,17 @@ function 粒度を比べる(画像) {
   const 画像の組 = new Set()
   const マス目の組 = new Set()
   画像.forEach((一枚, 日) => {
-    一枚.rows.forEach((一行) => 一行.cells.forEach((セル, i) => {
-      if (セル.role !== '') 画像の組.add(`${日}|${一行.name}|${一枚.times[i]}|${セル.role}`)
-    }))
+    一枚.rows.forEach((一行) => {
+      一行.cells.forEach((セル, i) => {
+        if (セル.role !== '') 画像の組.add(`${日}|${一行.name}|${一枚.times[i]}|${セル.role}`)
+      })
+    })
   })
-  マス目.forEach((一枚, 日) => 一枚.セル.forEach((セル) => {
-    if (セル.値 !== '') マス目の組.add(`${日}|${セル.氏名}|${セル.時刻}|${セル.値}`)
-  }))
+  マス目.forEach((一枚, 日) => {
+    一枚.セル.forEach((セル) => {
+      if (セル.値 !== '') マス目の組.add(`${日}|${セル.氏名}|${セル.時刻}|${セル.値}`)
+    })
+  })
   const 片方だけ = [...画像の組].filter((組) => !マス目の組.has(組)).concat([...マス目の組].filter((組) => !画像の組.has(組)))
   return {
     枚数: 画像.filter((一枚) => 一枚.rows.length > 0).length,
@@ -447,7 +628,10 @@ function 主処理() {
   // フォームを作り直したかを数えるため、メニュー「フォームを作る」の関数を見張る。
   const フォームの関数 = menuItems.filter((一つ) => 一つ.label === 'フォームを作る')[0].functionName
   const もとの関数 = 文脈[フォームの関数]
-  文脈[フォームの関数] = () => { 画面.フォームを作った = (画面.フォームを作った ?? 0) + 1; return もとの関数() }
+  文脈[フォームの関数] = () => {
+    画面.フォームを作った = (画面.フォームを作った ?? 0) + 1
+    return もとの関数()
+  }
 
   const 周たち = 宣言.周.並び.map((周, 番号) => 周を通す(周, 番号))
   const 初回 = 周たち[0]
@@ -489,9 +673,13 @@ function 主処理() {
       console.log(`        戻った: ${セル.シート} ${セル.時刻} ${セル.氏名}（${セル.学籍番号}）— ${理由}`)
     })
     console.log(`      手: ${周.手.join(' → ')}${周.一覧に無い操作.length === 0 ? '' : ` ＋ 一覧に無い操作 ${周.一覧に無い操作.length}`}`)
-    周.一覧に無い操作.forEach((一つ) => console.log(`        一覧に無い: ${一つ}`))
+    周.一覧に無い操作.forEach((一つ) => {
+      console.log(`        一覧に無い: ${一つ}`)
+    })
     console.log(`      画像: ${周.粒度.枚数} 枚 ／ （名前・時刻・役割）画像 ${周.粒度.画像のセル} ・マス目 ${周.粒度.マス目のセル} ／ 差分 ${周.粒度.差分}`)
-    周.粒度.例.forEach((一つ) => console.log(`        片方だけ: ${一つ}`))
+    周.粒度.例.forEach((一つ) => {
+      console.log(`        片方だけ: ${一つ}`)
+    })
   }
 
   const 手数の差 = 再実行.map((周) => 周.手数 - 初回.手数)
@@ -513,8 +701,7 @@ function 主処理() {
   else console.log(`  NG   ${宣言.本文.ファイル} に載っていない: ${欠け.join(' / ')}`)
 
   const 線 = 宣言.合格の線
-  const 通った = 手数の差.every((差) => 差 === 線.手数の差) && 戻った === 線.戻ったセル && 粒度の差分 === 線.粒度の差分
-    && 違反 === 0 && Boolean(狙い.選んだ) && 狙いを除いた && 欠け.length === 0
+  const 通った = 手数の差.every((差) => 差 === 線.手数の差) && 戻った === 線.戻ったセル && 粒度の差分 === 線.粒度の差分 && 違反 === 0 && Boolean(狙い.選んだ) && 狙いを除いた && 欠け.length === 0
 
   if (!通った) {
     console.log('')
@@ -528,10 +715,10 @@ function 主処理() {
 
   console.log('')
   console.log(
-    `結果: 手数の差 ${手数の差.join(' ／ ')}（初回 ${初回.手数} 手。合格の線 ${線.手数の差}）`
-      + ` ／ 戻ったセル ${戻った}（合格の線 ${線.戻ったセル}。名指しで返して除いたもの ${名指しで除いた}）`
-      + ` ／ 粒度の差分 ${粒度の差分}（合格の線 ${線.粒度の差分}）`
-      + (欠け.length === 0 ? '' : ` ／ 本文に載っていない句 ${欠け.length}`),
+    `結果: 手数の差 ${手数の差.join(' ／ ')}（初回 ${初回.手数} 手。合格の線 ${線.手数の差}）` +
+      ` ／ 戻ったセル ${戻った}（合格の線 ${線.戻ったセル}。名指しで返して除いたもの ${名指しで除いた}）` +
+      ` ／ 粒度の差分 ${粒度の差分}（合格の線 ${線.粒度の差分}）` +
+      (欠け.length === 0 ? '' : ` ／ 本文に載っていない句 ${欠け.length}`),
   )
   return 通った ? 0 : 1
 }

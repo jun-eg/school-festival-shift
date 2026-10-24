@@ -9,7 +9,6 @@
  * SpreadsheetApp を掴まない（→ 6 の #8）。他のファイルの値を最上位で使わない（→ core.ts の同じ注意）。
  */
 
-import { build } from './core.ts'
 import { assignmentName, internalError, sectionColumnsText, sectionWidth, sheetLayout } from './sheet-layout.ts'
 import type { Section } from './sheet-layout.ts'
 import type { Cell, CookLeaderGrades, Day, DayTimes, Need, PlacementRule, PrepCleanupRule, Row, Slot, Wish } from './types.ts'
@@ -179,9 +178,7 @@ function checkAscending(source: string, rowIndex: number, day: DayTimes): void {
 
   for (let i = 1; i < times.length; i++) {
     if (toMinutes(times[i - 1]) <= toMinutes(times[i])) continue
-    throw new Error(
-      `${whereIs(source, rowIndex)}の時刻を、左から早い順に書いてください（今:「${order[i - 1]}」が ${times[i - 1]}、「${order[i]}」が ${times[i]}）`,
-    )
+    throw new Error(`${whereIs(source, rowIndex)}の時刻を、左から早い順に書いてください（今:「${order[i - 1]}」が ${times[i - 1]}、「${order[i]}」が ${times[i]}）`)
   }
 }
 
@@ -243,9 +240,7 @@ export function toCookLeaderGrades(rows: Row[], source: string): CookLeaderGrade
     const number = readText(source, columns, row, rowIndex, '学年')
     const grade = `${number}年生`
     if (grades.indexOf(grade) === -1) {
-      throw new Error(
-        `${whereIs(source, rowIndex)}の「${number}」は、学年を ${grades.map((g) => g.replace('年生', '')).join('・')} のどれかの数字で書いてください`,
-      )
+      throw new Error(`${whereIs(source, rowIndex)}の「${number}」は、学年を ${grades.map((g) => g.replace('年生', '')).join('・')} のどれかの数字で書いてください`)
     }
     if (chosen.indexOf(grade) === -1) chosen.push(grade)
   })
@@ -265,9 +260,7 @@ export function toPrepCleanupRule(rows: Row[], source: string): PrepCleanupRule 
   eachFilledRow(source, section, rows, (row, rowIndex) => {
     const item = readText(source, columns, row, rowIndex, '項目')
     if (item !== prepCleanupItems.noonBoundary) {
-      throw new Error(
-        `${whereIs(source, rowIndex)}の項目「${item}」は使えません（書けるのは「${prepCleanupItems.noonBoundary}」だけです）`,
-      )
+      throw new Error(`${whereIs(source, rowIndex)}の項目「${item}」は使えません（書けるのは「${prepCleanupItems.noonBoundary}」だけです）`)
     }
     if (rule.noonBoundary !== '') {
       throw new Error(`${whereIs(source, rowIndex)}の「${item}」は、すでに上の行にあります`)
@@ -291,9 +284,7 @@ export function toPlacementRule(rows: Row[], source: string): PlacementRule {
   eachFilledRow(source, section, rows, (row, rowIndex) => {
     const item = readText(source, columns, row, rowIndex, '項目')
     if (item !== placementItems.minRun) {
-      throw new Error(
-        `${whereIs(source, rowIndex)}の項目「${item}」は使えません（書けるのは「${placementItems.minRun}」だけです）`,
-      )
+      throw new Error(`${whereIs(source, rowIndex)}の項目「${item}」は使えません（書けるのは「${placementItems.minRun}」だけです）`)
     }
     if (written) {
       throw new Error(`${whereIs(source, rowIndex)}の「${item}」は、すでに上の行にあります`)
@@ -317,9 +308,7 @@ export function readRunLength(source: string, columns: string[], row: Row, rowIn
   }
   const minutes = toRunMinutes(text)
   if (minutes < slotMinutes || minutes % slotMinutes !== 0) {
-    throw new Error(
-      `${cell.where}の「${text}」は、${slotMinutes} 分単位（1:00・1:30 など）で書いてください`,
-    )
+    throw new Error(`${cell.where}の「${text}」は、${slotMinutes} 分単位（1:00・1:30 など）で書いてください`)
   }
   return minutes
 }
@@ -336,7 +325,9 @@ export function toRunMinutes(text: string): number {
  */
 export function toWishes(rows: Row[]): Wish[] {
   const wishes: Wish[] = []
-  eachFilledRow('回答', answerSection(), rows, (row, rowIndex) => { wishes.push(toWish(row, rowIndex)) })
+  eachFilledRow('回答', answerSection(), rows, (row, rowIndex) => {
+    wishes.push(toWish(row, rowIndex))
+  })
   return wishes
 }
 
@@ -355,16 +346,12 @@ export function toWish(row: Row, rowIndex: number): Wish {
 
   const grade = readText(source, columns, row, rowIndex, wishColumns.grade)
   if (grades.indexOf(grade) === -1) {
-    throw new Error(
-      `${whereIs(source, rowIndex)}の学年「${grade}」は、${grades.join('・')} のどれかにしてください`,
-    )
+    throw new Error(`${whereIs(source, rowIndex)}の学年「${grade}」は、${grades.join('・')} のどれかにしてください`)
   }
 
   const cookAnswer = readText(source, columns, row, rowIndex, wishColumns.canCook)
   if (!Object.prototype.hasOwnProperty.call(cookAnswers, cookAnswer)) {
-    throw new Error(
-      `${whereIs(source, rowIndex)}の${wishColumns.canCook}「${cookAnswer}」は、${Object.keys(cookAnswers).join('・')} のどちらかにしてください`,
-    )
+    throw new Error(`${whereIs(source, rowIndex)}の${wishColumns.canCook}「${cookAnswer}」は、${Object.keys(cookAnswers).join('・')} のどちらかにしてください`)
   }
 
   return {
@@ -390,9 +377,7 @@ export function answerSection(): Section {
 
 /** 条件入力の区画 1 つ。 */
 export function conditionSection(heading: string): Section {
-  const section = sheetLayout
-    .filter((layout) => layout.name === '条件入力')[0]
-    .sections.filter((candidate) => candidate.heading === heading)[0]
+  const section = sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.filter((candidate) => candidate.heading === heading)[0]
   if (!section) throw internalError(`条件入力の区画に「${heading}」が無い`)
   return section
 }
@@ -429,9 +414,7 @@ export function sheetRowOf(source: string, rowIndex: number): number {
 
 /** その名前が、どのシート（シート名そのものか、区画の見出し）かを引く。 */
 function sheetOfSource(source: string) {
-  const layout = sheetLayout.filter((candidate) => (
-    candidate.name === source || candidate.sections.some((section) => section.heading === source)
-  ))[0]
+  const layout = sheetLayout.filter((candidate) => candidate.name === source || candidate.sections.some((section) => section.heading === source))[0]
   if (!layout) throw internalError(`シートの構成に「${source}」が無い`)
   return layout
 }
@@ -453,14 +436,11 @@ function headerRowsOf(source: string): number | null {
 function checkRowWidth(source: string, section: Section, row: Row, rowIndex: number): void {
   const width = sectionWidth(section)
   if (Array.isArray(row) && row.length === width) return
-  throw internalError(
-    `${whereIs(source, rowIndex)}の列数が構成と違う。`
-      + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${width}（${sectionColumnsText(section)}）`,
-  )
+  throw internalError(`${whereIs(source, rowIndex)}の列数が構成と違う。` + `いま: ${Array.isArray(row) ? row.length : '配列でない'} ／ 構成: ${width}（${sectionColumnsText(section)}）`)
 }
 
 /** 1 セルを取る。列は名前か、何列目か（0 から数える）で指す。 */
-export function cellOf(source: string, columns: string[], row: Row, rowIndex: number, column: string | number): { value: Cell, where: string } {
+export function cellOf(source: string, columns: string[], row: Row, rowIndex: number, column: string | number): { value: Cell; where: string } {
   const at = typeof column === 'number' ? column : columns.indexOf(column)
   if (at === -1) throw internalError(`「${source}」の構成に「${column}」の列が無い`)
   const which = typeof column === 'number' ? `${at + 1} 列目` : `「${column}」`
@@ -482,9 +462,7 @@ export function readText(source: string, columns: string[], row: Row, rowIndex: 
 export function readStudentId(source: string, columns: string[], row: Row, rowIndex: number): string {
   const studentId = readText(source, columns, row, rowIndex, wishColumns.studentId)
   if (!studentIdPattern.test(studentId)) {
-    throw new Error(
-      `${whereIs(source, rowIndex)}の学籍番号「${studentId}」は、10 桁の英数字で書いてください`,
-    )
+    throw new Error(`${whereIs(source, rowIndex)}の学籍番号「${studentId}」は、10 桁の英数字で書いてください`)
   }
   return studentId.toUpperCase()
 }
@@ -512,7 +490,7 @@ export function readTime(source: string, columns: string[], row: Row, rowIndex: 
 /** 人数のセル。数のまま来る（→ shell.ts の normalizeValue）。 */
 function readCount(source: string, columns: string[], row: Row, rowIndex: number, columnName: string): number {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
-  if (typeof cell.value !== 'number' || !isFinite(cell.value) || Math.floor(cell.value) !== cell.value || cell.value < 1) {
+  if (typeof cell.value !== 'number' || !Number.isFinite(cell.value) || Math.floor(cell.value) !== cell.value || cell.value < 1) {
     throw new Error(`${cell.where}は 1 以上の整数で書いてください（今: ${showBlankValue(cell.value)}）`)
   }
   return cell.value

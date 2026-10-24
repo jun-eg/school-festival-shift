@@ -23,17 +23,11 @@
 import { check } from '../../test/check.ts'
 import { FakeSheet, FakeSpreadsheet, asGas, gasGlobal, roundTrips } from '../../test/fakes/spreadsheet.ts'
 import type { Cell } from '../core/types.ts'
-import {
-  checkRowHighlights, fixedNote, friendsFromAnswers, isFixedNote, namesFromAnswers, roleColors,
-} from '../core/assignment-grid.ts'
+import { checkRowHighlights, fixedNote, friendsFromAnswers, isFixedNote, namesFromAnswers, roleColors } from '../core/assignment-grid.ts'
 import { checkRepresentation, coreSteps, outputNames, sheetColumns } from '../core/core.ts'
 import { isPrepCleanupSurplus } from '../core/count-violations.ts'
-import {
-  checkKind, dayLabels, dividerLine, formUrlBlock, handoverBlock, sectionRightEdge, sheetLayout,
-} from '../core/sheet-layout.ts'
-import {
-  a1Notation, distributionImagesOn, normalizeValue, readInputs, recountOnEdit, run, sheetsToRead, valueRepresentation, violationMark, withNamesFromAnswers,
-} from './shell.ts'
+import { checkKind, dayLabels, dividerLine, formUrlBlock, handoverBlock, sectionRightEdge, sheetLayout } from '../core/sheet-layout.ts'
+import { a1Notation, distributionImagesOn, normalizeValue, readInputs, recountOnEdit, run, sheetsToRead, valueRepresentation, violationMark, withNamesFromAnswers } from './shell.ts'
 
 // 偽のスプレッドシートは test/fakes/spreadsheet.ts が持つ。殻と構造の検証が使う SpreadsheetApp の口だけを持つ。
 
@@ -49,9 +43,17 @@ function newDataValidation() {
       rule.showDropdown = showDropdown
       return builder
     },
-    setAllowInvalid(allowInvalid) { rule.allowInvalid = allowInvalid; return builder },
-    setHelpText(helpText) { rule.helpText = helpText; return builder },
-    build() { return rule },
+    setAllowInvalid(allowInvalid) {
+      rule.allowInvalid = allowInvalid
+      return builder
+    },
+    setHelpText(helpText) {
+      rule.helpText = helpText
+      return builder
+    },
+    build() {
+      return rule
+    },
   }
   return builder
 }
@@ -78,10 +80,14 @@ function emptyTemplate() {
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
-      section.columns.forEach((columnName, i) => sheet.put(columnNameRow, section.startColumn + i, columnName))
+      section.columns.forEach((columnName, i) => {
+        sheet.put(columnNameRow, section.startColumn + i, columnName)
+      })
     })
     if (layout.name === formUrlBlock.sheet) {
-      formUrlBlock.rows.forEach((one, i) => sheet.put(formUrlBlock.row + i, formUrlBlock.labelColumn, one.label))
+      formUrlBlock.rows.forEach((one, i) => {
+        sheet.put(formUrlBlock.row + i, formUrlBlock.labelColumn, one.label)
+      })
     }
     if (layout.name === handoverBlock.sheet) {
       sheet.put(handoverBlock.row, handoverBlock.labelColumn, handoverBlock.label).put(handoverBlock.row, handoverBlock.urlColumn, handoverBlock.url)
@@ -97,12 +103,21 @@ function filledBook() {
   const conditions = book.getSheetByName('条件入力')
 
   // 日ごとの営業時刻（A〜F）— 4 日ぶん（回答の日ごとの列 4 つと 1 対 1）。時刻だけのセルは Date で返る
-  ;[[1, 8, 10, 18, 18, 20], [2, 8, 10, 18, 18, 20], [3, 8, 10, 18, 18, 20], [4, 8, 10, 18, 18, 20]].forEach((row, i) => {
+  ;[
+    [1, 8, 10, 18, 18, 20],
+    [2, 8, 10, 18, 18, 20],
+    [3, 8, 10, 18, 18, 20],
+    [4, 8, 10, 18, 18, 20],
+  ].forEach((row, i) => {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
-    row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
+    row.slice(1).forEach((hour, j) => {
+      conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0))
+    })
   })
   // 役割と必要人数（H〜L）— 1 行だけ。時間帯を空けた行はその日の調理帯に効く（→ 5-1 の #2）
-  ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 8 + j, value))
+  ;['', '', '', '調理', 2].forEach((value, j) => {
+    conditions.put(3, 8 + j, value)
+  })
   // 調理責任者の学年（N）— 2 行
   conditions.put(3, 14, 3).put(4, 14, ' 4 ')
   // 準備・片付けのルール（V〜W）— 1 行
@@ -115,10 +130,20 @@ function filledBook() {
   const answers = book.getSheetByName('回答')
   const answerRow = [
     // 友達欄は自由記述で、マス目の 3 列目に書かれたとおりに出る（→ issue #200）
-    new Date(2025, 8, 23, 16, 31, 9), 'EED2349987', '高木琴音', '3年生', 'いいえ', '太郎君、同期',
-    '8:00-21:00', '8:00-20:00', '8:00-22:00', '8:00-15:00',
+    new Date(2025, 8, 23, 16, 31, 9),
+    'EED2349987',
+    '高木琴音',
+    '3年生',
+    'いいえ',
+    '太郎君、同期',
+    '8:00-21:00',
+    '8:00-20:00',
+    '8:00-22:00',
+    '8:00-15:00',
   ]
-  answerRow.forEach((value, j) => answers.put(2, 1 + j, value))
+  answerRow.forEach((value, j) => {
+    answers.put(2, 1 + j, value)
+  })
 
   // 前の周の割り当て 1 セル（4 列目 ＝ 08:00-08:30）。メモが無いので機械が置いたセルである（→ ⑧）。
   const prepDay = book.getSheetByName(dayLabels[0])
@@ -132,35 +157,15 @@ function filledBook() {
 
 // ---- ① 値の表現が揃う -------------------------------------------------------
 
-check(
-  '① 時刻だけのセル（1899-12-30 を土台にした Date）が HH:MM になる',
-  [normalizeValue(new Date(1899, 11, 30, 8, 0, 0)), normalizeValue(new Date(1899, 11, 30, 12, 30, 0))],
-  ['08:00', '12:30'],
-)
+check('① 時刻だけのセル（1899-12-30 を土台にした Date）が HH:MM になる', [normalizeValue(new Date(1899, 11, 30, 8, 0, 0)), normalizeValue(new Date(1899, 11, 30, 12, 30, 0))], ['08:00', '12:30'])
 
-check(
-  '① 日付だけのセルが YYYY-MM-DD になり、日時は秒まで付く',
-  [normalizeValue(new Date(2025, 10, 1)), normalizeValue(new Date(2025, 8, 23, 16, 31, 9))],
-  ['2025-11-01', '2025-09-23 16:31:09'],
-)
+check('① 日付だけのセルが YYYY-MM-DD になり、日時は秒まで付く', [normalizeValue(new Date(2025, 10, 1)), normalizeValue(new Date(2025, 8, 23, 16, 31, 9))], ['2025-11-01', '2025-09-23 16:31:09'])
 
-check(
-  '① 数値はそのまま、真偽値と空のセルは文字列になる',
-  [normalizeValue(2), normalizeValue(true), normalizeValue(false), normalizeValue(null), normalizeValue(undefined)],
-  [2, 'TRUE', 'FALSE', '', ''],
-)
+check('① 数値はそのまま、真偽値と空のセルは文字列になる', [normalizeValue(2), normalizeValue(true), normalizeValue(false), normalizeValue(null), normalizeValue(undefined)], [2, 'TRUE', 'FALSE', '', ''])
 
-check(
-  '① 文字列は両端の空白を落とすだけで、中身に手を入れない',
-  [normalizeValue('  3年生 '), normalizeValue('8:00-21:00'), normalizeValue('15:00-00:00')],
-  ['3年生', '8:00-21:00', '15:00-00:00'],
-)
+check('① 文字列は両端の空白を落とすだけで、中身に手を入れない', [normalizeValue('  3年生 '), normalizeValue('8:00-21:00'), normalizeValue('15:00-00:00')], ['3年生', '8:00-21:00', '15:00-00:00'])
 
-check(
-  '① 揃えた先の形は、値の表現 に書いてあるとおりである',
-  [valueRepresentation.date, valueRepresentation.time, valueRepresentation.dateTime],
-  ['YYYY-MM-DD', 'HH:MM', 'YYYY-MM-DD HH:MM:SS'],
-)
+check('① 揃えた先の形は、値の表現 に書いてあるとおりである', [valueRepresentation.date, valueRepresentation.time, valueRepresentation.dateTime], ['YYYY-MM-DD', 'HH:MM', 'YYYY-MM-DD HH:MM:SS'])
 
 // ---- ②③ 読む ---------------------------------------------------------------
 
@@ -172,56 +177,25 @@ check(
   null,
 )
 
-check(
-  '③ 条件入力は 2 行目までが見出しなので、3 行目から読む — 9〜10 行目のフォームの URL 欄は読まず、4 行のままである',
-  inputs['日ごとの営業時刻'],
-  [
-    ['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00'],
-    ['2025-11-02', '08:00', '10:00', '18:00', '18:00', '20:00'],
-    ['2025-11-03', '08:00', '10:00', '18:00', '18:00', '20:00'],
-    ['2025-11-04', '08:00', '10:00', '18:00', '18:00', '20:00'],
-  ],
-)
+check('③ 条件入力は 2 行目までが見出しなので、3 行目から読む — 9〜10 行目のフォームの URL 欄は読まず、4 行のままである', inputs['日ごとの営業時刻'], [
+  ['2025-11-01', '08:00', '10:00', '18:00', '18:00', '20:00'],
+  ['2025-11-02', '08:00', '10:00', '18:00', '18:00', '20:00'],
+  ['2025-11-03', '08:00', '10:00', '18:00', '18:00', '20:00'],
+  ['2025-11-04', '08:00', '10:00', '18:00', '18:00', '20:00'],
+])
 
-check(
-  '③ 区画ごとに列を切って読む（役割と必要人数は H 列から 5 列ぶん）',
-  inputs['役割と必要人数'],
-  [['', '', '', '調理', 2]],
-)
+check('③ 区画ごとに列を切って読む（役割と必要人数は H 列から 5 列ぶん）', inputs['役割と必要人数'], [['', '', '', '調理', 2]])
 
-check(
-  '③ 行数の違う区画は、下の空の行が落ちる（横に並べてあるので最終行は揃っている）',
-  [inputs['調理責任者の学年'], inputs['委員会の指定枠'], inputs['準備・片付けのルール']],
-  [[[3], ['4']], [], [['午前と午後の境目', '12:00']]],
-)
+check('③ 行数の違う区画は、下の空の行が落ちる（横に並べてあるので最終行は揃っている）', [inputs['調理責任者の学年'], inputs['委員会の指定枠'], inputs['準備・片付けのルール']], [[[3], ['4']], [], [['午前と午後の境目', '12:00']]])
 
-check(
-  '③ 回答は 1 行目が見出しなので、2 行目から読む',
-  inputs['回答'][0].slice(0, 5),
-  ['2025-09-23 16:31:09', 'EED2349987', '高木琴音', '3年生', 'いいえ'],
-)
+check('③ 回答は 1 行目が見出しなので、2 行目から読む', inputs['回答'][0].slice(0, 5), ['2025-09-23 16:31:09', 'EED2349987', '高木琴音', '3年生', 'いいえ'])
 
 // マス目のセル 1 つが、割り当ての行 1 本に戻る。氏名は表示のための列なので空である（→ 5 の #1）。
-check(
-  '③ マス目の 4 枚が、まとまって「割り当て」1 つに戻る（→ issue #213）',
-  inputs['割り当て'],
-  [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '']],
-)
+check('③ マス目の 4 枚が、まとまって「割り当て」1 つに戻る（→ issue #213）', inputs['割り当て'], [['2025-11-01', '08:00', '08:30', '準備', 'EED2349987', '']])
 
-check(
-  '③ メモの無いセルは手直しにならない（前の周に機械が置いたセルである → 5-3）',
-  inputs['手直し'],
-  [],
-)
+check('③ メモの無いセルは手直しにならない（前の周に機械が置いたセルである → 5-3）', inputs['手直し'], [])
 
-check(
-  '③ 読むのは 6 枚（条件入力・回答・マス目の 4 枚）で、入力の名前は 条件入力の区画 ＋ 回答・割り当て・手直し である',
-  [sheetsToRead(), Object.keys(inputs).length],
-  [
-    ['条件入力', '回答'].concat(dayLabels),
-    sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 3,
-  ],
-)
+check('③ 読むのは 6 枚（条件入力・回答・マス目の 4 枚）で、入力の名前は 条件入力の区画 ＋ 回答・割り当て・手直し である', [sheetsToRead(), Object.keys(inputs).length], [['条件入力', '回答'].concat(dayLabels), sheetLayout.filter((layout) => layout.name === '条件入力')[0].sections.length + 3])
 
 // ---- ④⑤ 書く ---------------------------------------------------------------
 
@@ -235,31 +209,21 @@ function checkResultRow(kind, detail) {
 }
 
 // 欠けた段は差し替えで作る。関数でないものを渡せば「まだ作っていない」段になる（→ core.ts の build）。
-const withoutMetrics: any = { '指標を出す': null }
+const withoutMetrics: any = { 指標を出す: null }
 
 const skeletonBook = filledBook()
 roundTrips.reads = 0
 roundTrips.writes = 0
 const notBuilt = run(asGas(skeletonBook), withoutMetrics).notBuilt
 
-check(
-  '⑤ 骨組みのまま走らせても、マス目の手直しが残っている（→ 5-3）',
-  skeletonBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 4).getValues()[0],
-  ['EED2349987', '高木琴音', '', '準備'],
-)
+check('⑤ 骨組みのまま走らせても、マス目の手直しが残っている（→ 5-3）', skeletonBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 4).getValues()[0], ['EED2349987', '高木琴音', '', '準備'])
 
-check(
-  '⑤ 段が入っていないあいだは、生成シートに 1 度も書いていない',
-  roundTrips.writes,
-  0,
-)
+check('⑤ 段が入っていないあいだは、生成シートに 1 度も書いていない', roundTrips.writes, 0)
 
 check(
   '⑤ 何が入っていないかは、issue 番号つきで返る（中身が入っている段は出ない → core.ts の builtInSteps）',
   notBuilt.map((step) => `${step.name}#${step.issue}`),
-  coreSteps
-    .filter((step) => Object.keys(withoutMetrics).indexOf(step.name) !== -1)
-    .map((step) => `${step.name}#${step.issue}`),
+  coreSteps.filter((step) => Object.keys(withoutMetrics).indexOf(step.name) !== -1).map((step) => `${step.name}#${step.issue}`),
 )
 
 // 欠けているのは 指標を出す だけで、残る 5 段は中身が入っている。
@@ -267,22 +231,18 @@ const partialBook = filledBook()
 roundTrips.writes = 0
 run(asGas(partialBook), withoutMetrics)
 
-check(
-  '⑤ 段が 1 つでも欠けていれば、残りが入っていても 1 枚も書かない',
-  [roundTrips.writes, partialBook.getSheetByName('指標').getRange(2, 1, 1, 1).getValues()[0][0]],
-  [0, '古い行'],
-)
+check('⑤ 段が 1 つでも欠けていれば、残りが入っていても 1 枚も書かない', [roundTrips.writes, partialBook.getSheetByName('指標').getRange(2, 1, 1, 1).getValues()[0][0]], [0, '古い行'])
 
 const fullBook = filledBook()
 roundTrips.reads = 0
 roundTrips.writes = 0
 const fullNotBuilt = run(asGas(fullBook), {
-  '取り込む': (answers) => answers.map((row) => [row[1], row[3], row[4]]),
-  '展開する': (wishes) => wishes.map((row) => [row[0]]),
-  '生成する': (candidates) => candidates.map((row) => ['2025-11-01', '10:00', '10:30', '調理', row[0], '高木琴音']),
-  '違反を数える': () => [checkResultRow(checkKind.violation, '検便を通っていない')],
-  '未充足を名指しする': () => [checkResultRow(checkKind.unmet, 'あと 1 人')],
-  '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
+  取り込む: (answers) => answers.map((row) => [row[1], row[3], row[4]]),
+  展開する: (wishes) => wishes.map((row) => [row[0]]),
+  生成する: (candidates) => candidates.map((row) => ['2025-11-01', '10:00', '10:30', '調理', row[0], '高木琴音']),
+  違反を数える: () => [checkResultRow(checkKind.violation, '検便を通っていない')],
+  未充足を名指しする: () => [checkResultRow(checkKind.unmet, 'あと 1 人')],
+  指標を出す: (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
 }).notBuilt
 // 下の check が getValues を呼ぶので、数えた往復はここで写し取る
 const fullRoundTrips = { reads: roundTrips.reads, writes: roundTrips.writes }
@@ -292,46 +252,28 @@ check('④ 全部そろえば、未了は 1 つも無い', fullNotBuilt, [])
 // 10:00-10:30 は 5 つ目の枠なので、名前のある 3 列の右の 5 列目 ＝ 8 列目に落ちる。
 check(
   '④ 割り当てがマス目で書かれている（見出しは時刻、セルは役割名 1 つ → issue #213）',
-  [
-    fullBook.getSheetByName(dayLabels[0]).getRange(1, 1, 1, 8).getValues()[0],
-    fullBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 8).getValues()[0],
-  ],
+  [fullBook.getSheetByName(dayLabels[0]).getRange(1, 1, 1, 8).getValues()[0], fullBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 8).getValues()[0]],
   [
     ['学籍番号', '氏名', '一緒に組みたいお友達', '08:00', '08:30', '09:00', '09:30', '10:00'],
     ['EED2349987', '高木琴音', '太郎君、同期', '', '', '', '', '調理'],
   ],
 )
 
-check(
-  '④ 友達欄は回答から引いて、書かれたとおりにマス目の 3 列目に出る（生成は読まない → 5-2 ／ issue #200）',
-  [
-    typeof friendsFromAnswers,
-    fullBook.getSheetByName(dayLabels[0]).getRange(2, 3, 1, 1).getValues()[0][0],
-  ],
-  ['function', '太郎君、同期'],
-)
+check('④ 友達欄は回答から引いて、書かれたとおりにマス目の 3 列目に出る（生成は読まない → 5-2 ／ issue #200）', [typeof friendsFromAnswers, fullBook.getSheetByName(dayLabels[0]).getRange(2, 3, 1, 1).getValues()[0][0]], ['function', '太郎君、同期'])
 
-check(
-  '④ 氏名は回答から引く（生成は氏名を空で置いている → 5 の #1・assignment-grid.ts）',
-  [
-    typeof namesFromAnswers,
-    fullBook.getSheetByName(dayLabels[0]).getRange(2, 2, 1, 1).getValues()[0][0],
-  ],
-  ['function', '高木琴音'],
-)
+check('④ 氏名は回答から引く（生成は氏名を空で置いている → 5 の #1・assignment-grid.ts）', [typeof namesFromAnswers, fullBook.getSheetByName(dayLabels[0]).getRange(2, 2, 1, 1).getValues()[0][0]], ['function', '高木琴音'])
 
 // 差し替えずに回す。指標の段は氏名を空で返すので、埋まっていれば殻が引いている。
 const builtInBook = filledBook()
-check(
-  '④ 段を差し替えずに回すと、指標が 1 人 1 行で書かれ、氏名は回答から引いてある（→ issue #154）',
-  [run(asGas(builtInBook), {}).notBuilt, builtInBook.getSheetByName('指標').getRange(2, 1, 1, 2).getValues()[0]],
-  [[], ['EED2349987', '高木琴音']],
-)
+check('④ 段を差し替えずに回すと、指標が 1 人 1 行で書かれ、氏名は回答から引いてある（→ issue #154）', [run(asGas(builtInBook), {}).notBuilt, builtInBook.getSheetByName('指標').getRange(2, 1, 1, 2).getValues()[0]], [[], ['EED2349987', '高木琴音']])
 
 check(
   '④ 氏名を引くのは空の欄だけで、コアの出力を書き換えない',
   (() => {
-    const rows = [['EED2349987', '', 1, 1, 0], ['EED0000000', '手で書いた名前', 1, 1, 0]]
+    const rows = [
+      ['EED2349987', '', 1, 1, 0],
+      ['EED0000000', '手で書いた名前', 1, 1, 0],
+    ]
     const filled = withNamesFromAnswers(rows, '指標', () => '回答の名前')
     return [filled.map((row) => row[1]), rows[0][1]]
   })(),
@@ -345,8 +287,7 @@ check(
     violation[checkResultColumns.indexOf('学籍番号')] = 'EED2349987'
     const unmet = checkResultRow(checkKind.unmet, 'あと 1 人')
     const nameAt = checkResultColumns.indexOf('氏名')
-    return withNamesFromAnswers([violation, unmet], '検証結果', (studentId) => (studentId === 'EED2349987' ? '高木琴音' : ''))
-      .map((row) => row[nameAt])
+    return withNamesFromAnswers([violation, unmet], '検証結果', (studentId) => (studentId === 'EED2349987' ? '高木琴音' : '')).map((row) => row[nameAt])
   })(),
   ['高木琴音', ''],
 )
@@ -374,29 +315,18 @@ check(
   [10, '候補', true],
 )
 
-check(
-  '④ 割り当ての無い日も、見出しだけは書き直される（前の周の列が残らない）',
-  [
-    fullBook.getSheetByName(dayLabels[1]).getRange(1, 1, 1, 5).getValues()[0],
-    fullBook.getSheetByName(dayLabels[1]).getLastRow(),
-  ],
-  [['学籍番号', '氏名', '一緒に組みたいお友達', '08:00', '08:30'], 1],
-)
+check('④ 割り当ての無い日も、見出しだけは書き直される（前の周の列が残らない）', [fullBook.getSheetByName(dayLabels[1]).getRange(1, 1, 1, 5).getValues()[0], fullBook.getSheetByName(dayLabels[1]).getLastRow()], [['学籍番号', '氏名', '一緒に組みたいお友達', '08:00', '08:30'], 1])
 
-check(
-  '④ 時刻の見出しが左に寄っている（時刻のセルは既定で右寄せになる → issue #213）',
-  [
-    fullBook.getSheetByName(dayLabels[0]).alignments.get('1,4'),
-    fullBook.getSheetByName(dayLabels[0]).alignments.get('1,8'),
-    fullBook.getSheetByName(dayLabels[0]).alignments.get('1,3'),
-  ],
-  ['left', 'left', undefined],
-)
+check('④ 時刻の見出しが左に寄っている（時刻のセルは既定で右寄せになる → issue #213）', [fullBook.getSheetByName(dayLabels[0]).alignments.get('1,4'), fullBook.getSheetByName(dayLabels[0]).alignments.get('1,8'), fullBook.getSheetByName(dayLabels[0]).alignments.get('1,3')], ['left', 'left', undefined])
 
 check(
   '④ 検証結果と指標は、見出しの次の行から書かれている',
   [
-    fullBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => row[0]),
+    fullBook
+      .getSheetByName('検証結果')
+      .getRange(2, 1, 2, 9)
+      .getValues()
+      .map((row) => row[0]),
     fullBook.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0],
   ],
   [
@@ -405,23 +335,12 @@ check(
   ],
 )
 
-check(
-  '④ 前の周の残りかすが消えている（指標の「古い行」が残っていない）',
-  fullBook.getSheetByName('指標').getRange(3, 1, 1, 1).getValues()[0],
-  [''],
-)
+check('④ 前の周の残りかすが消えている（指標の「古い行」が残っていない）', fullBook.getSheetByName('指標').getRange(3, 1, 1, 1).getValues()[0], [''])
 
 // 読むのは、構造の検証がシートごとに 1 回 ＋ 区画ごとに 1 回 ＋ 回答 1 ＋ マス目（中身のある 準備日 だけ 2 回）。
 // 書くのは、シート 1 枚につき「消す」と「置く」。マス目は見出しとデータで 2 組ある。
 const gridCount = dayLabels.length
-check(
-  '④ 読み書きはどちらも範囲ごとに 1 回で、セル単位で往復していない（→ 6 の #2）',
-  [
-    fullRoundTrips.reads,
-    fullRoundTrips.writes <= gridCount * 4 + (outputNames.length - 1) * 2,
-  ],
-  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 1), true],
-)
+check('④ 読み書きはどちらも範囲ごとに 1 回で、セル単位で往復していない（→ 6 の #2）', [fullRoundTrips.reads, fullRoundTrips.writes <= gridCount * 4 + (outputNames.length - 1) * 2], [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 1), true])
 
 // ---- ⑦ 手直しの後に数え直す -------------------------------------------------
 // 担当者が 片付け（2025-11-04）の 16:00 に 準備 を書いた。希望は 8:00-15:00 なので規則 1 の違反になる。
@@ -457,10 +376,12 @@ const recountRoundTrips = { ...roundTrips }
 
 check(
   '⑦ マス目を 1 セル書き換えると、規則 1 の違反が検証結果に出る（人が数えない → 5 の #8・#13 の ①）',
-  recountBook.getSheetByName('検証結果').getRange(2, 1, 200, 9).getValues().filter((row) => row[0] === checkKind.violation),
-  [
-    [checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '高木琴音', '希望時間外: 希望していない時間に入っています', ''],
-  ],
+  recountBook
+    .getSheetByName('検証結果')
+    .getRange(2, 1, 200, 9)
+    .getValues()
+    .filter((row) => row[0] === checkKind.violation),
+  [[checkKind.violation, '2025-11-04', '16:00', '16:30', '準備', 'EED2349987', '高木琴音', '希望時間外: 希望していない時間に入っています', '']],
 )
 
 check(
@@ -468,93 +389,41 @@ check(
   dayLabels.map((name) => {
     const sheet = recountBook.getSheetByName(name)
     const borders = [...sheet.rightBorders.entries()]
-    return [
-      borders.length === sheet.getMaxRows() - 1,
-      borders.every(([key, line]) => key.split(',')[1] === '3' && Number(key.split(',')[0]) >= 2 && line === `${dividerLine.color} solid-thick`),
-    ]
+    return [borders.length === sheet.getMaxRows() - 1, borders.every(([key, line]) => key.split(',')[1] === '3' && Number(key.split(',')[0]) >= 2 && line === `${dividerLine.color} solid-thick`)]
   }),
   dayLabels.map(() => [true, true]),
 )
 
 const grayOf = roleColors.filter((one) => one.roles.indexOf('準備') !== -1)[0].color
 
-check(
-  '⑦ 違反した所が、赤い太字で出る（片付け の 2 行目 4 列目 → 6 の #2）',
-  [
-    [...recountBook.getSheetByName(dayLabels[3]).fontColors.entries()],
-    [...recountBook.getSheetByName(dayLabels[3]).fontWeights.entries()],
-  ],
-  [[['2,4', violationMark.fontColor]], [['2,4', violationMark.fontWeight]]],
-)
+check('⑦ 違反した所が、赤い太字で出る（片付け の 2 行目 4 列目 → 6 の #2）', [[...recountBook.getSheetByName(dayLabels[3]).fontColors.entries()], [...recountBook.getSheetByName(dayLabels[3]).fontWeights.entries()]], [[['2,4', violationMark.fontColor]], [['2,4', violationMark.fontWeight]]])
 
-check(
-  '⑦ 背景は役割の色である（準備 はグレー。違反したセルも背景は役割の色のまま → issue #213 の「色」）',
-  [
-    [...recountBook.getSheetByName(dayLabels[3]).backgrounds.entries()],
-    [...recountBook.getSheetByName(dayLabels[0]).backgrounds.entries()],
-  ],
-  [[['2,4', grayOf]], [['2,4', grayOf]]],
-)
+check('⑦ 背景は役割の色である（準備 はグレー。違反したセルも背景は役割の色のまま → issue #213 の「色」）', [[...recountBook.getSheetByName(dayLabels[3]).backgrounds.entries()], [...recountBook.getSheetByName(dayLabels[0]).backgrounds.entries()]], [[['2,4', grayOf]], [['2,4', grayOf]]])
 
-check(
-  '⑦ 前の周の印は消えている（違反でなくなったセルに赤い太字が残らない）',
-  [recountBook.getSheetByName(dayLabels[0]).fontColors.size, recountBook.getSheetByName(dayLabels[0]).fontWeights.size],
-  [0, 0],
-)
+check('⑦ 前の周の印は消えている（違反でなくなったセルに赤い太字が残らない）', [recountBook.getSheetByName(dayLabels[0]).fontColors.size, recountBook.getSheetByName(dayLabels[0]).fontWeights.size], [0, 0])
 
 // 準備 が 11-01 と 11-04 に 1 枠ずつ → 合計 1 時間 ／ 塊 2 つ ／ 準備に入った日 2 日（→ 5-6）
-check(
-  '⑦ 指標も数え直され、書き換えた 1 枠が合計時間に入っている',
-  recountBook.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0],
-  ['EED2349987', '高木琴音', 1, 2, 2],
-)
+check('⑦ 指標も数え直され、書き換えた 1 枠が合計時間に入っている', recountBook.getSheetByName('指標').getRange(2, 1, 1, 5).getValues()[0], ['EED2349987', '高木琴音', 1, 2, 2])
 
-check(
-  '⑦ 生成を走らせない — マス目は 1 セルも書き換わっていない（担当者のセルそのものを数える）',
-  JSON.stringify(gridSnapshot(recountBook)),
-  gridsBeforeRecount,
-)
+check('⑦ 生成を走らせない — マス目は 1 セルも書き換わっていない（担当者のセルそのものを数える）', JSON.stringify(gridSnapshot(recountBook)), gridsBeforeRecount)
 
-check(
-  '⑦ 担当者に見せる一言に、違反の件数と色の在処が入っている',
-  [said!.text.includes('違反 1 件'), said!.text.includes('赤い太字'), said!.seconds],
-  [true, true, 5],
-)
+check('⑦ 担当者に見せる一言に、違反の件数と色の在処が入っている', [said!.text.includes('違反 1 件'), said!.text.includes('赤い太字'), said!.seconds], [true, true, 5])
 
 // 読むのは run と同じで、マス目は中身のある 2 枚だけが 2 回。
 // 書くのは検証結果の置く 1 ＋ 指標の消す・置く 2 ＝ 3 で、マス目には書かない。
 // 書式は 消す 4 ＋ 境の線 4 ＋ 背景 2（準備日・片付け）＋ 文字の色と太さ 2（片付け）＋ 検証結果の背景 1。
-check(
-  '⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 5 回までである',
-  [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats],
-  [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + gridCount + 2 + 2 + 1],
-)
+check('⑦ 数え直しの読み書きも範囲ごとに 1 回で、マス目に値を書かず、書式は 1 枚につき 5 回までである', [recountRoundTrips.reads, recountRoundTrips.writes, recountRoundTrips.formats], [sheetLayout.length + sheetLayout[0].sections.length + 1 + (gridCount + 2), 3, gridCount + gridCount + 2 + 2 + 1])
 
 const conditionEditBook = editedBook()
 const conditionEditBefore = bookSnapshot(conditionEditBook)
-check(
-  '⑦ 条件入力の書き換えでは数え直さない（書きかけの途中で名指しを出さない）',
-  [
-    recountOnEdit(asGas({ source: conditionEditBook, range: conditionEditBook.getSheetByName('条件入力').getRange(3, 8) })),
-    bookSnapshot(conditionEditBook),
-  ],
-  [null, conditionEditBefore],
-)
+check('⑦ 条件入力の書き換えでは数え直さない（書きかけの途中で名指しを出さない）', [recountOnEdit(asGas({ source: conditionEditBook, range: conditionEditBook.getSheetByName('条件入力').getRange(3, 8) })), bookSnapshot(conditionEditBook)], [null, conditionEditBefore])
 
 // 見出しの無い列に役割を書いた。どの枠かが決まらないので数えられない。
 const strayBook = editedBook()
 strayBook.getSheetByName(dayLabels[3]).put(2, 11, '調理')
 const strayBefore = bookSnapshot(strayBook)
 const straySaid = recountOnEdit(asGas({ source: strayBook, range: strayBook.getSheetByName(dayLabels[3]).getRange(2, 11) }))
-check(
-  '⑦ 載らない書き換えは、止まった理由を名指しの一言で返し、検証結果も指標も書き換えない',
-  [
-    straySaid!.text.startsWith('集計し直せませんでした'),
-    straySaid!.text.includes('シート「片付け」の 11 列目の時刻'),
-    bookSnapshot(strayBook) === strayBefore,
-  ],
-  [true, true, true],
-)
+check('⑦ 載らない書き換えは、止まった理由を名指しの一言で返し、検証結果も指標も書き換えない', [straySaid!.text.startsWith('集計し直せませんでした'), straySaid!.text.includes('シート「片付け」の 11 列目の時刻'), bookSnapshot(strayBook) === strayBefore], [true, true, true])
 
 check(
   '⑦ 生成を押しても塗り直す — 前の周の赤い太字は消え、背景は書いたマス目の役割の色になる（生成は違反を作らない → 5 の #6）',
@@ -570,11 +439,7 @@ check(
   dayLabels.map(() => [0, true, true]),
 )
 
-check(
-  '⑦ RangeList に渡す A1 の書き方（マス目は 51 列目＝AY 列まである）',
-  [a1Notation(1, 1), a1Notation(3, 26), a1Notation(2, 27), a1Notation(2, 51)],
-  ['A1', 'Z3', 'AA2', 'AY2'],
-)
+check('⑦ RangeList に渡す A1 の書き方（マス目は 51 列目＝AY 列まである）', [a1Notation(1, 1), a1Notation(3, 26), a1Notation(2, 27), a1Notation(2, 51)], ['A1', 'Z3', 'AA2', 'AY2'])
 
 // ---- ⑧ 手直しの印（→ 5-3 ／ issue #156） -----------------------------------
 // 書き換えたセルにだけメモが付き、生成はそこを固定として先に置く。メモの無いセルは組み直される。
@@ -594,34 +459,15 @@ function notesOf(book, label) {
 const markBook = filledBook()
 edit(markBook, dayLabels[0], 2, 6, '準備') // 11-01 09:00 に 準備（08:00 の 準備 は前の周の機械のセル）
 
-check(
-  '⑧ 書き換えたセルに手直しの印（メモ）が付く。見出しの行と名前のある 3 列には付かない',
-  [notesOf(markBook, dayLabels[0]), isFixedNote(fixedNote), isFixedNote('担当者が自分で書いたメモ')],
-  [[['2,6', fixedNote]], true, false],
-)
+check('⑧ 書き換えたセルに手直しの印（メモ）が付く。見出しの行と名前のある 3 列には付かない', [notesOf(markBook, dayLabels[0]), isFixedNote(fixedNote), isFixedNote('担当者が自分で書いたメモ')], [[['2,6', fixedNote]], true, false])
 
-check(
-  '⑧ 印の付いたセルだけが、入力の「手直し」になる（日・見出しの時刻・役割・学籍番号）',
-  readInputs(asGas(markBook))['手直し'],
-  [['2025-11-01', '09:00', '準備', 'EED2349987']],
-)
+check('⑧ 印の付いたセルだけが、入力の「手直し」になる（日・見出しの時刻・役割・学籍番号）', readInputs(asGas(markBook))['手直し'], [['2025-11-01', '09:00', '準備', 'EED2349987']])
 
 run(asGas(markBook), {})
-check(
-  '⑧ 生成し直すと、印の付いたセルは残り、印の無い前の周のセルは組み直される（この人は調理の枠に置けないので消える）',
-  [
-    markBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 6).getValues()[0],
-    notesOf(markBook, dayLabels[0]),
-  ],
-  [['EED2349987', '高木琴音', '太郎君、同期', '', '', '準備'], [['2,6', fixedNote]]],
-)
+check('⑧ 生成し直すと、印の付いたセルは残り、印の無い前の周のセルは組み直される（この人は調理の枠に置けないので消える）', [markBook.getSheetByName(dayLabels[0]).getRange(2, 1, 1, 6).getValues()[0], notesOf(markBook, dayLabels[0])], [['EED2349987', '高木琴音', '太郎君、同期', '', '', '準備'], [['2,6', fixedNote]]])
 
 run(asGas(markBook), {})
-check(
-  '⑧ もう一度生成し直しても残る（書き戻すときに印も付け直すので、次の周でも固定である）',
-  [markBook.getSheetByName(dayLabels[0]).getRange(2, 6, 1, 1).getValues()[0][0], notesOf(markBook, dayLabels[0])],
-  ['準備', [['2,6', fixedNote]]],
-)
+check('⑧ もう一度生成し直しても残る（書き戻すときに印も付け直すので、次の周でも固定である）', [markBook.getSheetByName(dayLabels[0]).getRange(2, 6, 1, 1).getValues()[0][0], notesOf(markBook, dayLabels[0])], ['準備', [['2,6', fixedNote]]])
 
 // 11-02 10:00 の 調理 は規則 5 の違反（調理担当ですか？ が いいえ）。11-03 は営業時刻を動かす前の列（07:00）に印がある。
 const conflictBook = filledBook()
@@ -638,7 +484,11 @@ const kindAt = checkResultColumns.indexOf('種別')
 check(
   '⑧ 条件を破る手直しは置かれず、食い違った固定として検証結果の先頭に名指しで出る（違反は 0 件のまま）',
   [
-    conflictBook.getSheetByName('検証結果').getRange(2, 1, 2, 9).getValues().map((row) => [row[0], row[1], row[2], row[4], row[6], row[7]]),
+    conflictBook
+      .getSheetByName('検証結果')
+      .getRange(2, 1, 2, 9)
+      .getValues()
+      .map((row) => [row[0], row[1], row[2], row[4], row[6], row[7]]),
     conflictOutput['検証結果'].filter((row) => row[kindAt] === checkKind.violation).length,
   ],
   [
@@ -650,15 +500,10 @@ check(
   ],
 )
 
-check(
-  '⑧ 営業時刻を動かした後の前の周の列があっても、生成は止まらない（前の周の列は書き直される）',
-  conflictBook.getSheetByName(dayLabels[2]).getRange(1, 1, 1, 4).getValues()[0],
-  ['学籍番号', '氏名', '一緒に組みたいお友達', '08:00'],
-)
+check('⑧ 営業時刻を動かした後の前の周の列があっても、生成は止まらない（前の周の列は書き直される）', conflictBook.getSheetByName(dayLabels[2]).getRange(1, 1, 1, 4).getValues()[0], ['学籍番号', '氏名', '一緒に組みたいお友達', '08:00'])
 
 check(
-  '⑧ 残せなかった手直しは、そのセルのメモに理由が出る。1 枠も置いていない人にも行が残る。'
-    + 'いまの枠に無いものは学籍番号のセルに出る（見出しは 08:00 から敷き直されるので、10:00 は 8 列目である）',
+  '⑧ 残せなかった手直しは、そのセルのメモに理由が出る。1 枠も置いていない人にも行が残る。' + 'いまの枠に無いものは学籍番号のセルに出る（見出しは 08:00 から敷き直されるので、10:00 は 8 列目である）',
   [
     conflictBook.getSheetByName(dayLabels[1]).getRange(2, 1, 1, 4).getValues()[0],
     notesOf(conflictBook, dayLabels[1]).map(([key, note]) => [key, note.startsWith('この修正（調理）は反映できませんでした：調理担当ではない人')]),
@@ -667,11 +512,7 @@ check(
   [['EED2349987', '高木琴音', '太郎君、同期', ''], [['2,8', true]], [['2,1', true]]],
 )
 
-check(
-  '⑧ 残せなかった手直しのメモは印にならない（次の生成で同じ食い違いを名指しし直さない）',
-  [readInputs(asGas(conflictBook))['手直し'], run(asGas(conflictBook), {})['検証結果'].filter((row) => row[kindAt] === checkKind.fixConflict)],
-  [[], []],
-)
+check('⑧ 残せなかった手直しのメモは印にならない（次の生成で同じ食い違いを名指しし直さない）', [readInputs(asGas(conflictBook))['手直し'], run(asGas(conflictBook), {})['検証結果'].filter((row) => row[kindAt] === checkKind.fixConflict)], [[], []])
 
 // 会計 を 11-01 に 1 人立て（生成は 10:00 から置く）、10:00 のセルを空にした。
 const removalBook = filledBook()
@@ -686,18 +527,16 @@ check(
   [
     before10,
     removalBook.getSheetByName(dayLabels[0]).getRange(2, 8, 1, 2).getValues()[0],
-    notesOf(removalBook, dayLabels[0]).filter(([key]) => key === '2,8').map(([, note]) => note),
+    notesOf(removalBook, dayLabels[0])
+      .filter(([key]) => key === '2,8')
+      .map(([, note]) => note),
   ],
   [['会計', '会計'], ['', '会計'], [fixedNote]],
 )
 
 const ownerBook = filledBook()
 edit(ownerBook, dayLabels[0], 2, 1, 'EED2349987')
-check(
-  '⑧ 学籍番号を書き換えた行は、役割の入っているセルぜんぶに印が付く（空のセルと名前の列には付かない）',
-  notesOf(ownerBook, dayLabels[0]),
-  [['2,4', fixedNote]],
-)
+check('⑧ 学籍番号を書き換えた行は、役割の入っているセルぜんぶに印が付く（空のセルと名前の列には付かない）', notesOf(ownerBook, dayLabels[0]), [['2,4', fixedNote]])
 
 // ---- ⑩ 取りこぼした書き換え（→ issue #226） ---------------------------------
 // 間を置かずに 2 セル書き換えると onEdit が 1 回しか走らない。2 手目は値だけを置き、イベントを起こさない。
@@ -719,7 +558,10 @@ const seenBook = generatedBook()
 check(
   '⑩ 生成すると、マス目 4 枚それぞれに控えが 1 つ置かれる（学籍番号 × 見出しの時刻 → 役割）',
   dayLabels.map((label) => {
-    const kept = seenBook.getSheetByName(label).getDeveloperMetadata().filter((one) => one.getKey() === 'seenGrid')
+    const kept = seenBook
+      .getSheetByName(label)
+      .getDeveloperMetadata()
+      .filter((one) => one.getKey() === 'seenGrid')
     return kept.length === 1 && JSON.parse(kept[0].getValue()).rows !== undefined
   }),
   [true, true, true, true],
@@ -731,14 +573,26 @@ const burstSaid = edit(burstBook, dayLabels[0], 2, 8, '') // 1 手目 — 10:00 
 check(
   '⑩ onEdit が 1 回しか走らなくても、続けて書き換えた 2 セルとも印が付く',
   [notesOf(burstBook, dayLabels[0]), burstSaid!.text.startsWith('集計し直しました')],
-  [[['2,8', fixedNote], ['2,9', fixedNote]], true],
+  [
+    [
+      ['2,8', fixedNote],
+      ['2,9', fixedNote],
+    ],
+    true,
+  ],
 )
 
 run(asGas(burstBook), {})
 check(
   '⑩ そのあと生成し直しても、2 手目は戻らない（空のまま、印も残る）',
   [burstBook.getSheetByName(dayLabels[0]).getRange(2, 8, 1, 2).getValues()[0], notesOf(burstBook, dayLabels[0])],
-  [['', ''], [['2,8', fixedNote], ['2,9', fixedNote]]],
+  [
+    ['', ''],
+    [
+      ['2,8', fixedNote],
+      ['2,9', fixedNote],
+    ],
+  ],
 )
 
 const lastDroppedBook = generatedBook()
@@ -746,12 +600,15 @@ edit(lastDroppedBook, dayLabels[0], 2, 8, '')
 editWithoutEvent(lastDroppedBook, dayLabels[0], 2, 9, '') // 数え直しが終わった後に書き換えた。onEdit が落ちた
 check(
   '⑩ 最後の 1 手の onEdit が落ちても、次の「生成」がその書き換えを手直しとして読み、戻さない',
+  [readInputs(asGas(lastDroppedBook))['手直し'].length, run(asGas(lastDroppedBook), {}) && lastDroppedBook.getSheetByName(dayLabels[0]).getRange(2, 8, 1, 2).getValues()[0], notesOf(lastDroppedBook, dayLabels[0])],
   [
-    readInputs(asGas(lastDroppedBook))['手直し'].length,
-    run(asGas(lastDroppedBook), {}) && lastDroppedBook.getSheetByName(dayLabels[0]).getRange(2, 8, 1, 2).getValues()[0],
-    notesOf(lastDroppedBook, dayLabels[0]),
+    1,
+    ['', ''],
+    [
+      ['2,8', fixedNote],
+      ['2,9', fixedNote],
+    ],
   ],
-  [1, ['', ''], [['2,8', fixedNote], ['2,9', fixedNote]]],
 )
 
 const ownerBurstBook = generatedBook()
@@ -770,40 +627,24 @@ check(
 const noSeenBook = filledBook()
 editWithoutEvent(noSeenBook, dayLabels[0], 2, 5, '準備')
 run(asGas(noSeenBook), {})
-check(
-  '⑩ 控えが無ければ（テンプレートのまま・消された）、今までどおりに動く — 黙って全部を手直しにしない',
-  [notesOf(noSeenBook, dayLabels[0]), noSeenBook.getSheetByName(dayLabels[0]).getRange(2, 5, 1, 1).getValues()[0][0]],
-  [[], ''],
-)
+check('⑩ 控えが無ければ（テンプレートのまま・消された）、今までどおりに動く — 黙って全部を手直しにしない', [notesOf(noSeenBook, dayLabels[0]), noSeenBook.getSheetByName(dayLabels[0]).getRange(2, 5, 1, 1).getValues()[0][0]], [[], ''])
 
 const machineBook = generatedBook()
 run(asGas(machineBook), {})
-check(
-  '⑩ 生成し直しただけでは印は付かない（スクリプトの書き戻しは控えを置き直すので、差にならない）',
-  notesOf(machineBook, dayLabels[0]),
-  [],
-)
+check('⑩ 生成し直しただけでは印は付かない（スクリプトの書き戻しは控えを置き直すので、差にならない）', notesOf(machineBook, dayLabels[0]), [])
 
 const imageSeenBook = generatedBook()
 editWithoutEvent(imageSeenBook, dayLabels[0], 2, 8, '')
 const imageSeenBefore = JSON.stringify(imageSeenBook.getSheetByName(dayLabels[0]).metadata)
 distributionImagesOn(asGas(imageSeenBook))
-check(
-  '⑩ 画像の書き出しは取りこぼしを拾わない（1 セルも書き換えない。控えも置き直さない）',
-  [notesOf(imageSeenBook, dayLabels[0]), JSON.stringify(imageSeenBook.getSheetByName(dayLabels[0]).metadata) === imageSeenBefore],
-  [[], true],
-)
+check('⑩ 画像の書き出しは取りこぼしを拾わない（1 セルも書き換えない。控えも置き直さない）', [notesOf(imageSeenBook, dayLabels[0]), JSON.stringify(imageSeenBook.getSheetByName(dayLabels[0]).metadata) === imageSeenBefore], [[], true])
 
 const brokenSeenBook = generatedBook()
 brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value = '{壊れた'
 editWithoutEvent(brokenSeenBook, dayLabels[0], 2, 9, '')
 check(
   '⑩ 控えが読めなくても止まらない（取りこぼしを拾わないだけで、数え直しは走り、控えは置き直される）',
-  [
-    edit(brokenSeenBook, dayLabels[0], 2, 8, '')!.text.startsWith('集計し直しました'),
-    notesOf(brokenSeenBook, dayLabels[0]),
-    JSON.parse(brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value).rows !== undefined,
-  ],
+  [edit(brokenSeenBook, dayLabels[0], 2, 8, '')!.text.startsWith('集計し直しました'), notesOf(brokenSeenBook, dayLabels[0]), JSON.parse(brokenSeenBook.getSheetByName(dayLabels[0]).metadata[0].value).rows !== undefined],
   [true, [['2,8', fixedNote]], true],
 )
 
@@ -818,12 +659,12 @@ function checkRow(kind, role, detail) {
 /** 検証結果の行を差し替えて 1 周する。ほかの段は ④ と同じ差し替えである。 */
 function runWithChecks(book, violations, unmet) {
   return run(book, {
-    '取り込む': (answers) => answers.map((row) => [row[1], row[3], row[4]]),
-    '展開する': (wishes) => wishes.map((row) => [row[0]]),
-    '生成する': (candidates) => candidates.map((row) => ['2025-11-01', '10:00', '10:30', '調理', row[0], '高木琴音']),
-    '違反を数える': () => violations,
-    '未充足を名指しする': () => unmet,
-    '指標を出す': (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
+    取り込む: (answers) => answers.map((row) => [row[1], row[3], row[4]]),
+    展開する: (wishes) => wishes.map((row) => [row[0]]),
+    生成する: (candidates) => candidates.map((row) => ['2025-11-01', '10:00', '10:30', '調理', row[0], '高木琴音']),
+    違反を数える: () => violations,
+    未充足を名指しする: () => unmet,
+    指標を出す: (assignments) => assignments.map((row) => [row[4], row[5], 0.5, 1, 0]),
   })
 }
 
@@ -838,33 +679,31 @@ function paintedRows(book) {
   return Object.keys(byRow).map((row) => [Number(row), byRow[row].length, [...new Set(byRow[row])]])
 }
 
-const { violation: { color: redOf }, storeRole: { color: yellowOf }, prepCleanupSurplus: { color: lightBlueOf } } = checkRowHighlights
+const {
+  violation: { color: redOf },
+  storeRole: { color: yellowOf },
+  prepCleanupSurplus: { color: lightBlueOf },
+} = checkRowHighlights
 const mixedViolations = [
   checkRow(checkKind.violation, '調理', '規則 5: 検便を通っていない'),
   checkRow(checkKind.violation, '', '準備・片付け: 午前だけ入っているので、準備だけにしてください（境目 12:00。今：準備なし／片付けなし）'),
   checkRow(checkKind.violation, '準備', '規則 1: 希望の時間の外に置いている'),
   checkRow(checkKind.violation, '', '準備・片付け: 午後だけ入っているので、片付けだけにしてください（境目 12:00。今：準備あり／片付けあり）'),
 ]
-const mixedUnmet = [
-  checkRow(checkKind.unmet, '準備', 'あと 3 人'),
-  checkRow(checkKind.unmet, '会計', 'あと 1 人'),
-  checkRow(checkKind.unmet, '片付け', 'あと 2 人'),
-]
+const mixedUnmet = [checkRow(checkKind.unmet, '準備', 'あと 3 人'), checkRow(checkKind.unmet, '会計', 'あと 1 人'), checkRow(checkKind.unmet, '片付け', 'あと 2 人')]
 const paintedBook = filledBook()
 runWithChecks(paintedBook, mixedViolations, mixedUnmet)
 const checkWidth = checkResultColumns.length
 
-check(
-  '⑪ 違反の行は役割に関係なく行ぜんぶ（9 列）赤、準備も片付けも入っている規則 3 の違反だけ水色、違反でない店の役割の行は行ぜんぶ黄色、ほかは塗らない（→ issue #220・#258）',
-  paintedRows(paintedBook),
-  [[2, checkWidth, [redOf]], [3, checkWidth, [redOf]], [4, checkWidth, [redOf]], [5, checkWidth, [lightBlueOf]], [7, checkWidth, [yellowOf]]],
-)
+check('⑪ 違反の行は役割に関係なく行ぜんぶ（9 列）赤、準備も片付けも入っている規則 3 の違反だけ水色、違反でない店の役割の行は行ぜんぶ黄色、ほかは塗らない（→ issue #220・#258）', paintedRows(paintedBook), [
+  [2, checkWidth, [redOf]],
+  [3, checkWidth, [redOf]],
+  [4, checkWidth, [redOf]],
+  [5, checkWidth, [lightBlueOf]],
+  [7, checkWidth, [yellowOf]],
+])
 
-check(
-  '⑪ 値は書いた行のとおりで、色を足しても 1 セルも変わらない',
-  paintedBook.getSheetByName('検証結果').getRange(2, 1, 8, checkWidth).getValues(),
-  mixedViolations.concat(mixedUnmet).concat([checkResultColumns.map(() => '')]),
-)
+check('⑪ 値は書いた行のとおりで、色を足しても 1 セルも変わらない', paintedBook.getSheetByName('検証結果').getRange(2, 1, 8, checkWidth).getValues(), mixedViolations.concat(mixedUnmet).concat([checkResultColumns.map(() => '')]))
 
 runWithChecks(paintedBook, [], [checkRow(checkKind.unmet, '準備', 'あと 3 人')])
 check('⑪ 生成し直して違反も店の役割の行も無くなれば、前の周の赤も黄色も残らない', paintedRows(paintedBook), [])
@@ -873,17 +712,16 @@ check('⑪ 生成し直して違反も店の役割の行も無くなれば、前
 const recountPaintedBook = editedBook()
 recountPaintedBook.getSheetByName('条件入力').put(4, 11, '会計').put(4, 12, 1)
 recountOnEdit(asGas({ source: recountPaintedBook, range: recountPaintedBook.getSheetByName(dayLabels[3]).getRange(2, 3) }))
-const recountChecks = recountPaintedBook.getSheetByName('検証結果').getRange(2, 1, 200, checkWidth).getValues()
+const recountChecks = recountPaintedBook
+  .getSheetByName('検証結果')
+  .getRange(2, 1, 200, checkWidth)
+  .getValues()
   .filter((row) => row[0] !== '')
 const kindColumnIndex = checkResultColumns.indexOf('種別')
 const roleColumnIndex = checkResultColumns.indexOf('役割')
 check(
   '⑪ 数え直しでも塗り直す — 違反の行は赤、違反でない店の役割の行は黄色、ほかは塗らない',
-  [
-    recountChecks.some((row) => row[kindColumnIndex] === checkKind.violation),
-    recountChecks.some((row) => row[kindColumnIndex] !== checkKind.violation && row[roleColumnIndex] === '会計'),
-    paintedRows(recountPaintedBook).map(([row, , colors]) => [row, colors]),
-  ],
+  [recountChecks.some((row) => row[kindColumnIndex] === checkKind.violation), recountChecks.some((row) => row[kindColumnIndex] !== checkKind.violation && row[roleColumnIndex] === '会計'), paintedRows(recountPaintedBook).map(([row, , colors]) => [row, colors])],
   [
     true,
     true,
@@ -912,73 +750,68 @@ check(
   '⑨ マス目の 1 セルが、そのまま配る画像の 1 セルになる（名前は氏名だけで、学籍番号は載らない）',
   exported.map((image) => [image.label, image.fileName, image.times, image.rows]),
   [
-    ['準備日', '11月1日シフト表.png', ['08:00', '08:30', '09:00'], [{ name: '高木琴音', cells: [{ role: '準備', color: grayOf }, { role: '', color: null }, { role: '', color: null }] }]],
+    [
+      '準備日',
+      '11月1日シフト表.png',
+      ['08:00', '08:30', '09:00'],
+      [
+        {
+          name: '高木琴音',
+          cells: [
+            { role: '準備', color: grayOf },
+            { role: '', color: null },
+            { role: '', color: null },
+          ],
+        },
+      ],
+    ],
     ['学祭1日目', '11月2日シフト表.png', [], []],
     ['学祭2日目', '11月3日シフト表.png', [], []],
     ['片付け', '11月4日シフト表.png', [], []],
   ],
 )
-check('⑨ 描かない日は図形を持たない（塗る側が「描いていない」と言う）', exported.map((image) => image.drawing === null), [false, true, true, true])
+check(
+  '⑨ 描かない日は図形を持たない（塗る側が「描いていない」と言う）',
+  exported.map((image) => image.drawing === null),
+  [false, true, true, true],
+)
 check('⑨ 1 セルも書き換えない（値も書式もメモも）', [bookSnapshot(imageBook) === imageBookBefore, everyNote(imageBook) === imageNotesBefore, roundTrips.writes, roundTrips.formats], [true, true, 0, 0])
 
 const brokenImageBook = filledBook()
 brokenImageBook.getSheetByName('検証結果').put(1, 1, '区分')
-check(
-  '⑨ 構造が崩れていれば、描かずに名指しで止まる（生成と同じ検証を先に通す）',
-  whyItStopped(() => distributionImagesOn(asGas(brokenImageBook)))?.includes('「検証結果」の 1 行目 1 列目'),
-  true,
-)
+check('⑨ 構造が崩れていれば、描かずに名指しで止まる（生成と同じ検証を先に通す）', whyItStopped(() => distributionImagesOn(asGas(brokenImageBook)))?.includes('「検証結果」の 1 行目 1 列目'), true)
 
 // ---- シートが無いとき -------------------------------------------------------
 
 const bookMissingASheet = emptyTemplate()
 bookMissingASheet.sheets = bookMissingASheet.sheets.filter((s) => s.getName() !== '回答')
 
-check(
-  'シートが 1 枚でも無ければ、名指しして止まる（黙って作らない）',
-  whyItStopped(() => readInputs(asGas(bookMissingASheet)))?.includes('シート「回答」が見つかりません'),
-  true,
-)
+check('シートが 1 枚でも無ければ、名指しして止まる（黙って作らない）', whyItStopped(() => readInputs(asGas(bookMissingASheet)))?.includes('シート「回答」が見つかりません'), true)
 
 // ---- ⑥ 構造が崩れているとき -------------------------------------------------
 // 崩れたまま走ると、手直しが黙って消えるか、列がずれたまま書かれる。
 
 const brokenBook = filledBook()
 brokenBook.getSheetByName('検証結果').put(1, 1, '区分')
-const brokenBookCopy = JSON.stringify(
-  brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()]),
-)
+const brokenBookCopy = JSON.stringify(brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()]))
 roundTrips.reads = 0
 roundTrips.writes = 0
-const whyTheBreakageStoppedIt = whyItStopped(() => run(asGas(brokenBook), {
-  '取り込む': () => [],
-  '展開する': () => [],
-  '生成する': () => [],
-  '違反を数える': () => [],
-  '未充足を名指しする': () => [],
-  '指標を出す': () => [],
-}))
-
-check(
-  '⑥ 構造が崩れていれば、段が全部そろっていても走らずに名指しで止まる',
-  [
-    whyTheBreakageStoppedIt?.includes('処理できません'),
-    whyTheBreakageStoppedIt?.includes('「検証結果」の 1 行目 1 列目'),
-  ],
-  [true, true],
+const whyTheBreakageStoppedIt = whyItStopped(() =>
+  run(asGas(brokenBook), {
+    取り込む: () => [],
+    展開する: () => [],
+    生成する: () => [],
+    違反を数える: () => [],
+    未充足を名指しする: () => [],
+    指標を出す: () => [],
+  }),
 )
 
-check(
-  '⑥ 止まったとき、生成シートに 1 度も書いていない（入力も 1 行も読んでいない）',
-  [roundTrips.writes, roundTrips.reads],
-  [0, sheetLayout.length],
-)
+check('⑥ 構造が崩れていれば、段が全部そろっていても走らずに名指しで止まる', [whyTheBreakageStoppedIt?.includes('処理できません'), whyTheBreakageStoppedIt?.includes('「検証結果」の 1 行目 1 列目')], [true, true])
 
-check(
-  '⑥ 止まったとき、セルが 1 つも変わっていない（黙って直した箇所が 0 である）',
-  JSON.stringify(brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])),
-  brokenBookCopy,
-)
+check('⑥ 止まったとき、生成シートに 1 度も書いていない（入力も 1 行も読んでいない）', [roundTrips.writes, roundTrips.reads], [0, sheetLayout.length])
+
+check('⑥ 止まったとき、セルが 1 つも変わっていない（黙って直した箇所が 0 である）', JSON.stringify(brokenBook.sheets.map((s) => [s.name, [...s.cells.entries()].sort()])), brokenBookCopy)
 
 // ---- ⑫ 氏名のプルダウンと、学籍番号の自動入力（→ issue #271） --------------
 // 回答には、高木琴音（filledBook）に加えて、森田咲良（出し直しで 2 行・学籍番号の大文字小文字が違う）と、
@@ -993,7 +826,11 @@ function dropdownBook() {
     [new Date(2025, 8, 23, 18, 0, 0), 'ESA0000001', '佐藤花', '1年生', 'いいえ', ''],
     [new Date(2025, 8, 23, 19, 0, 0), 'ESA0000002', '佐藤花', '2年生', 'いいえ', ''],
     [new Date(2025, 8, 24, 9, 0, 0), 'eck2626643', ' 森田咲良 ', '2年生', 'いいえ', ''],
-  ].forEach((row, i) => row.concat(wishes).forEach((value, j) => answers.put(3 + i, 1 + j, value)))
+  ].forEach((row, i) => {
+    row.concat(wishes).forEach((value, j) => {
+      answers.put(3 + i, 1 + j, value)
+    })
+  })
   return book
 }
 
@@ -1035,31 +872,18 @@ check(
 
 const uniqueBook = dropdownBook()
 const uniqueSaid = edit(uniqueBook, dayLabels[1], 2, 2, '森田咲良')
-check(
-  '⑫ 学籍番号が空の行で氏名を選ぶと、回答から学籍番号が大文字で入る（出し直しの 2 行は 1 人に数える）',
-  [uniqueBook.getSheetByName(dayLabels[1]).cells.get('2,1'), uniqueSaid!.text.startsWith('集計し直しました'), uniqueSaid!.seconds],
-  ['ECK2626643', true, 5],
-)
+check('⑫ 学籍番号が空の行で氏名を選ぶと、回答から学籍番号が大文字で入る（出し直しの 2 行は 1 人に数える）', [uniqueBook.getSheetByName(dayLabels[1]).cells.get('2,1'), uniqueSaid!.text.startsWith('集計し直しました'), uniqueSaid!.seconds], ['ECK2626643', true, 5])
 
 const sameNameBook = dropdownBook()
 const sameNameSaid = edit(sameNameBook, dayLabels[1], 2, 2, '佐藤花')
 check(
   '⑫ 同じ氏名で学籍番号が異なる人が複数いれば、学籍番号を入れずに、その旨を一言で知らせる',
-  [
-    sameNameBook.getSheetByName(dayLabels[1]).cells.get('2,1') ?? '',
-    sameNameSaid!.text.startsWith('同じ氏名で異なる学籍番号の人が複数いたため、学籍番号を自動入力できませんでした（氏名「佐藤花」）'),
-    sameNameSaid!.text.includes('／集計し直しました'),
-    sameNameSaid!.seconds,
-  ],
+  [sameNameBook.getSheetByName(dayLabels[1]).cells.get('2,1') ?? '', sameNameSaid!.text.startsWith('同じ氏名で異なる学籍番号の人が複数いたため、学籍番号を自動入力できませんでした（氏名「佐藤花」）'), sameNameSaid!.text.includes('／集計し直しました'), sameNameSaid!.seconds],
   ['', true, true, 15],
 )
 
 const notFoundSaid = edit(dropdownBook(), dayLabels[1], 2, 2, '山田太郎')
-check(
-  '⑫ 回答に同じ氏名が無ければ（プルダウンの外から貼られたとき）、学籍番号を入れずに知らせる',
-  notFoundSaid!.text.startsWith('「回答」シートに同じ氏名が無いため、学籍番号を自動入力できませんでした（氏名「山田太郎」）'),
-  true,
-)
+check('⑫ 回答に同じ氏名が無ければ（プルダウンの外から貼られたとき）、学籍番号を入れずに知らせる', notFoundSaid!.text.startsWith('「回答」シートに同じ氏名が無いため、学籍番号を自動入力できませんでした（氏名「山田太郎」）'), true)
 
 // 1 日目の 2 行目は高木琴音（EED2349987）の行で、役割が入っている。
 const reselectBook = dropdownBook()
@@ -1069,7 +893,9 @@ check(
   [
     reselectBook.getSheetByName(dayLabels[0]).cells.get('2,1'),
     reselectSaid!.text.startsWith('集計し直しました'),
-    notesOf(reselectBook, dayLabels[0]).filter(([key]) => key.startsWith('2,')).every(([, note]) => note === fixedNote),
+    notesOf(reselectBook, dayLabels[0])
+      .filter(([key]) => key.startsWith('2,'))
+      .every(([, note]) => note === fixedNote),
     notesOf(reselectBook, dayLabels[0]).some(([key]) => key.startsWith('2,')),
   ],
   ['ECK2626643', true, true, true],
@@ -1077,31 +903,16 @@ check(
 
 const clearedBook = dropdownBook()
 edit(clearedBook, dayLabels[0], 2, 2, '')
-check(
-  '⑫ 氏名を消すと、学籍番号も消える（→ issue #286）',
-  clearedBook.getSheetByName(dayLabels[0]).cells.get('2,1') ?? '',
-  '',
-)
+check('⑫ 氏名を消すと、学籍番号も消える（→ issue #286）', clearedBook.getSheetByName(dayLabels[0]).cells.get('2,1') ?? '', '')
 
 const sameNameOwnedBook = dropdownBook()
 sameNameOwnedBook.getSheetByName(dayLabels[1]).put(2, 1, 'esa0000002')
 const sameNameOwnedSaid = edit(sameNameOwnedBook, dayLabels[1], 2, 2, '佐藤花')
-check(
-  '⑫ 同姓同名でも、今の学籍番号がその中の 1 人なら残し、知らせない（大文字小文字は揃えて比べる → issue #286）',
-  [sameNameOwnedBook.getSheetByName(dayLabels[1]).cells.get('2,1'), sameNameOwnedSaid!.text.startsWith('集計し直しました')],
-  ['esa0000002', true],
-)
+check('⑫ 同姓同名でも、今の学籍番号がその中の 1 人なら残し、知らせない（大文字小文字は揃えて比べる → issue #286）', [sameNameOwnedBook.getSheetByName(dayLabels[1]).cells.get('2,1'), sameNameOwnedSaid!.text.startsWith('集計し直しました')], ['esa0000002', true])
 
 const sameNameOtherBook = dropdownBook()
 const sameNameOtherSaid = edit(sameNameOtherBook, dayLabels[0], 2, 2, '佐藤花')
-check(
-  '⑫ 同姓同名で、今の学籍番号がその中に無ければ、前の人の学籍番号を消して知らせる（→ issue #286）',
-  [
-    sameNameOtherBook.getSheetByName(dayLabels[0]).cells.get('2,1') ?? '',
-    sameNameOtherSaid!.text.startsWith('同じ氏名で異なる学籍番号の人が複数いたため'),
-  ],
-  ['', true],
-)
+check('⑫ 同姓同名で、今の学籍番号がその中に無ければ、前の人の学籍番号を消して知らせる（→ issue #286）', [sameNameOtherBook.getSheetByName(dayLabels[0]).cells.get('2,1') ?? '', sameNameOtherSaid!.text.startsWith('同じ氏名で異なる学籍番号の人が複数いたため')], ['', true])
 
 check(
   '⑫ 学籍番号と氏名を一緒に書き換えた（行ごと貼った）ときは、学籍番号は貼った値のまま（→ issue #286）',
@@ -1119,15 +930,7 @@ check(
 const roleFirstBook = dropdownBook()
 roleFirstBook.getSheetByName(dayLabels[0]).put(3, 5, '準備')
 const roleFirstSaid = edit(roleFirstBook, dayLabels[0], 3, 2, '森田咲良')
-check(
-  '⑫ 役割を先に書いた行でも、氏名を選べば学籍番号が入って数え直せ、その役割に手直しの印が付く',
-  [
-    roleFirstBook.getSheetByName(dayLabels[0]).cells.get('3,1'),
-    roleFirstSaid!.text.startsWith('集計し直しました'),
-    roleFirstBook.getSheetByName(dayLabels[0]).notes.get('3,5'),
-  ],
-  ['ECK2626643', true, fixedNote],
-)
+check('⑫ 役割を先に書いた行でも、氏名を選べば学籍番号が入って数え直せ、その役割に手直しの印が付く', [roleFirstBook.getSheetByName(dayLabels[0]).cells.get('3,1'), roleFirstSaid!.text.startsWith('集計し直しました'), roleFirstBook.getSheetByName(dayLabels[0]).notes.get('3,5')], ['ECK2626643', true, fixedNote])
 
 check(
   '⑫ 氏名の列にかからない書き換えでは、学籍番号を埋めに行かない（回答を読まない）',

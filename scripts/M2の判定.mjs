@@ -22,14 +22,20 @@ import { 読む, 宣言, 実装の文脈, 取り出す, 判定の入力 } from '
 // 文脈と入力は scripts/判定の入力.mjs が組む（まとまりと散らし.mjs と同じ案の上で読むため）。
 
 const 文脈 = 実装の文脈()
-const {
-  build, builtInSteps, coreSteps, takeConditions,
-  readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind,
-  violationRules, violationsNotCounted, ruleRoles,
-} = 取り出す(文脈, [
-  'build', 'builtInSteps', 'coreSteps', 'takeConditions',
-  'readAssignments', 'allNeeds', 'requiredAt', 'rolesInOrder', 'sheetColumns', 'checkKind',
-  'violationRules', 'violationsNotCounted', 'ruleRoles',
+const { build, builtInSteps, coreSteps, takeConditions, readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind, violationRules, violationsNotCounted, ruleRoles } = 取り出す(文脈, [
+  'build',
+  'builtInSteps',
+  'coreSteps',
+  'takeConditions',
+  'readAssignments',
+  'allNeeds',
+  'requiredAt',
+  'rolesInOrder',
+  'sheetColumns',
+  'checkKind',
+  'violationRules',
+  'violationsNotCounted',
+  'ruleRoles',
 ])
 
 // ---- 入力を組む ------------------------------------------------------------
@@ -161,7 +167,9 @@ const 置いた役割 = (() => {
   Object.keys(ruleRoles).forEach((鍵) => {
     if (並び.indexOf(ruleRoles[鍵]) === -1) 並び.push(ruleRoles[鍵])
   })
-  Object.keys(数え).forEach((役割) => { if (並び.indexOf(役割) === -1) 並び.push(役割) })
+  Object.keys(数え).forEach((役割) => {
+    if (並び.indexOf(役割) === -1) 並び.push(役割)
+  })
   return 並び.map((役割) => ({ 役割: 役割, 件数: 数え[役割] || 0 }))
 })()
 
@@ -174,11 +182,11 @@ const 名指し = {}
 
 // 両方向で突き合わせる（→ 宣言の「確かめること」）。
 const 名指しされていない不足 = 案.不足.filter((一つ) => !名指し[一つ.鍵])
-const 人数が食い違う不足 = 案.不足
-  .filter((一つ) => 名指し[一つ.鍵])
-  .filter((一つ) => Number(値(名指し[一つ.鍵], 'あと何人')) !== 一つ.あと何人)
+const 人数が食い違う不足 = 案.不足.filter((一つ) => 名指し[一つ.鍵]).filter((一つ) => Number(値(名指し[一つ.鍵], 'あと何人')) !== 一つ.あと何人)
 const 不足の鍵 = {}
-案.不足.forEach((一つ) => { 不足の鍵[一つ.鍵] = true })
+案.不足.forEach((一つ) => {
+  不足の鍵[一つ.鍵] = true
+})
 const 空の名指し = 未充足の行.filter((行) => !不足の鍵[枠の鍵(値(行, '日'), 値(行, '開始'), 値(行, '終了'), 値(行, '役割'))])
 
 // あと何人が食い違う行も、人数が名指しされていないので「名指しされていない未充足」に数える。
@@ -208,14 +216,14 @@ const 揃わなかった突き合わせ = 突き合わせ.filter((一つ) => 一
 
 const 期待 = 宣言.入力の期待値
 const 実際 = {
-  '回答の行': 回答の全行.length,
-  '取り込んだ人数': 希望.length,
-  '展開で止まる人数': 止まる人.length,
-  '組む人数': 希望.length - 止まる人.length,
-  '枠': 日ごと.reduce((合計, 一日) => 合計 + 一日.slots.length, 0),
-  '日ごとの枠': 日ごと.map((一日) => 一日.slots.length),
-  '需要のべ': 案.需要のべ,
-  '需要のべの内訳': 案.のべの内訳,
+  回答の行: 回答の全行.length,
+  取り込んだ人数: 希望.length,
+  展開で止まる人数: 止まる人.length,
+  組む人数: 希望.length - 止まる人.length,
+  枠: 日ごと.reduce((合計, 一日) => 合計 + 一日.slots.length, 0),
+  日ごとの枠: 日ごと.map((一日) => 一日.slots.length),
+  需要のべ: 案.需要のべ,
+  需要のべの内訳: 案.のべの内訳,
 }
 const 外れた入力 = Object.keys(実際).filter((名) => JSON.stringify(実際[名]) !== JSON.stringify(期待[名]))
 
@@ -267,7 +275,9 @@ function 主処理() {
   if (時刻の検め.外れ.length === 0) {
     console.log('  OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
   } else {
-    時刻の検め.外れ.forEach((一つ) => console.log(`  NG   5 時刻が期待と違う: ${一つ}`))
+    時刻の検め.外れ.forEach((一つ) => {
+      console.log(`  NG   5 時刻が期待と違う: ${一つ}`)
+    })
   }
   console.log('       値の出どころ（どの行から出たか）は node scripts/前回の5時刻.mjs が出す')
 
@@ -289,9 +299,11 @@ function 主処理() {
   console.log(`  割り当ての行: ${出力['割り当て'].length}`)
   console.log(`  需要のべ ${案.需要のべ} ＝ 需要の枠に置いた ${案.需要の枠に置いた} ＋ あと何人 ${あと何人の合計}`)
   console.log(`  役割ごと: ${置いた役割.map((一つ) => `${一つ.役割} ${一つ.件数}`).join(' ／ ')}`)
-  置いた役割.filter((一つ) => 一つ.件数 === 0).forEach((一つ) => {
-    console.log(`       ${一つ.役割} は 0 件。その帯が 1 枠も無い日しか無いか、置ける人が残らなかった（帯の内訳は上）`)
-  })
+  置いた役割
+    .filter((一つ) => 一つ.件数 === 0)
+    .forEach((一つ) => {
+      console.log(`       ${一つ.役割} は 0 件。その帯が 1 枠も無い日しか無いか、置ける人が残らなかった（帯の内訳は上）`)
+    })
 
   const 違反 = 違反の内訳()
   console.log('')
@@ -355,11 +367,8 @@ function 主処理() {
     console.log(`  NG   ${宣言.本文.ファイル} に載っていない: ${本文に無い言葉.join(' / ')}`)
   }
 
-  const 線を外した = 違反の行.length !== 宣言.合格の線.違反
-    || 名指しされていない未充足 !== 宣言.合格の線.名指しされていない未充足
-    || 空の名指し.length !== 0
-  const 判定できない = 外れた入力.length !== 0 || 時刻の検め.落ちた
-    || 揃わなかった突き合わせ.length !== 0 || 本文に無い言葉.length !== 0
+  const 線を外した = 違反の行.length !== 宣言.合格の線.違反 || 名指しされていない未充足 !== 宣言.合格の線.名指しされていない未充足 || 空の名指し.length !== 0
+  const 判定できない = 外れた入力.length !== 0 || 時刻の検め.落ちた || 揃わなかった突き合わせ.length !== 0 || 本文に無い言葉.length !== 0
 
   if (判定できない) {
     console.log('')
@@ -380,12 +389,7 @@ function 主処理() {
   }
 
   console.log('')
-  console.log(
-    `結果: 違反 ${違反の行.length} 件（線 ${宣言.合格の線.違反}）`
-      + ` ／ 名指しされていない未充足 ${名指しされていない未充足} 件（線 ${宣言.合格の線.名指しされていない未充足}）`
-      + ` ／ 未充足 ${未充足の行.length} 件・あと ${あと何人の合計} 人（線を当てない）`
-      + ` ／ 所要時間 ${秒で(一周.全体の秒)}`,
-  )
+  console.log(`結果: 違反 ${違反の行.length} 件（線 ${宣言.合格の線.違反}）` + ` ／ 名指しされていない未充足 ${名指しされていない未充足} 件（線 ${宣言.合格の線.名指しされていない未充足}）` + ` ／ 未充足 ${未充足の行.length} 件・あと ${あと何人の合計} 人（線を当てない）` + ` ／ 所要時間 ${秒で(一周.全体の秒)}`)
   console.log(`      規則 3 の ⑥（複数日で偏らせない）は数えに入っていない（→ docs/agent/tech-requirements.md 5-4 の但し書き）`)
   console.log('')
 

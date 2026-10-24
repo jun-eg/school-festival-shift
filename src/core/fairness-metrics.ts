@@ -25,8 +25,7 @@ export const metricDefinitions = [
   },
   {
     column: 'シフト回数',
-    counts: '塊の数。塊は、同じ人・同じ日で同じ役割が、時刻の続いた枠に続いた区間である（→ 5-5 の「まとまり」）。'
-      + '役割が変われば別の塊である',
+    counts: '塊の数。塊は、同じ人・同じ日で同じ役割が、時刻の続いた枠に続いた区間である（→ 5-5 の「まとまり」）。' + '役割が変われば別の塊である',
   },
   {
     column: '準備回数',
@@ -48,7 +47,9 @@ export function fairnessMetrics(assignments: Row[] | undefined, conditions: Part
   const placed = readAssignments(assignments || [], conditions || {})
   const byPerson: Record<string, Placement[]> = {}
 
-  ;(wishes || []).forEach((wish) => { byPerson[wish.studentId] = [] })
+  ;(wishes || []).forEach((wish) => {
+    byPerson[wish.studentId] = []
+  })
   placed.forEach((one) => {
     if (!byPerson[one.studentId]) byPerson[one.studentId] = []
     byPerson[one.studentId].push(one)
@@ -63,11 +64,11 @@ export function fairnessMetrics(assignments: Row[] | undefined, conditions: Part
 export function metricRow(studentId: string, rows: Placement[]): Row {
   const slots = distinctSlots(rows)
   const values: Record<string, Cell> = {
-    '学籍番号': studentId,
-    '氏名': rows.length > 0 ? rows[0].name : '',
-    '合計時間': totalHours(slots),
-    'シフト回数': countRuns(slots),
-    '準備回数': countPrepCleanupDays(slots),
+    学籍番号: studentId,
+    氏名: rows.length > 0 ? rows[0].name : '',
+    合計時間: totalHours(slots),
+    シフト回数: countRuns(slots),
+    準備回数: countPrepCleanupDays(slots),
   }
   return sheetColumns('指標').map((name) => values[name])
 }

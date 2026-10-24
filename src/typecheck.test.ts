@@ -33,12 +33,15 @@ const files: Record<string, string> = {
 }
 for (const [name, source] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), source)
 
-fs.writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({
-  extends: path.join(root, 'tsconfig.json'),
-  compilerOptions: { typeRoots: [path.join(root, 'node_modules', '@types')] },
-  include: [path.join(dir, '*.ts')],
-  exclude: [],
-}))
+fs.writeFileSync(
+  path.join(dir, 'tsconfig.json'),
+  JSON.stringify({
+    extends: path.join(root, 'tsconfig.json'),
+    compilerOptions: { typeRoots: [path.join(root, 'node_modules', '@types')] },
+    include: [path.join(dir, '*.ts')],
+    exclude: [],
+  }),
+)
 
 const result = spawnSync(process.execPath, [tsc, '-p', path.join(dir, 'tsconfig.json'), '--pretty', 'false'], { encoding: 'utf8' })
 const output = `${result.stdout}${result.stderr}`
@@ -46,17 +49,14 @@ fs.rmSync(dir, { recursive: true, force: true })
 
 /** tsc の出力のうち、そのファイルについての行の、エラー番号。 */
 function errorsIn(name: string): string[] {
-  return output.split('\n')
+  return output
+    .split('\n')
     .filter((line) => line.includes(`${name}(`))
     .map((line) => (/error (TS\d+)/.exec(line) || [])[1])
     .filter(Boolean)
 }
 
 check('① 悪い書き方が無い 1 本は、tsc を通る（②〜④ が設定の誤りで落ちているのではない）', errorsIn('fine.ts'), [])
-check(
-  '② es2019 に無い API（structuredClone ・ replaceAll）を使うと、tsc が落ちる',
-  [errorsIn('new-api.ts').includes('TS2304'), errorsIn('new-api.ts').includes('TS2550')],
-  [true, true],
-)
+check('② es2019 に無い API（structuredClone ・ replaceAll）を使うと、tsc が落ちる', [errorsIn('new-api.ts').includes('TS2304'), errorsIn('new-api.ts').includes('TS2550')], [true, true])
 check('③ enum を書くと、tsc が落ちる（erasableSyntaxOnly — 型剥がしで走らない）', errorsIn('enum.ts'), ['TS1294'])
 check('④ 型だけの import を import type にしないと、tsc が落ちる（verbatimModuleSyntax）', errorsIn('type-import.ts'), ['TS1484'])

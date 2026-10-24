@@ -18,9 +18,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { check } from '../../test/check.ts'
-import {
-  entrantItemNames, formItemKind, formItems, formItemsFor, wishTimeDescription, wishTimeExamples, wishTimeLabels, wishTimePattern,
-} from './form-definition.ts'
+import { entrantItemNames, formItemKind, formItems, formItemsFor, wishTimeDescription, wishTimeExamples, wishTimeLabels, wishTimePattern } from './form-definition.ts'
 import { dayLabels } from './sheet-layout.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -98,20 +96,9 @@ function asTableRow(item) {
   }
 }
 
-check(
-  '① 前回の日付と営業時刻を入れると、4-1 の表と 1 行ずつ突き合わせて差分が 0（→ 仕様 #2）',
-  lastYearItems.map(asTableRow),
-  tableInRequirements,
-)
+check('① 前回の日付と営業時刻を入れると、4-1 の表と 1 行ずつ突き合わせて差分が 0（→ 仕様 #2）', lastYearItems.map(asTableRow), tableInRequirements)
 
-check(
-  '① 設問は 9 つ、画像アイテムは 1 つである',
-  [
-    lastYearItems.filter((item) => item.kind !== formItemKind.image).length,
-    lastYearItems.filter((item) => item.kind === formItemKind.image).length,
-  ],
-  [9, 1],
-)
+check('① 設問は 9 つ、画像アイテムは 1 つである', [lastYearItems.filter((item) => item.kind !== formItemKind.image).length, lastYearItems.filter((item) => item.kind === formItemKind.image).length], [9, 1])
 
 check(
   '① 画像アイテムは設問ではないので、# を持たない',
@@ -138,9 +125,7 @@ check(
 
 check(
   '② 友達欄は、学籍番号でない書き方も任意のまま通る（記録で弾かれる形だった答え ◎ → ADR 入る側-0012 ／ issue #200）',
-  lastYearItems
-    .filter((item) => item.title === '一緒に組みたいお友達')
-    .map((item) => [item.required, item.pattern === undefined]),
+  lastYearItems.filter((item) => item.title === '一緒に組みたいお友達').map((item) => [item.required, item.pattern === undefined]),
   [[false, true]],
 )
 
@@ -150,12 +135,7 @@ check(
   [true, true, true, true],
 )
 
-check(
-  '② 正規表現が 4-2 の 1 本と完全に一致する',
-  wishTimePattern,
-  '^(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d'
-    + '(?:,(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d)*$',
-)
+check('② 正規表現が 4-2 の 1 本と完全に一致する', wishTimePattern, '^(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d' + '(?:,(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d-(?:[0-9]|[01]\\d|2[0-3]):[0-5]\\d)*$')
 
 const wishTime = new RegExp(wishTimePattern)
 check(
@@ -177,23 +157,15 @@ check(
   ],
 )
 
-check(
-  '③ エラーメッセージを持つのは希望時間 4 設問だけである（記録に無い文言を発明していない）',
-  lastYearItems.filter((item) => item.errorMessage).length,
-  4,
-)
+check('③ エラーメッセージを持つのは希望時間 4 設問だけである（記録に無い文言を発明していない）', lastYearItems.filter((item) => item.errorMessage).length, 4)
 
 // ---- ④ 説明文は、例 3 つと営業時間を持つ（→ 4-2） ---------------------------
 
-check(
-  '④ 説明文に書かれた例 ◎ が 3 つとも記録どおりである',
-  wishTimeExamples,
-  [
-    { label: '例1', value: '10:00-15:00' },
-    { label: '例2（複数指定）', value: '10:00-12:00,13:00-15:00' },
-    { label: '例3（終日出れない場合）', value: '00:00-00:00' },
-  ],
-)
+check('④ 説明文に書かれた例 ◎ が 3 つとも記録どおりである', wishTimeExamples, [
+  { label: '例1', value: '10:00-15:00' },
+  { label: '例2（複数指定）', value: '10:00-12:00,13:00-15:00' },
+  { label: '例3（終日出れない場合）', value: '00:00-00:00' },
+])
 
 check(
   '④ 説明文に書かれた営業時間 ◎ が、日ごとに記録どおりである',
@@ -210,21 +182,19 @@ check(
   '④ 組み上がった説明文に、例 3 つとその日の営業時間が入っている',
   wishTimeItems.map((item) => {
     const text = wishTimeDescription(item)
-    return [
-      text.includes(item.businessHours!),
-      ...wishTimeExamples.map((example) => text.includes(example.value)),
-    ]
+    return [text.includes(item.businessHours!), ...wishTimeExamples.map((example) => text.includes(example.value))]
   }),
-  [[true, true, true, true], [true, true, true, true], [true, true, true, true], [true, true, true, true]],
+  [
+    [true, true, true, true],
+    [true, true, true, true],
+    [true, true, true, true],
+    [true, true, true, true],
+  ],
 )
 
 // ---- ⑤ 入る側から数えると 6 項目である（→ 5 の #3） -------------------------
 
-check(
-  '⑤ 入る側から数え直すと 6 項目である（設問は 9 つに割れているだけ）',
-  entrantItemNames(),
-  ['学籍番号', '氏名', '学年', '調理可否', '友達欄', '希望時間'],
-)
+check('⑤ 入る側から数え直すと 6 項目である（設問は 9 つに割れているだけ）', entrantItemNames(), ['学籍番号', '氏名', '学年', '調理可否', '友達欄', '希望時間'])
 
 check(
   '⑤ 希望時間の 4 設問は、入る側から見ると 1 項目である',
@@ -238,39 +208,37 @@ check(
   [null],
 )
 
-check(
-  '⑤ 締切が定義に無い（毎回決める入力で、フォーム側は締切で閉じない ◎ → 4-1）',
-  lastYearItems.filter((item) => /締切/.test(item.title!)).length,
-  0,
-)
+check('⑤ 締切が定義に無い（毎回決める入力で、フォーム側は締切で閉じない ◎ → 4-1）', lastYearItems.filter((item) => /締切/.test(item.title!)).length, 0)
 
 // ---- ⑥ data/ の希望データのモック 50 行が、定義を通る ----------------------
 
 /** 引用符の中のコンマを割らないだけの CSV の読み。友達欄が引用符付きで入っている。 */
 function readCsv(text) {
-  return text.replace(/^﻿/, '').trim().split(/\r?\n/).map((line) => {
-    const cells: string[] = []
-    let cell = ''
-    let quoted = false
-    for (const character of line) {
-      if (character === '"') quoted = !quoted
-      else if (character === ',' && !quoted) { cells.push(cell); cell = '' }
-      else cell += character
-    }
-    cells.push(cell)
-    return cells
-  })
+  return text
+    .replace(/^﻿/, '')
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => {
+      const cells: string[] = []
+      let cell = ''
+      let quoted = false
+      for (const character of line) {
+        if (character === '"') quoted = !quoted
+        else if (character === ',' && !quoted) {
+          cells.push(cell)
+          cell = ''
+        } else cell += character
+      }
+      cells.push(cell)
+      return cells
+    })
 }
 
 const answerRows = readCsv(fs.readFileSync(path.join(dataDir, '前回の希望データ-モック.csv'), 'utf8'))
 const answerHeader = answerRows[0]
 const answers = answerRows.slice(1)
 
-check(
-  '⑥ 前回の希望データ（モック）の見出しが、前回の日付で組んだ題 9 つ ＋ タイムスタンプと同じである',
-  answerHeader,
-  ['タイムスタンプ', ...lastYearItems.filter((item) => item.kind !== formItemKind.image).map((item) => item.title)],
-)
+check('⑥ 前回の希望データ（モック）の見出しが、前回の日付で組んだ題 9 つ ＋ タイムスタンプと同じである', answerHeader, ['タイムスタンプ', ...lastYearItems.filter((item) => item.kind !== formItemKind.image).map((item) => item.title)])
 
 /** 列の並びは見出しと同じである（上の検査が見ている）。 */
 function columnOf(title) {
@@ -292,11 +260,7 @@ answers.forEach((row, index) => {
   })
 })
 
-check(
-  '⑥ 前回の回答 50 行を、正規表現も選択肢も必須も 1 件も弾かない',
-  [answers.length, rejected],
-  [50, []],
-)
+check('⑥ 前回の回答 50 行を、正規表現も選択肢も必須も 1 件も弾かない', [answers.length, rejected], [50, []])
 
 // ---- ⑦ 今年の日付を入れると、今年のものになる（→ 4-1・4-2） ----------------
 
@@ -321,7 +285,12 @@ check(
     const text = wishTimeDescription(item)
     return [text.includes(item.businessHours!), /8:00-(21|20|15):00/.test(text)]
   }),
-  [[true, false], [true, false], [true, false], [true, false]],
+  [
+    [true, false],
+    [true, false],
+    [true, false],
+    [true, false],
+  ],
 )
 
 check(
@@ -330,26 +299,11 @@ check(
   lastYearItems.filter((item) => item.kind !== formItemKind.paragraph),
 )
 
-check(
-  '⑦ ラベル 4 つは定義側の固定である ◎（学祭は例年この 4 日 → 4-1）',
-  wishTimeLabels(),
-  ['準備日', '学祭1日目', '学祭2日目', '片付け'],
-)
+check('⑦ ラベル 4 つは定義側の固定である ◎（学祭は例年この 4 日 → 4-1）', wishTimeLabels(), ['準備日', '学祭1日目', '学祭2日目', '片付け'])
 
-check(
-  '⑦ ラベルの値は 1 か所である — 割り当ての 4 枚の名前と同じものを見ている（→ issue #213）',
-  wishTimeLabels(),
-  dayLabels,
-)
+check('⑦ ラベルの値は 1 か所である — 割り当ての 4 枚の名前と同じものを見ている（→ issue #213）', wishTimeLabels(), dayLabels)
 
-check(
-  '⑦ 表の側はラベルを持たない。何日目かだけを持ち、ラベルは組むときに付く（→ formItemsFor）',
-  [
-    formItems.filter((item) => item.dayIndex !== undefined).map((item) => item.dayIndex),
-    formItems.filter((item) => item.label !== undefined).length,
-  ],
-  [[0, 1, 2, 3], 0],
-)
+check('⑦ 表の側はラベルを持たない。何日目かだけを持ち、ラベルは組むときに付く（→ formItemsFor）', [formItems.filter((item) => item.dayIndex !== undefined).map((item) => item.dayIndex), formItems.filter((item) => item.label !== undefined).length], [[0, 1, 2, 3], 0])
 
 /** 止まることを見る。止まらなければ null が返る。 */
 function whyItStopped(work) {
@@ -362,11 +316,7 @@ function whyItStopped(work) {
 }
 
 const stoppedOnEmpty = whyItStopped(() => formItemsFor([]))
-check(
-  '⑦ 「日ごとの営業時刻」が空なら、区画を名指しして止まる（→ 2 の止まる箇所 9）',
-  [stoppedOnEmpty?.includes('「日ごとの営業時刻」が空です'), stoppedOnEmpty?.includes('4 日分入れて')],
-  [true, true],
-)
+check('⑦ 「日ごとの営業時刻」が空なら、区画を名指しして止まる（→ 2 の止まる箇所 9）', [stoppedOnEmpty?.includes('「日ごとの営業時刻」が空です'), stoppedOnEmpty?.includes('4 日分入れて')], [true, true])
 
 check(
   '⑦ 4 行でなければ、何行あるかを名指しして止まる（3 行でも 5 行でも）',
@@ -374,5 +324,8 @@ check(
     const stopped = whyItStopped(() => formItemsFor(days as any))
     return [stopped?.includes(`${days.length} 行です`), stopped?.includes('準備日・学祭1日目・学祭2日目・片付け')]
   }),
-  [[true, true], [true, true]],
+  [
+    [true, true],
+    [true, true],
+  ],
 )

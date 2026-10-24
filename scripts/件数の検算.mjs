@@ -42,19 +42,38 @@ function 確定シフトを読む() {
 /** 素の CSV パーサ（引用符と埋め込み改行に対応する）。 */
 function csvを開く(s) {
   const 表 = []
-  let 行 = [], 欄 = '', 引用中 = false
+  let 行 = [],
+    欄 = '',
+    引用中 = false
   for (let i = 0; i < s.length; i++) {
     const c = s[i]
     if (引用中) {
-      if (c !== '"') { 欄 += c }
-      else if (s[i + 1] === '"') { 欄 += '"'; i++ }
-      else { 引用中 = false }
-    } else if (c === '"') { 引用中 = true }
-    else if (c === ',') { 行.push(欄); 欄 = '' }
-    else if (c === '\n') { 行.push(欄); 表.push(行); 行 = []; 欄 = '' }
-    else if (c !== '\r') { 欄 += c }
+      if (c !== '"') {
+        欄 += c
+      } else if (s[i + 1] === '"') {
+        欄 += '"'
+        i++
+      } else {
+        引用中 = false
+      }
+    } else if (c === '"') {
+      引用中 = true
+    } else if (c === ',') {
+      行.push(欄)
+      欄 = ''
+    } else if (c === '\n') {
+      行.push(欄)
+      表.push(行)
+      行 = []
+      欄 = ''
+    } else if (c !== '\r') {
+      欄 += c
+    }
   }
-  if (欄 !== '' || 行.length) { 行.push(欄); 表.push(行) }
+  if (欄 !== '' || 行.length) {
+    行.push(欄)
+    表.push(行)
+  }
   return 表
 }
 
@@ -68,7 +87,10 @@ function 希望データを読む() {
 
 // ---- 数え方（期待値ファイルが宣言したもの） ---------------------------------
 
-const 分 = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+const 分 = (t) => {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
 
 /** 重なりの定義: 端が接するだけは重なりに数えない。 */
 const 重なる = (a, b) => 分(a.start) < 分(b.end) && 分(b.start) < 分(a.end)
@@ -117,12 +139,20 @@ function 確定シフトを数える() {
     氏名の種類: new Set(行.map((r) => r.name)).size,
   }
 
-  let 時刻だけ = 0, 役割だけ = 0, 両方 = 0, 日付 = 0, 読めない = 0
+  let 時刻だけ = 0,
+    役割だけ = 0,
+    両方 = 0,
+    日付 = 0,
+    読めない = 0
   for (const r of 行) {
     const p = slotIdを読む(r.slotId)
-    if (!p) { 読めない++; continue }
+    if (!p) {
+      読めない++
+      continue
+    }
     if (p.date !== r.date) 日付++
-    const t = p.time !== r.start, k = p.role !== r.role
+    const t = p.time !== r.start,
+      k = p.role !== r.role
     if (t && k) 両方++
     else if (t) 時刻だけ++
     else if (k) 役割だけ++
@@ -180,12 +210,14 @@ function 確定シフトを数える() {
   const 割れた氏名 = [...氏名ごとの学籍番号.entries()].filter(([, s]) => s.size >= 2).map(([n]) => n)
   数え['確定シフト-同じ氏名に学籍番号が2つ'] = { 組数: 割れた氏名.length, 氏名: 割れた氏名 }
 
-  let 群の間 = 0, 完全一致 = 0
+  let 群の間 = 0,
+    完全一致 = 0
   for (const 名 of 割れた氏名) {
     const g = 行.filter((r) => r.name === 名)
     for (let i = 0; i < g.length; i++) {
       for (let j = i + 1; j < g.length; j++) {
-        const a = g[i], b = g[j]
+        const a = g[i],
+          b = g[j]
         if (a.memberId === b.memberId || a.date !== b.date || !重なる(a, b)) continue
         群の間++
         if (a.start === b.start && a.end === b.end && a.role === b.role) 完全一致++
@@ -226,7 +258,8 @@ function 希望データを数える() {
   // 参照の解決は大文字・小文字を無視する（→ docs/agent/tech-requirements.md 7）。
   const 提出者 = new Set([...種類].map((s) => s.toUpperCase()))
   const 参照を数える = (xs) => {
-    let 参照 = 0, 解決 = 0
+    let 参照 = 0,
+      解決 = 0
     for (const r of xs) {
       const v = 友達欄(r)
       if (!v) continue
@@ -251,7 +284,8 @@ function 希望データを数える() {
   const ts = (r) => 時刻(r[列['タイムスタンプ']])
   const 締切後 = 行.filter((r) => ts(r).値 > 締切)
   const 締切後の人 = new Set(締切後.map(学籍番号))
-  let 間に合わなかった = 0, 出し直し = 0
+  let 間に合わなかった = 0,
+    出し直し = 0
   for (const id of 締切後の人) {
     if (行.some((r) => 学籍番号(r) === id && ts(r).値 <= 締切)) 出し直し++
     else 間に合わなかった++
@@ -276,7 +310,8 @@ function 希望データを数える() {
 
   const 営業 = 期待.境目.営業時間.値
   const 終日出れない = 期待.境目.終日出れない.値
-  let 外 = 0, 逆 = 0
+  let 外 = 0,
+    逆 = 0
   for (const r of 行) {
     for (const 設問 of Object.keys(営業)) {
       const v = r[列[設問]].trim()
@@ -284,7 +319,10 @@ function 希望データを数える() {
       for (const 区間 of v.split(',')) {
         if (区間 === 終日出れない) continue
         const [s, e] = 区間.split('-')
-        if (分(e) <= 分(s)) { 逆++; continue }
+        if (分(e) <= 分(s)) {
+          逆++
+          continue
+        }
         if (分(s) < 分(営業[設問][0]) || 分(e) > 分(営業[設問][1])) 外++
       }
     }
@@ -306,14 +344,16 @@ function 節を切り出す(本文, 節) {
   let 終わり = 行.length
   for (let i = 始め + 1; i < 行.length; i++) {
     const m = /^(#{1,6}) /.exec(行[i])
-    if (m && m[1].length <= 深さ) { 終わり = i; break }
+    if (m && m[1].length <= 深さ) {
+      終わり = i
+      break
+    }
   }
   return 行.slice(始め, 終わり).join('\n')
 }
 
 /** 数字が「数字として」出てくるか。時刻や日付の一部は数えない。 */
-const 数字が載っている = (本文, n) =>
-  new RegExp(`(?<![\\d:：\\-−])${n}(?![\\d:：\\-−])`).test(本文)
+const 数字が載っている = (本文, n) => new RegExp(`(?<![\\d:：\\-−])${n}(?![\\d:：\\-−])`).test(本文)
 
 function 本文を見る(検算) {
   const 結果 = []

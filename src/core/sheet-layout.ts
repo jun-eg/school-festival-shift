@@ -26,12 +26,12 @@ export type Section = {
 export type Layout = {
   name: string
   staffWrites: boolean
-  protect: { kind: string, note: string, openInputs?: boolean }
+  protect: { kind: string; note: string; openInputs?: boolean }
   hasSectionHeadings: boolean
   frozenRows: number
   frozenColumns?: number
   /** 割り当ての 4 枚だけが持つ。 */
-  grid?: { of: string, fixed: string, dayIndex: number }
+  grid?: { of: string; fixed: string; dayIndex: number }
   sections: Section[]
 }
 
@@ -39,7 +39,7 @@ export type Layout = {
 export type BorderStyleName = 'DOTTED' | 'DASHED' | 'SOLID' | 'SOLID_MEDIUM' | 'SOLID_THICK' | 'DOUBLE'
 
 /** 枠線の形。 */
-export type BorderLine = { color: string, style: BorderStyleName }
+export type BorderLine = { color: string; style: BorderStyleName }
 
 /**
  * 保護のかけ方 2 つ。値がそのまま組み立ての記録に出る（強さは src/README.md）。
@@ -111,17 +111,18 @@ function gridSheet(dayIndex: number): Layout {
         // 担当者がセルを書き換えるのが仕様である（→ 5-3）ので、保護は「持ち主だけ」である（→ issue #234）。
         // 印のメモを消すと、次の生成で組み直す（→ issue #156）。お友達欄は生成が読まない（→ 5-2 ／ issue #200）。
         // note は作成者が読む説明なので、issue・docs の節番号を書かない（→ issue #249）。
-        note: 'シフト表です（行が人・列が 30 分・セルが役割）。'
-          + 'セルを書き換えると「シフト作成者による修正済み」のメモが付き、生成し直しても残ります（メモを消すと次の生成で作り直します）。'
-          + '時刻の見出しと氏名・お友達欄は生成のたびに更新されます。'
-          + '人を手で足すときは、氏名をプルダウンから選ぶと、学籍番号が自動で入ります（選び直すと入れ替わり、消すと消えます）。'
-          + 'お友達と組ませたいときは、手でセルを書き換えてください。',
+        note:
+          'シフト表です（行が人・列が 30 分・セルが役割）。' +
+          'セルを書き換えると「シフト作成者による修正済み」のメモが付き、生成し直しても残ります（メモを消すと次の生成で作り直します）。' +
+          '時刻の見出しと氏名・お友達欄は生成のたびに更新されます。' +
+          '人を手で足すときは、氏名をプルダウンから選ぶと、学籍番号が自動で入ります（選び直すと入れ替わり、消すと消えます）。' +
+          'お友達と組ませたいときは、手でセルを書き換えてください。',
         // 一緒に組みたいお友達は、担当者が手で寄せるときに読むだけの列である（→ issue #200）。
         columns: ['学籍番号', '氏名', '一緒に組みたいお友達'],
         // 右は時刻の列で、名前を持たない。当てるのは見出しの時刻である（→ assignment-grid.ts）。
         slotColumns: maxSlotsPerDay,
         // 友達欄は長くなりうるので、時刻の列 3 つ分の幅を取る（→ issue #245）。
-        wideColumns: { '一緒に組みたいお友達': 3 },
+        wideColumns: { 一緒に組みたいお友達: 3 },
         // 友達欄と時刻の列の境に、固定の線（氏名と友達欄の境）と同じく目立つ線を引く（→ dividerLine ／ issue #245）。
         dividerAfter: '一緒に組みたいお友達',
       },
@@ -193,8 +194,7 @@ export const sheetLayout: Layout[] = [
         heading: '日ごとの営業時刻',
         startColumn: 1,
         // ここから 30 分枠を刻む（→ 5-1 の #1・規則 1 の ①）。片付け終了がその日の終わり（→ ADR tech-requirements-0006）。
-        note: '1 日 1 行、4 日分（準備日・学祭1日目・学祭2日目・片付け の順）。'
-          + '時刻は 8:00 のように、左から早い順に書きます。片付け終了がその日の終わりです。',
+        note: '1 日 1 行、4 日分（準備日・学祭1日目・学祭2日目・片付け の順）。' + '時刻は 8:00 のように、左から早い順に書きます。片付け終了がその日の終わりです。',
         columns: ['日付', '準備開始', '調理開始', '調理終了', '片付け開始', '片付け終了'],
         // 下の URL 欄（→ formUrlBlock）の 1 つ上の行までが入力欄である。読むのも、初期値を置くのも、保護の外に出すのもここまで。
         // 4 行より多く書いたときに名指しで止まれるよう、4 行ちょうどでは切らない（→ input-types.ts の toDays）。
@@ -212,8 +212,7 @@ export const sheetLayout: Layout[] = [
         heading: '役割と必要人数',
         startColumn: 8,
         // 空けた日・時間帯の効き方は 5-1 の #2。
-        note: '日を空けると全日、開始・終了を空けると調理開始〜調理終了のあいだに効きます。'
-          + '準備・片付けの時間に人を置くときは、開始・終了を書いてください。',
+        note: '日を空けると全日、開始・終了を空けると調理開始〜調理終了のあいだに効きます。' + '準備・片付けの時間に人を置くときは、開始・終了を書いてください。',
         columns: ['日', '開始', '終了', '役割名', '人数'],
         initialRows: [
           ['', '', '', '調理責任者', 1],
@@ -280,14 +279,7 @@ export const sheetLayout: Layout[] = [
         // 列は 4-1 の設問 9 つ ＋ タイムスタンプの転記で、後ろ 4 列の列名は毎年変わる（設問の題そのものだからである → 4-1）。
         // 回答先をこのシートに向けるのは issue #144。
         note: 'フォームの回答が自動で入ります。手で書き換えないでください。',
-        columns: [
-          'タイムスタンプ',
-          '学籍番号',
-          '氏名',
-          '学年',
-          '調理担当ですか？',
-          '一緒に組みたいお友達',
-        ],
+        columns: ['タイムスタンプ', '学籍番号', '氏名', '学年', '調理担当ですか？', '一緒に組みたいお友達'],
         // 後ろ 4 列は希望時間 4 設問で、列名（設問の題）が毎年変わるので名前を持たない。
         // 突き合わせも取り込みも位置で当てる（→ input-types.ts の dayAnswerColumns）。
         yearlyColumns: 4,
@@ -311,11 +303,10 @@ export const sheetLayout: Layout[] = [
         startColumn: 1,
         // 種別で分けて並べる（→ 5-4）。残せなかった手直しは先頭に並ぶ（→ 5-3）。
         // 候補は、その行の 30 分枠を希望に含み、その枠にまだ置かれていない人の氏名で、ほかの条件に合うかは見ていない（→ issue #246 ／ #254）。
-        note: '違反（条件に合わない配置）と人数不足を並べます。反映できなかった修正は先頭に出ます。'
-          + '「候補」はその時間に出られると答えていて、まだシフトが入っていない人です（ほかの条件は見ていません）。',
+        note: '違反（条件に合わない配置）と人数不足を並べます。反映できなかった修正は先頭に出ます。' + '「候補」はその時間に出られると答えていて、まだシフトが入っていない人です（ほかの条件は見ていません）。',
         columns: ['種別', '日', '開始', '終了', '役割', '学籍番号', '氏名', '内容', 'あと何人', '候補'],
         // 候補は名前が何人も並ぶので、ほかの列（あと何人）の 5 倍の幅を取る（→ issue #246 ／ widthBaseColumn）。
-        wideColumns: { '候補': 5 },
+        wideColumns: { 候補: 5 },
       },
     ],
   },
@@ -330,8 +321,7 @@ export const sheetLayout: Layout[] = [
         heading: null,
         startColumn: 1,
         // 人ごとに 3 つ並べるだけで、順位付けも閾値も出さない（→ 5 の #7・上流の △ 5）。数え方は 5-6。
-        note: '合計時間（30 分＝0.5、準備・片付けを含む）／シフト回数（同じ役割が続いたまとまりの数）／'
-          + '準備回数（準備か片付けに入った日数）です。',
+        note: '合計時間（30 分＝0.5、準備・片付けを含む）／シフト回数（同じ役割が続いたまとまりの数）／' + '準備回数（準備か片付けに入った日数）です。',
         columns: ['学籍番号', '氏名', '合計時間', 'シフト回数', '準備回数'],
       },
     ],
@@ -370,9 +360,7 @@ export function sectionWidth(section: Section): number {
 
 /** 列数が構成と違うことを名指しする文。名前のある列は名前で、そうでない列は数で出す。 */
 export function sectionColumnsText(section: Section): string {
-  return section.columns.join(' / ')
-    + (section.yearlyColumns ? ` ＋ 毎年名前が変わる ${section.yearlyColumns} 列` : '')
-    + (section.slotColumns ? ` ＋ 時刻の ${section.slotColumns} 列` : '')
+  return section.columns.join(' / ') + (section.yearlyColumns ? ` ＋ 毎年名前が変わる ${section.yearlyColumns} 列` : '') + (section.slotColumns ? ` ＋ 時刻の ${section.slotColumns} 列` : '')
 }
 
 /** 区画の右端の列 ＝ そのシートが要る列数。テンプレートを広げる側と列数を照らす側が同じここを見る。 */
@@ -421,7 +409,5 @@ export function assignmentSection(): Section {
 
 /** マス目のシート 4 枚を、dayIndex の順に引く（→ grid）。 */
 export function gridLayouts(of: string): Layout[] {
-  return sheetLayout
-    .filter((layout) => layout.grid && layout.grid.of === of)
-    .sort((a, b) => a.grid!.dayIndex - b.grid!.dayIndex)
+  return sheetLayout.filter((layout) => layout.grid && layout.grid.of === of).sort((a, b) => a.grid!.dayIndex - b.grid!.dayIndex)
 }

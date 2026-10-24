@@ -11,16 +11,14 @@
 import { sheetColumns } from './core.ts'
 import { isPrepCleanupSurplus, prepCleanupRoles } from './count-violations.ts'
 import { answerSection, studentIdPattern } from './input-types.ts'
-import {
-  assignmentColumns, assignmentName, checkKind, fixedColumns, gridLayouts, internalError, outputColumns,
-} from './sheet-layout.ts'
+import { assignmentColumns, assignmentName, checkKind, fixedColumns, gridLayouts, internalError, outputColumns } from './sheet-layout.ts'
 import type { ByStudentId, Cell, Day, Grid, Row, Slot } from './types.ts'
 
 /** 「見たとき」のマス目の写し（→ seenGrid）。人ごとに、時刻の列の値を 1 文字ずつの記号にしたもの。 */
-export type SeenGrid = { times: string[], values: string[], rows: Record<string, string> }
+export type SeenGrid = { times: string[]; values: string[]; rows: Record<string, string> }
 
 /** マス目の中の 1 マス（0 から数える行と列）。 */
-export type GridCell = { row: number, column: number }
+export type GridCell = { row: number; column: number }
 
 /** 見出しの左側の、名前のある 3 列（→ sheet-layout.ts の gridSheet）。 */
 export function gridNamedColumns(): string[] {
@@ -55,7 +53,9 @@ export function toAssignmentGrid(assignments: Row[], day: Day | undefined, nameO
   if (!day) return { header: header, rows: [] }
 
   const slotIndex: Record<string, number> = {}
-  day.slots.forEach((slot, index) => { slotIndex[gridSlotKey(slot.start, slot.end)] = index })
+  day.slots.forEach((slot, index) => {
+    slotIndex[gridSlotKey(slot.start, slot.end)] = index
+  })
 
   const people: Record<string, string[]> = {}
   const order: string[] = []
@@ -70,19 +70,14 @@ export function toAssignmentGrid(assignments: Row[], day: Day | undefined, nameO
     const index = slotIndex[gridSlotKey(start, end)]
 
     if (index === undefined) {
-      throw internalError(
-        `割り当ての ${rowIndex + 1} 行目の ${day.date} ${start}-${end} が、その日の枠に無い`,
-      )
+      throw internalError(`割り当ての ${rowIndex + 1} 行目の ${day.date} ${start}-${end} が、その日の枠に無い`)
     }
     if (!people[studentId]) {
       people[studentId] = day.slots.map(() => '')
       order.push(studentId)
     }
     if (people[studentId][index] !== '') {
-      throw internalError(
-        `${day.date} ${start}-${end} の「${studentId}」に、`
-          + `「${people[studentId][index]}」と「${role}」の 2 つが入っている（1 セルに入るのは役割 1 つである）`,
-      )
+      throw internalError(`${day.date} ${start}-${end} の「${studentId}」に、` + `「${people[studentId][index]}」と「${role}」の 2 つが入っている（1 セルに入るのは役割 1 つである）`)
     }
     people[studentId][index] = role
   })
@@ -94,12 +89,15 @@ export function toAssignmentGrid(assignments: Row[], day: Day | undefined, nameO
     order.push(id)
   })
 
-  const shown: Record<string, ByStudentId | null | undefined> = { '学籍番号': (studentId) => studentId, '氏名': nameOf, '一緒に組みたいお友達': friendsOf }
-  const rows = order
-    .sort()
-    .map((studentId) => named
-      .map((column) => { const show = shown[column]; return show ? (show(studentId) || '') : '' })
-      .concat(people[studentId]))
+  const shown: Record<string, ByStudentId | null | undefined> = { 学籍番号: (studentId) => studentId, 氏名: nameOf, 一緒に組みたいお友達: friendsOf }
+  const rows = order.sort().map((studentId) =>
+    named
+      .map((column) => {
+        const show = shown[column]
+        return show ? show(studentId) || '' : ''
+      })
+      .concat(people[studentId]),
+  )
 
   return { header: header, rows: rows }
 }
@@ -121,11 +119,13 @@ export function fromAssignmentGrid(header: Row, dataRows: Row[], day: Day | unde
   }
 
   const slotOf: Record<string, Slot> = {}
-  day.slots.forEach((slot) => { slotOf[slot.start] = slot })
+  day.slots.forEach((slot) => {
+    slotOf[slot.start] = slot
+  })
 
   dataRows.forEach((row, rowIndex) => {
     const studentId = String(row[studentIdColumn] || '').toUpperCase()
-    const filled: { column: number, role: string }[] = []
+    const filled: { column: number; role: string }[] = []
     for (let column = named.length; column < row.length; column++) {
       const role = String(row[column] || '').trim()
       if (role !== '') filled.push({ column: column, role: role })
@@ -139,10 +139,7 @@ export function fromAssignmentGrid(header: Row, dataRows: Row[], day: Day | unde
       const headerTime = String(header[cell.column] || '')
       const slot = slotOf[headerTime]
       if (!slot) {
-        throw new Error(
-          `シート「${label}」の ${cell.column + 1} 列目の時刻「${headerTime === '' ? '（空）' : headerTime}」が、今の営業時刻に合いません。`
-            + '営業時刻を変えたときは、メニューの「生成」を押してください（修正済みのセルは残ります）',
-        )
+        throw new Error(`シート「${label}」の ${cell.column + 1} 列目の時刻「${headerTime === '' ? '（空）' : headerTime}」が、今の営業時刻に合いません。` + '営業時刻を変えたときは、メニューの「生成」を押してください（修正済みのセルは残ります）')
       }
       rows.push(buildAssignmentRow(day.date, slot, cell.role, studentId))
     })
@@ -171,7 +168,7 @@ function badStudentIdText(label: string, rowIndex: number, studentId: string): s
 
 /** 割り当ての 1 行を、列の並びのとおりに組む（氏名は空）。 */
 export function buildAssignmentRow(date: string, slot: Slot, role: string, studentId: string): Row {
-  const values: Record<string, Cell> = { '日': date, '開始': slot.start, '終了': slot.end, '役割': role, '学籍番号': studentId, '氏名': '' }
+  const values: Record<string, Cell> = { 日: date, 開始: slot.start, 終了: slot.end, 役割: role, 学籍番号: studentId, 氏名: '' }
   return assignmentColumns.map((columnName) => values[columnName])
 }
 
@@ -185,7 +182,11 @@ export const fixedNote = 'シフト作成者による修正済み'
 
 /** そのメモが手直しの印か（頭が印の文言なら、後ろに書き足してあっても印）。 */
 export function isFixedNote(note: string | undefined): boolean {
-  return String(note || '').trim().indexOf(fixedNote) === 0
+  return (
+    String(note || '')
+      .trim()
+      .indexOf(fixedNote) === 0
+  )
 }
 
 /**
@@ -267,7 +268,9 @@ export function missedEdits(seen: SeenGrid | null | undefined, header: Row, data
 }
 
 function studentIdOf(row: Row, studentIdColumn: number): string {
-  return String(row[studentIdColumn] === undefined ? '' : row[studentIdColumn]).trim().toUpperCase()
+  return String(row[studentIdColumn] === undefined ? '' : row[studentIdColumn])
+    .trim()
+    .toUpperCase()
 }
 
 function studentIdCounts(dataRows: Row[], studentIdColumn: number): Record<string, number> {
@@ -294,7 +297,9 @@ export function fixedFromAssignmentGrid(header: Row, dataRows: Row[], notes: str
 
   dataRows.forEach((row, rowIndex) => {
     const rowNotes = (notes || [])[rowIndex] || []
-    const studentId = String(row[studentIdColumn] || '').trim().toUpperCase()
+    const studentId = String(row[studentIdColumn] || '')
+      .trim()
+      .toUpperCase()
 
     for (let column = named.length; column < row.length; column++) {
       if (!isFixedNote(rowNotes[column])) continue
@@ -304,7 +309,7 @@ export function fixedFromAssignmentGrid(header: Row, dataRows: Row[], notes: str
       if (!day) throw new Error(missingDayText(label))
       if (studentId === '') throw new Error(emptyStudentIdText(label, rowIndex))
       if (!studentIdPattern.test(studentId)) throw new Error(badStudentIdText(label, rowIndex, studentId))
-      const values: Record<string, Cell> = { '日': day.date, '開始': String(header[column] || ''), '役割': role, '学籍番号': studentId }
+      const values: Record<string, Cell> = { 日: day.date, 開始: String(header[column] || ''), 役割: role, 学籍番号: studentId }
       rows.push(fixedColumns.map((columnName) => values[columnName]))
     }
   })
@@ -425,11 +430,8 @@ export function checkResultBackgrounds(rows: Row[], width: number): (string | nu
     const role = String(row[roleColumn] || '').trim()
     let color: string | null = null
     if (row[kindColumn] === checkKind.violation) {
-      color = isPrepCleanupSurplus(row[contentColumn])
-        ? checkRowHighlights.prepCleanupSurplus.color
-        : checkRowHighlights.violation.color
-    }
-    else if (role !== '' && prepCleanup.indexOf(role) === -1) color = checkRowHighlights.storeRole.color
+      color = isPrepCleanupSurplus(row[contentColumn]) ? checkRowHighlights.prepCleanupSurplus.color : checkRowHighlights.violation.color
+    } else if (role !== '' && prepCleanup.indexOf(role) === -1) color = checkRowHighlights.storeRole.color
     const colors: (string | null)[] = []
     for (let column = 0; column < width; column++) colors.push(color)
     return colors
@@ -454,7 +456,9 @@ export function violationCells(header: Row, dataRows: Row[], day: Day | undefine
 
   const rowsOf: Record<string, number[]> = {}
   dataRows.forEach((row, rowIndex) => {
-    const studentId = String(row[named.indexOf('学籍番号')] || '').trim().toUpperCase()
+    const studentId = String(row[named.indexOf('学籍番号')] || '')
+      .trim()
+      .toUpperCase()
     if (studentId === '') return
     rowsOf[studentId] = (rowsOf[studentId] || []).concat([rowIndex])
   })
@@ -482,7 +486,9 @@ export function violationCells(header: Row, dataRows: Row[], day: Day | undefine
     const start = at(violation, '開始')
     rows.forEach((row) => {
       if (start === '') {
-        whoColumns.forEach((column) => mark(row, column))
+        whoColumns.forEach((column) => {
+          mark(row, column)
+        })
         return
       }
       if (columnOf[start] !== undefined) mark(row, columnOf[start])
@@ -522,7 +528,9 @@ export function studentIdsFromAnswers(rows: Row[]): (name: string) => string[] {
   const studentIds: Record<string, string[]> = {}
 
   rows.forEach((row) => {
-    const studentId = String(row[studentIdColumn] || '').trim().toUpperCase()
+    const studentId = String(row[studentIdColumn] || '')
+      .trim()
+      .toUpperCase()
     const name = String(row[nameColumn] || '').trim()
     if (studentId === '' || name === '') return
     if (!Object.prototype.hasOwnProperty.call(studentIds, name)) studentIds[name] = []
@@ -543,11 +551,15 @@ function latestAnswerOf(rows: Row[], columnName: string, keepBlank?: boolean): B
   const values: Record<string, string> = {}
 
   rows.forEach((row) => {
-    const studentId = String(row[studentIdColumn] || '').trim().toUpperCase()
+    const studentId = String(row[studentIdColumn] || '')
+      .trim()
+      .toUpperCase()
     const value = String(row[valueColumn] || '').trim()
     if (studentId === '' || (value === '' && !keepBlank)) return
     values[studentId] = value
   })
 
-  return function (studentId: string) { return values[String(studentId).toUpperCase()] || '' }
+  return function (studentId: string) {
+    return values[String(studentId).toUpperCase()] || ''
+  }
 }

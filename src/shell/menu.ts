@@ -56,12 +56,7 @@ export function runGeneration() {
   if (notBuilt.length === 0) {
     const kindAt = outputColumns('検証結果').indexOf('種別')
     const conflicts = output['検証結果'].filter((row) => row[kindAt] === checkKind.fixConflict).length
-    SpreadsheetApp.getActive().toast(
-      'シフトを作成しました（修正済みのセルはそのまま残しています）'
-        + (conflicts === 0 ? '' : `。修正済みのうち ${conflicts} 件は反映できませんでした。理由は「検証結果」シートの先頭と、そのセルのメモを見てください`),
-      menuName,
-      conflicts === 0 ? 5 : 15,
-    )
+    SpreadsheetApp.getActive().toast('シフトを作成しました（修正済みのセルはそのまま残しています）' + (conflicts === 0 ? '' : `。修正済みのうち ${conflicts} 件は反映できませんでした。理由は「検証結果」シートの先頭と、そのセルのメモを見てください`), menuName, conflicts === 0 ? 5 : 15)
     return
   }
   // 段は全部そろっているので、ここに来るのはコードが食い違ったときだけである。何が欠けたかは実行ログに残す。
@@ -74,9 +69,7 @@ export function runGeneration() {
  * 中身はダイアログが開いてから取りに来る。開く前に投げると、止まった理由が担当者に出ないためである。
  */
 export function exportImages() {
-  const dialog = HtmlService.createHtmlOutputFromFile('export-images')
-    .setWidth(960)
-    .setHeight(640)
+  const dialog = HtmlService.createHtmlOutputFromFile('export-images').setWidth(960).setHeight(640)
   SpreadsheetApp.getUi().showModalDialog(dialog, '画像を書き出す')
 }
 

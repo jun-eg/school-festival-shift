@@ -14,14 +14,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { check } from '../../test/check.ts'
-import {
-  sheetLayout, checkKind, sectionWidth,
-  protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts, dividerColumn, widthBaseColumn,
-} from './sheet-layout.ts'
+import { sheetLayout, checkKind, sectionWidth, protectionKind, dayLabels, assignmentName, maxSlotsPerDay, outputColumns, gridLayouts, dividerColumn, widthBaseColumn } from './sheet-layout.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..', '..')
-
 
 /** 名前でシート 1 枚の区画を引く（並びの番号だと、並びが動いたとき別の枚を見る）。 */
 function sheetSectionOf(name) {
@@ -51,7 +47,10 @@ check(
 check(
   '割り当ての行の形は、シートの列ではなく別に持つ（マス目に載るため → #213）',
   [outputColumns(assignmentName), gridLayouts(assignmentName)[0].sections[0].columns],
-  [['日', '開始', '終了', '役割', '学籍番号', '氏名'], ['学籍番号', '氏名', '一緒に組みたいお友達']],
+  [
+    ['日', '開始', '終了', '役割', '学籍番号', '氏名'],
+    ['学籍番号', '氏名', '一緒に組みたいお友達'],
+  ],
 )
 
 check(
@@ -75,7 +74,11 @@ check(
 check(
   '担当者が書かないシートは「警告のみ」を全面にかける',
   sheetLayout.filter((s) => !s.staffWrites).map((s) => [s.name, s.protect.kind, Boolean(s.protect.openInputs)]),
-  [['回答', protectionKind.warningOnly, false], ['検証結果', protectionKind.warningOnly, false], ['指標', protectionKind.warningOnly, false]],
+  [
+    ['回答', protectionKind.warningOnly, false],
+    ['検証結果', protectionKind.warningOnly, false],
+    ['指標', protectionKind.warningOnly, false],
+  ],
 )
 
 check(
@@ -84,11 +87,7 @@ check(
   ['日ごとの営業時刻', '役割と必要人数', '調理責任者の学年', '委員会の指定枠', '準備・片付けのルール', '置き方のルール'],
 )
 
-check(
-  '委員会の指定枠は、役割と必要人数と同じ形である（→ 5-1 の #4）',
-  sheetLayout[0].sections.find((k) => k.heading === '委員会の指定枠')!.columns,
-  sheetLayout[0].sections.find((k) => k.heading === '役割と必要人数')!.columns,
-)
+check('委員会の指定枠は、役割と必要人数と同じ形である（→ 5-1 の #4）', sheetLayout[0].sections.find((k) => k.heading === '委員会の指定枠')!.columns, sheetLayout[0].sections.find((k) => k.heading === '役割と必要人数')!.columns)
 
 check(
   '条件入力のほかに区画を 2 つ以上持つシートは無い',
@@ -120,11 +119,7 @@ for (const layout of sheetLayout) {
 check('列名に空が無い', blankColumnNames, [])
 check('1 つの区画の中で列名が重なっていない', duplicateColumnNames, [])
 
-check(
-  '検証結果は違反と未充足を種別で分けて持ち（→ 5-4）、残せなかった手直しは 3 つ目の種別で持つ（→ 5-3）',
-  [sheetSectionOf('検証結果').columns[0], ...Object.values(checkKind)],
-  ['種別', '違反', '未充足', '反映できなかった修正'],
-)
+check('検証結果は違反と未充足を種別で分けて持ち（→ 5-4）、残せなかった手直しは 3 つ目の種別で持つ（→ 5-3）', [sheetSectionOf('検証結果').columns[0], ...Object.values(checkKind)], ['種別', '違反', '未充足', '反映できなかった修正'])
 
 check(
   '指標は 3 つを並べるだけで、順位も閾値も列に無い（→ 5 の #7）',
@@ -158,26 +153,11 @@ const csvHeadings = fs
 
 const answerSection = sheetLayout[1].sections[0]
 
-check(
-  '回答シートの並びが、タイムスタンプ ＋ 設問 9 つの 10 列である（→ 4-1・5-1 の #6）',
-  sectionWidth(answerSection),
-  csvHeadings.length,
-)
+check('回答シートの並びが、タイムスタンプ ＋ 設問 9 つの 10 列である（→ 4-1・5-1 の #6）', sectionWidth(answerSection), csvHeadings.length)
 
-check(
-  '構成が名前で持つ前の 6 列が、前回の希望データ（記録）の見出しの頭 6 列と一致する',
-  answerSection.columns,
-  csvHeadings.slice(0, answerSection.columns.length),
-)
+check('構成が名前で持つ前の 6 列が、前回の希望データ（記録）の見出しの頭 6 列と一致する', answerSection.columns, csvHeadings.slice(0, answerSection.columns.length))
 
-check(
-  '後ろ 4 列は構成が名前を持たない（列名は設問の題そのもので毎年変わる → 4-1）',
-  [
-    answerSection.yearlyColumns,
-    answerSection.columns.filter((name) => /月|日/.test(name)),
-  ],
-  [4, []],
-)
+check('後ろ 4 列は構成が名前を持たない（列名は設問の題そのもので毎年変わる → 4-1）', [answerSection.yearlyColumns, answerSection.columns.filter((name) => /月|日/.test(name))], [4, []])
 
 check(
   '毎年名前が変わる列があるのは「回答」だけである',
@@ -185,14 +165,7 @@ check(
   ['回答'],
 )
 
-check(
-  '時刻の列を持つのはマス目の 4 枚だけで、幅は 1 日に刻める枠の上限である（→ maxSlotsPerDay）',
-  [
-    sheetLayout.filter((s) => s.sections.some((k) => k.slotColumns)).map((s) => s.name),
-    sectionWidth(gridLayouts(assignmentName)[0].sections[0]),
-  ],
-  [dayLabels, 3 + maxSlotsPerDay],
-)
+check('時刻の列を持つのはマス目の 4 枚だけで、幅は 1 日に刻める枠の上限である（→ maxSlotsPerDay）', [sheetLayout.filter((s) => s.sections.some((k) => k.slotColumns)).map((s) => s.name), sectionWidth(gridLayouts(assignmentName)[0].sections[0])], [dayLabels, 3 + maxSlotsPerDay])
 
 check(
   '左の 2 列を固定するのはマス目の 4 枚だけである（右へ送っても誰の行かが読める）',
@@ -202,23 +175,12 @@ check(
 
 check(
   '右の線を持つのはマス目の 4 枚だけで、名前のある列（友達欄）を指している（→ issue #245）',
-  sheetLayout
-    .filter((s) => s.sections.some((k) => k.dividerAfter))
-    .map((s) => s.sections.map((k) => [k.columns.includes(k.dividerAfter!), dividerColumn(k)])),
+  sheetLayout.filter((s) => s.sections.some((k) => k.dividerAfter)).map((s) => s.sections.map((k) => [k.columns.includes(k.dividerAfter!), dividerColumn(k)])),
   dayLabels.map(() => [[true, 3]]),
 )
 
 check(
-  '広く取る列を持つのはマス目の 4 枚（友達欄）と検証結果（候補）で、どれも名前のある列を指し、'
-    + '物差しは広げない列のうち一番右である — マス目は時刻の右端、検証結果は「あと何人」（→ issue #245・#246）',
-  sheetLayout
-    .filter((s) => s.sections.some((k) => k.wideColumns))
-    .map((s) => [s.name, s.sections.map((k) => [
-      Object.keys(k.wideColumns!).every((name) => k.columns.includes(name)),
-      widthBaseColumn(k),
-    ])]),
-  [
-    ...dayLabels.map((name) => [name, [[true, 3 + maxSlotsPerDay]]]),
-    ['検証結果', [[true, 9]]],
-  ],
+  '広く取る列を持つのはマス目の 4 枚（友達欄）と検証結果（候補）で、どれも名前のある列を指し、' + '物差しは広げない列のうち一番右である — マス目は時刻の右端、検証結果は「あと何人」（→ issue #245・#246）',
+  sheetLayout.filter((s) => s.sections.some((k) => k.wideColumns)).map((s) => [s.name, s.sections.map((k) => [Object.keys(k.wideColumns!).every((name) => k.columns.includes(name)), widthBaseColumn(k)])]),
+  [...dayLabels.map((name) => [name, [[true, 3 + maxSlotsPerDay]]]), ['検証結果', [[true, 9]]]],
 )

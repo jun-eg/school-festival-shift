@@ -60,11 +60,7 @@ export function checkStructure(spreadsheet: Spreadsheet): Breakage[] {
   if (breakages.length === 0) return breakages
 
   // 黙って直さない。生成・書き換え後の数え直し・画像の書き出しのどれからも呼ばれるので、「生成」とは言わない。
-  throw new Error(
-    `シートの見出しや列が ${breakages.length} か所変わっているため、処理できません。`
-      + '元に戻すか、テンプレートをコピーし直して条件を入れ直してください。\n'
-      + breakages.map(breakageToText).join('\n'),
-  )
+  throw new Error(`シートの見出しや列が ${breakages.length} か所変わっているため、処理できません。` + '元に戻すか、テンプレートをコピーし直して条件を入れ直してください。\n' + breakages.map(breakageToText).join('\n'))
 }
 
 /** 崩れ 1 つを、場所を名指しした 1 行にする。 */
@@ -80,8 +76,7 @@ export function breakageToText(breakage: Breakage): string {
     return `${where} に、本来ない「${breakage.actual[0]}」があります`
   }
   const width = breakage.expected.length > 1 ? `から ${breakage.expected.length} 列` : ''
-  return `${where}${width} が本来と違います。`
-    + `今: ${breakage.actual.map(showBlank).join(' / ')} ／ 本来: ${breakage.expected.join(' / ')}`
+  return `${where}${width} が本来と違います。` + `今: ${breakage.actual.map(showBlank).join(' / ')} ／ 本来: ${breakage.expected.join(' / ')}`
 }
 
 /** シートの列が構成の要る数だけあるかを見る（列をまとめて消されたとき、範囲外の例外より先に名指しする）。 */
@@ -105,10 +100,7 @@ function checkColumnCount(sheet: Sheet, layout: Layout, breakages: Breakage[]): 
  */
 function readHeaderRows(sheet: Sheet, layout: Layout): string[][] {
   const rowCount = Math.min(headerRowCount(layout), sheet.getMaxRows())
-  const columnCount = Math.min(
-    Math.max(sectionRightEdge(layout), sheet.getLastColumn()),
-    sheet.getMaxColumns(),
-  )
+  const columnCount = Math.min(Math.max(sectionRightEdge(layout), sheet.getLastColumn()), sheet.getMaxColumns())
   return sheet
     .getRange(1, 1, rowCount, columnCount)
     .getValues()

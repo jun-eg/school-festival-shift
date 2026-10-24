@@ -42,7 +42,7 @@ export function takeIn(rows: Row[]): Wish[] {
   const section = answerSection()
   const columns = section.columns
   const order: string[] = []
-  const kept: Record<string, { wish: Wish, at: string, rowIndex: number }> = {}
+  const kept: Record<string, { wish: Wish; at: string; rowIndex: number }> = {}
 
   eachFilledRow(source, section, rows, (row, rowIndex) => {
     const coming = {
@@ -63,10 +63,7 @@ export function takeIn(rows: Row[]): Wish[] {
     // ② タイムスタンプで畳む ／ ③ 採るのは後から来た行
     if (coming.at === kept[studentId].at) {
       // どちらを採るか決まらないので止まる。
-      throw new Error(
-        `学籍番号「${studentId}」の回答が、同じ時刻（${coming.at}）に 2 つあります`
-          + `（${whereIs(source, kept[studentId].rowIndex)}と ${sheetRowOf(source, rowIndex)} 行目）。どちらかの行を消してください`,
-      )
+      throw new Error(`学籍番号「${studentId}」の回答が、同じ時刻（${coming.at}）に 2 つあります` + `（${whereIs(source, kept[studentId].rowIndex)}と ${sheetRowOf(source, rowIndex)} 行目）。どちらかの行を消してください`)
     }
     if (takesOver(coming.at, kept[studentId].at)) kept[studentId] = coming
   })
@@ -84,10 +81,7 @@ export function readTimestamp(source: string, columns: string[], row: Row, rowIn
   const cell = cellOf(source, columns, row, rowIndex, timestampColumn)
   if (!timestampPattern.test(String(cell.value))) {
     // 同じ人の行を畳むのに使うので、直してから通す。
-    throw new Error(
-      `${whereIs(source, rowIndex)}のタイムスタンプが日時になっていません（今: ${showBlankValue(cell.value)}）。`
-        + '直してから、もう一度押してください',
-    )
+    throw new Error(`${whereIs(source, rowIndex)}のタイムスタンプが日時になっていません（今: ${showBlankValue(cell.value)}）。` + '直してから、もう一度押してください')
   }
   return String(cell.value)
 }

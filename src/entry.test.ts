@@ -17,7 +17,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { build, renderHtml, renderMain, renderScript } from '../build.mjs'
+import { build, renderHtml, renderScript } from '../build.mjs'
 import { check } from '../test/check.ts'
 import { gasGlobal } from '../test/fakes/spreadsheet.ts'
 import { entryPoints } from './entry.ts'
@@ -59,7 +59,10 @@ function mismatch(listed, expected) {
   }
 }
 
-const htmlNames = fs.readdirSync(path.join(srcDir, 'ui')).filter((name) => name.endsWith('.html')).map((name) => name.replace('.html', ''))
+const htmlNames = fs
+  .readdirSync(path.join(srcDir, 'ui'))
+  .filter((name) => name.endsWith('.html'))
+  .map((name) => name.replace('.html', ''))
 const calledByHtml = htmlNames.flatMap((name) => calledFromHtml(fs.readFileSync(path.join(srcDir, 'ui', `${name}.ts`), 'utf8')))
 const triggers = ['onOpen', 'onEdit']
 const runByHand = ['buildTemplate']
@@ -71,18 +74,13 @@ const listedNames = Object.keys(entryPoints)
 check(
   '① HTML が google.script.run で呼ぶ関数は、2 枚で 2 つ（exportImagesFromDialog ／ createFormFromPicker）',
   [htmlNames.sort(), calledByHtml.sort()],
-  [['export-images', 'form-picker'], ['createFormFromPicker', 'exportImagesFromDialog']],
+  [
+    ['export-images', 'form-picker'],
+    ['createFormFromPicker', 'exportImagesFromDialog'],
+  ],
 )
-check(
-  '① 一覧に足りない名前も、呼ばれていない名前も無い（トリガー・menuItems・HTML の呼び先・buildTemplate と一致する）',
-  mismatch(listedNames, expectedNames),
-  { notListed: [], notCalled: [] },
-)
-check(
-  '① 一覧の名前はどれも関数で、メニューの 4 項目は一覧にある',
-  [listedNames.filter((name) => typeof entryPoints[name] !== 'function'), menuItems.map((item) => item.functionName).filter((name) => listedNames.indexOf(name) === -1)],
-  [[], []],
-)
+check('① 一覧に足りない名前も、呼ばれていない名前も無い（トリガー・menuItems・HTML の呼び先・buildTemplate と一致する）', mismatch(listedNames, expectedNames), { notListed: [], notCalled: [] })
+check('① 一覧の名前はどれも関数で、メニューの 4 項目は一覧にある', [listedNames.filter((name) => typeof entryPoints[name] !== 'function'), menuItems.map((item) => item.functionName).filter((name) => listedNames.indexOf(name) === -1)], [[], []])
 
 // ---- ② main.gs の最上位の function ------------------------------------------
 
@@ -91,42 +89,43 @@ await build(outdir)
 const main = fs.readFileSync(path.join(outdir, 'main.gs'), 'utf8')
 const topLevelFunctions = [...main.matchAll(/^function (\w+)\(/gm)].map((match) => match[1])
 
-check(
-  '② npm run build は dist に 4 つ（main.gs ・ HTML 2 枚 ・ appsscript.json）を出す',
-  fs.readdirSync(outdir).sort(),
-  ['appsscript.json', 'export-images.html', 'form-picker.html', 'main.gs'],
-)
-check(
-  '② main.gs の最上位の function 宣言は、一覧の名前と過不足なく一致する',
-  mismatch(topLevelFunctions, listedNames),
-  { notListed: [], notCalled: [] },
-)
-check(
-  '② appsscript.json は src/ の写しである',
-  fs.readFileSync(path.join(outdir, 'appsscript.json'), 'utf8') === fs.readFileSync(path.join(srcDir, 'appsscript.json'), 'utf8'),
-  true,
-)
+check('② npm run build は dist に 4 つ（main.gs ・ HTML 2 枚 ・ appsscript.json）を出す', fs.readdirSync(outdir).sort(), ['appsscript.json', 'export-images.html', 'form-picker.html', 'main.gs'])
+check('② main.gs の最上位の function 宣言は、一覧の名前と過不足なく一致する', mismatch(topLevelFunctions, listedNames), { notListed: [], notCalled: [] })
+check('② appsscript.json は src/ の写しである', fs.readFileSync(path.join(outdir, 'appsscript.json'), 'utf8') === fs.readFileSync(path.join(srcDir, 'appsscript.json'), 'utf8'), true)
 
 // ---- ③ 出した main.gs が動く ------------------------------------------------
 // main.gs の最上位の function を、そのまま Node で読み込めるようにして呼ぶ（Apps Script が名前で引くのと同じ引き方）。
 
 const added: any[] = []
 const menu = {
-  addItem(label, functionName) { added.push({ label, functionName }); return menu },
-  addSeparator() { added.push('---'); return menu },
-  addToUi() { added.push('shown') },
+  addItem(label, functionName) {
+    added.push({ label, functionName })
+    return menu
+  },
+  addSeparator() {
+    added.push('---')
+    return menu
+  },
+  addToUi() {
+    added.push('shown')
+  },
 }
-gasGlobal.SpreadsheetApp = { getUi() { return { createMenu(name) { added.push(name); return menu } } } }
+gasGlobal.SpreadsheetApp = {
+  getUi() {
+    return {
+      createMenu(name) {
+        added.push(name)
+        return menu
+      },
+    }
+  },
+}
 const loadable = path.join(outdir, 'main-loadable.mjs')
 fs.writeFileSync(loadable, `${main}\nexport { ${topLevelFunctions.join(', ')} }\n`)
 const gas = await import(pathToFileURL(loadable).href)
 gas.onOpen()
 
-check(
-  '③ main.gs の onOpen は、メニュー「シフト」に 4 項目を出す（来年用に空にするは区切り線の下）',
-  added,
-  ['シフト', ...menuItems.flatMap((item) => ((item.separatorBefore ? ['---'] : []) as any[]).concat([{ label: item.label, functionName: item.functionName }])), 'shown'],
-)
+check('③ main.gs の onOpen は、メニュー「シフト」に 4 項目を出す（来年用に空にするは区切り線の下）', added, ['シフト', ...menuItems.flatMap((item) => ((item.separatorBefore ? ['---'] : []) as any[]).concat([{ label: item.label, functionName: item.functionName }])), 'shown'])
 check(
   '③ メニューの 4 項目の functionName は、どれも main.gs の最上位の関数である',
   menuItems.map((item) => typeof gas[item.functionName]),
@@ -135,7 +134,12 @@ check(
 check(
   '③ 4 項目の表示名と呼び先は、これまでと同じである（担当者の操作を増やさない）',
   menuItems.map((item) => [item.label, item.functionName]),
-  [['フォームを作る', 'createForm'], ['生成', 'runGeneration'], ['画像を書き出す', 'exportImages'], ['来年用に空にする', 'clearForNextYear']],
+  [
+    ['フォームを作る', 'createForm'],
+    ['生成', 'runGeneration'],
+    ['画像を書き出す', 'exportImages'],
+    ['来年用に空にする', 'clearForNextYear'],
+  ],
 )
 
 // ---- ④ HTML -----------------------------------------------------------------
@@ -145,7 +149,16 @@ for (const name of htmlNames) {
   const script = renderScript(`${name}.ts`)
   check(
     `④ ${name}.html は外から読み込む script を持たず、src/ui/${name}.ts を変換した中身がそのまま入っている`,
-    [/<script[^>]*\bsrc=/i.test(html), html.includes(script.split('\n').map((line) => (line === '' ? line : `      ${line}`)).join('\n')), html === renderHtml(name)],
+    [
+      /<script[^>]*\bsrc=/i.test(html),
+      html.includes(
+        script
+          .split('\n')
+          .map((line) => (line === '' ? line : `      ${line}`))
+          .join('\n'),
+      ),
+      html === renderHtml(name),
+    ],
     [false, true, true],
   )
 }
@@ -155,7 +168,10 @@ for (const name of htmlNames) {
 check(
   '⑤ 一覧から 1 つ落とすと、足りない名前を名指しする。余計な名前を足すと、呼ばれていない名前を名指しする',
   [
-    mismatch(listedNames.filter((name) => name !== 'exportImagesFromDialog'), expectedNames),
+    mismatch(
+      listedNames.filter((name) => name !== 'exportImagesFromDialog'),
+      expectedNames,
+    ),
     mismatch([...listedNames, 'oldRemovedFunction'], expectedNames),
   ],
   [
@@ -166,8 +182,8 @@ check(
 check(
   '⑤ HTML の呼び先を拾う: 成功・失敗のハンドラは数えず、鎖のサーバー側の関数を返す（ハンドラ無しでも、1 ファイルに 2 か所あっても）。google.script.run が無ければ空である',
   [
-    calledFromHtml("google.script.run\n  .withSuccessHandler(show)\n  .withFailureHandler(function (e) { say(e.message) })\n  .someServerFunction({ a: 1 })"),
-    calledFromHtml("google.script.run.withSuccessHandler(done).other()"),
+    calledFromHtml('google.script.run\n  .withSuccessHandler(show)\n  .withFailureHandler(function (e) { say(e.message) })\n  .someServerFunction({ a: 1 })'),
+    calledFromHtml('google.script.run.withSuccessHandler(done).other()'),
     calledFromHtml('document.getElementById("x")'),
     calledFromHtml('google.script.run.f(x)'),
     calledFromHtml('google.script.run.withSuccessHandler(function (a) { b(a) }).first()\ngoogle.script.run.second({ k: 1 })'),

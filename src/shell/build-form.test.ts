@@ -34,8 +34,12 @@ const { FormApp, forms: createdForms } = createFormApp(books)
 gasGlobal.SpreadsheetApp = { ProtectionType: { SHEET: 'SHEET' }, BorderStyle: { SOLID_THICK: 'solid-thick' }, flush() {} }
 gasGlobal.FormApp = FormApp
 gasGlobal.Utilities = {
-  base64Decode(base64) { return [...base64].map((c) => c.charCodeAt(0)) },
-  newBlob(bytes, mimeType, fileName) { return { bytes, mimeType, fileName } },
+  base64Decode(base64) {
+    return [...base64].map((c) => c.charCodeAt(0))
+  },
+  newBlob(bytes, mimeType, fileName) {
+    return { bytes, mimeType, fileName }
+  },
 }
 console.log = () => {}
 
@@ -65,7 +69,9 @@ const lastYearRows = [
 function putBusinessHours(book, rows) {
   const sheet = book.getSheetByName('条件入力')
   sheet.getRange(3, 1, 4, 6).setValues(Array.from({ length: 4 }, () => Array(6).fill('')))
-  rows.forEach((row, i) => sheet.getRange(3 + i, 1, 1, row.length).setValues([row]))
+  rows.forEach((row, i) => {
+    sheet.getRange(3 + i, 1, 1, row.length).setValues([row])
+  })
   return book
 }
 
@@ -115,7 +121,10 @@ check(
 check(
   '① 選択肢が 4-1 の表どおりに入った',
   form.items.filter((item) => item.kind === 'radio').map((item) => [item.title, item.choices]),
-  [['学年', ['1年生', '2年生', '3年生', '4年生']], ['調理担当ですか？', ['はい', 'いいえ']]],
+  [
+    ['学年', ['1年生', '2年生', '3年生', '4年生']],
+    ['調理担当ですか？', ['はい', 'いいえ']],
+  ],
 )
 
 check(
@@ -143,13 +152,13 @@ check(
 
 check(
   '① 長文回答の説明文に、その日の営業時間と例 3 つが入った（→ 4-2）',
-  form.items.filter((item) => item.kind === 'paragraph').map((item) => [
-    item.helpText.includes('8:00-'),
-    item.helpText.includes('10:00-15:00'),
-    item.helpText.includes('10:00-12:00,13:00-15:00'),
-    item.helpText.includes('00:00-00:00'),
-  ]),
-  [[true, true, true, true], [true, true, true, true], [true, true, true, true], [true, true, true, true]],
+  form.items.filter((item) => item.kind === 'paragraph').map((item) => [item.helpText.includes('8:00-'), item.helpText.includes('10:00-15:00'), item.helpText.includes('10:00-12:00,13:00-15:00'), item.helpText.includes('00:00-00:00')]),
+  [
+    [true, true, true, true],
+    [true, true, true, true],
+    [true, true, true, true],
+    [true, true, true, true],
+  ],
 )
 
 check(
@@ -158,32 +167,13 @@ check(
   [rosterImage],
 )
 
-check(
-  '② 画像が選ばれていなければ、フォームを 1 つも作らずに名指しで止まる',
-  [
-    whyItStopped(() => rosterImageFrom(null))?.includes('調理名簿の画像を選んでください'),
-    whyItStopped(() => rosterImageFrom(asGas({ mimeType: 'image/png' })))?.includes('調理名簿の画像を選んでください'),
-  ],
-  [true, true],
-)
+check('② 画像が選ばれていなければ、フォームを 1 つも作らずに名指しで止まる', [whyItStopped(() => rosterImageFrom(null))?.includes('調理名簿の画像を選んでください'), whyItStopped(() => rosterImageFrom(asGas({ mimeType: 'image/png' })))?.includes('調理名簿の画像を選んでください')], [true, true])
 
-check(
-  '③ 回答先が、このスプレッドシート自身に向いた（担当者が紐付けない）',
-  form.destination,
-  { type: 'SPREADSHEET', id: 'this-spreadsheet' },
-)
+check('③ 回答先が、このスプレッドシート自身に向いた（担当者が紐付けない）', form.destination, { type: 'SPREADSHEET', id: 'this-spreadsheet' })
 
-check(
-  '③ フォームの名前は、担当者が付けたこのファイルの名前である（文言を発明しない）',
-  form.title,
-  book.getName(),
-)
+check('③ フォームの名前は、担当者が付けたこのファイルの名前である（文言を発明しない）', form.title, book.getName())
 
-check(
-  '③ 配る URL が返る（担当者が LINE ノートに貼る → 2 の一覧 4）',
-  [built.url, built.editUrl],
-  [form.getPublishedUrl(), form.getEditUrl()],
-)
+check('③ 配る URL が返る（担当者が LINE ノートに貼る → 2 の一覧 4）', [built.url, built.editUrl], [form.getPublishedUrl(), form.getEditUrl()])
 
 check(
   '④ シートは 5 枚のままで、構成の並びも変わっていない',
@@ -193,23 +183,11 @@ check(
 
 const answerSheet = book.getSheetByName('回答')
 
-check(
-  '④ 「回答」はフォームが作ったシートで、紐付きを持っている',
-  [answerSheet.getFormUrl(), answerSheet.frozenRows],
-  [form.getEditUrl(), 1],
-)
+check('④ 「回答」はフォームが作ったシートで、紐付きを持っている', [answerSheet.getFormUrl(), answerSheet.frozenRows], [form.getEditUrl(), 1])
 
-check(
-  '④ 「回答」の見出しが、タイムスタンプ ＋ 置いた設問の題 9 つである（後ろ 4 列は今年の題 → 4-1）',
-  answerSheet.getRange(1, 1, 1, 10).getValues()[0],
-  ['タイムスタンプ', ...lastYearTitles],
-)
+check('④ 「回答」の見出しが、タイムスタンプ ＋ 置いた設問の題 9 つである（後ろ 4 列は今年の題 → 4-1）', answerSheet.getRange(1, 1, 1, 10).getValues()[0], ['タイムスタンプ', ...lastYearTitles])
 
-check(
-  '④ 「回答」の頭 6 列は、構成が名前で持っている列と一致する',
-  answerSheet.getRange(1, 1, 1, 6).getValues()[0],
-  sheetLayout.filter((layout) => layout.name === '回答')[0].sections[0].columns,
-)
+check('④ 「回答」の頭 6 列は、構成が名前で持っている列と一致する', answerSheet.getRange(1, 1, 1, 6).getValues()[0], sheetLayout.filter((layout) => layout.name === '回答')[0].sections[0].columns)
 
 check(
   '④ 「回答」に警告のみの保護がかかっている（生成シートである）',
@@ -228,50 +206,25 @@ check(
 const formsBeforeSecondRun = createdForms.length
 const secondRun = whyItStopped(() => buildFormOn(book, asGas(rosterImage)))
 
-check(
-  '⑤ 2 回目は、すでに紐付いていることを名指しし、「来年用に空にする」へ向けて止まる（テンプレートには向けない → #263）',
-  [
-    secondRun?.includes('もうフォームがあります'),
-    secondRun?.includes('「シフト」→「来年用に空にする」を押してから'),
-    secondRun?.includes('テンプレート'),
-  ],
-  [true, true, false],
-)
+check('⑤ 2 回目は、すでに紐付いていることを名指しし、「来年用に空にする」へ向けて止まる（テンプレートには向けない → #263）', [secondRun?.includes('もうフォームがあります'), secondRun?.includes('「シフト」→「来年用に空にする」を押してから'), secondRun?.includes('テンプレート')], [true, true, false])
 
-check(
-  '⑤ 止まったとき、フォームを 1 つも作っていない',
-  createdForms.length,
-  formsBeforeSecondRun,
-)
+check('⑤ 止まったとき、フォームを 1 つも作っていない', createdForms.length, formsBeforeSecondRun)
 
 const bookWithAnswers = freshTemplate('with-answers')
-bookWithAnswers.getSheetByName('回答').getRange(2, 1, 1, 2).setValues([['2025/09/23 16:31:09', 'EED2349987']])
+bookWithAnswers
+  .getSheetByName('回答')
+  .getRange(2, 1, 1, 2)
+  .setValues([['2025/09/23 16:31:09', 'EED2349987']])
 const stoppedOnAnswers = whyItStopped(() => buildFormOn(bookWithAnswers, asGas(rosterImage)))
 
-check(
-  '⑤ 回答シートに中身があるときは、消さずに名指しし、「来年用に空にする」へ向けて止まる（→ #263）',
-  [
-    stoppedOnAnswers?.includes('すでに 1 行ある'),
-    stoppedOnAnswers?.includes('フォームを作れません'),
-    stoppedOnAnswers?.includes('「シフト」→「来年用に空にする」を押してから'),
-  ],
-  [true, true, true],
-)
+check('⑤ 回答シートに中身があるときは、消さずに名指しし、「来年用に空にする」へ向けて止まる（→ #263）', [stoppedOnAnswers?.includes('すでに 1 行ある'), stoppedOnAnswers?.includes('フォームを作れません'), stoppedOnAnswers?.includes('「シフト」→「来年用に空にする」を押してから')], [true, true, true])
 
-check(
-  '⑤ 止まったとき、書いてあった行を消していない',
-  bookWithAnswers.getSheetByName('回答').getRange(2, 1, 1, 2).getValues()[0],
-  ['2025/09/23 16:31:09', 'EED2349987'],
-)
+check('⑤ 止まったとき、書いてあった行を消していない', bookWithAnswers.getSheetByName('回答').getRange(2, 1, 1, 2).getValues()[0], ['2025/09/23 16:31:09', 'EED2349987'])
 
 const bookWithoutAnswerSheet = freshTemplate('no-answer-sheet')
 bookWithoutAnswerSheet.deleteSheet(bookWithoutAnswerSheet.getSheetByName('回答'))
 
-check(
-  '⑤ 「回答」が無いときは、シートの名前を出して止まる',
-  whyItStopped(() => buildFormOn(bookWithoutAnswerSheet, asGas(rosterImage)))?.includes('シート「回答」が見つかりません'),
-  true,
-)
+check('⑤ 「回答」が無いときは、シートの名前を出して止まる', whyItStopped(() => buildFormOn(bookWithoutAnswerSheet, asGas(rosterImage)))?.includes('シート「回答」が見つかりません'), true)
 
 // フォームが作るシートの見出しが構成と違う形（設問の題を 1 つ変えて作らせる）。
 const bookWithOddHeader = freshTemplate('odd-header')
@@ -296,33 +249,15 @@ const stoppedOnHeader = whyItStopped(() => {
   }
 })
 
-check(
-  '⑤ フォームが作った回答シートの見出しが、置いた題と違えば、繋がずに名指しして止まる',
-  [
-    stoppedOnHeader?.includes('いま置いた設問の題と違う'),
-    stoppedOnHeader?.includes('名前'),
-    stoppedOnHeader?.includes('繋がずに止まる'),
-  ],
-  [true, true, true],
-)
+check('⑤ フォームが作った回答シートの見出しが、置いた題と違えば、繋がずに名指しして止まる', [stoppedOnHeader?.includes('いま置いた設問の題と違う'), stoppedOnHeader?.includes('名前'), stoppedOnHeader?.includes('繋がずに止まる')], [true, true, true])
 
-check(
-  '⑤ 止まったとき、テンプレートの「回答」を消していない',
-  [
-    bookWithOddHeader.getSheetByName('回答') !== null,
-    bookWithOddHeader.getSheetByName('フォームの回答 1') !== null,
-  ],
-  [true, true],
-)
+check('⑤ 止まったとき、テンプレートの「回答」を消していない', [bookWithOddHeader.getSheetByName('回答') !== null, bookWithOddHeader.getSheetByName('フォームの回答 1') !== null], [true, true])
 
 // ---- ⑥ 題と営業時間は「日ごとの営業時刻」から出る（→ 4-1・4-2） -------------
 
 check(
   '⑥ 前回の日付と営業時刻を入れて作ったフォームが、4 の表の題と営業時間になる（→ 仕様 #2）',
-  form.items.filter((item) => item.kind === 'paragraph').map((item) => [
-    item.title,
-    item.helpText.split('\n')[0],
-  ]),
+  form.items.filter((item) => item.kind === 'paragraph').map((item) => [item.title, item.helpText.split('\n')[0]]),
   [
     ['11月1日(準備日)', '営業時間は 8:00-21:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
     ['11月2日(学祭1日目)', '営業時間は 8:00-20:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
@@ -344,10 +279,7 @@ const thisYearForm = createdForms[createdForms.length - 1]
 
 check(
   '⑥ 今年の日付を入れると、題も説明文の営業時間も今年のものになる',
-  thisYearForm.items.filter((item) => item.kind === 'paragraph').map((item) => [
-    item.title,
-    item.helpText.split('\n')[0],
-  ]),
+  thisYearForm.items.filter((item) => item.kind === 'paragraph').map((item) => [item.title, item.helpText.split('\n')[0]]),
   [
     ['10月29日(準備日)', '営業時間は 9:00-22:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
     ['10月30日(学祭1日目)', '営業時間は 9:30-19:00 です。出られる時間帯を「10:00-15:00」のように書いてください。'],
@@ -356,14 +288,18 @@ check(
   ],
 )
 
-check(
-  '⑥ 列名が今年の題に変わっても、「回答」に繋がる（見出しは位置で当てる → 4-1）',
-  thisYearBook.getSheetByName('回答').getRange(1, 1, 1, 10).getValues()[0],
-  [
-    'タイムスタンプ', '学籍番号', '氏名', '学年', '調理担当ですか？', '一緒に組みたいお友達',
-    '10月29日(準備日)', '10月30日(学祭1日目)', '10月31日(学祭2日目)', '11月1日(片付け)',
-  ],
-)
+check('⑥ 列名が今年の題に変わっても、「回答」に繋がる（見出しは位置で当てる → 4-1）', thisYearBook.getSheetByName('回答').getRange(1, 1, 1, 10).getValues()[0], [
+  'タイムスタンプ',
+  '学籍番号',
+  '氏名',
+  '学年',
+  '調理担当ですか？',
+  '一緒に組みたいお友達',
+  '10月29日(準備日)',
+  '10月30日(学祭1日目)',
+  '10月31日(学祭2日目)',
+  '11月1日(片付け)',
+])
 
 check(
   '⑥ 残り 5 設問と画像アイテムは、今年の入力で 1 文字も動いていない',
@@ -381,19 +317,11 @@ function stoppedOn(id, rows) {
 
 const onEmpty = stoppedOn('no-hours', [])
 
-check(
-  '⑥ 「日ごとの営業時刻」が空のまま押されたら、名指しして止まる（→ 2 の止まる箇所 9）',
-  [onEmpty.stopped?.includes('「日ごとの営業時刻」が空です'), onEmpty.stopped?.includes('4 日分入れて')],
-  [true, true],
-)
+check('⑥ 「日ごとの営業時刻」が空のまま押されたら、名指しして止まる（→ 2 の止まる箇所 9）', [onEmpty.stopped?.includes('「日ごとの営業時刻」が空です'), onEmpty.stopped?.includes('4 日分入れて')], [true, true])
 
 const onThreeRows = stoppedOn('three-days', lastYearRows.slice(0, 3))
 
-check(
-  '⑥ 4 行でなければ、何行あるかとラベル 4 つを名指しして止まる',
-  [onThreeRows.stopped?.includes('3 行です'), onThreeRows.stopped?.includes('準備日・学祭1日目・学祭2日目・片付け')],
-  [true, true],
-)
+check('⑥ 4 行でなければ、何行あるかとラベル 4 つを名指しして止まる', [onThreeRows.stopped?.includes('3 行です'), onThreeRows.stopped?.includes('準備日・学祭1日目・学祭2日目・片付け')], [true, true])
 
 const onReversed = stoppedOn('reversed', [
   ['2025-11-01', '08:00', '08:00', '08:00', '08:00', '21:00'],
@@ -402,54 +330,38 @@ const onReversed = stoppedOn('reversed', [
   ['2025-11-04', '15:00', '08:00', '08:00', '08:00', '15:00'],
 ])
 
-check(
-  '⑥ 5 時刻が早い順でなければ、行と時刻を名指しして止まる（黙って並べ替えない → 5-1 の #1）',
-  [onReversed.stopped?.includes('左から早い順に書いてください'), onReversed.stopped?.includes('「準備開始」が 15:00')],
-  [true, true],
-)
+check('⑥ 5 時刻が早い順でなければ、行と時刻を名指しして止まる（黙って並べ替えない → 5-1 の #1）', [onReversed.stopped?.includes('左から早い順に書いてください'), onReversed.stopped?.includes('「準備開始」が 15:00')], [true, true])
 
-check(
-  '⑥ 3 つとも、フォームを 1 つも作らずに止まっている（作りかけが残らない）',
-  [onEmpty.madeForms, onThreeRows.madeForms, onReversed.madeForms],
-  [0, 0, 0],
-)
+check('⑥ 3 つとも、フォームを 1 つも作らずに止まっている（作りかけが残らない）', [onEmpty.madeForms, onThreeRows.madeForms, onReversed.madeForms], [0, 0, 0])
 
 check(
   '⑥ 止まったとき、テンプレートの「回答」はそのままで、シートも 8 枚のままである',
-  [onEmpty.book, onThreeRows.book, onReversed.book].map((one) => [
-    one.getSheets().length,
-    one.getSheetByName('回答') !== null,
-    one.getSheetByName('回答').getFormUrl(),
-  ]),
-  [[8, true, null], [8, true, null], [8, true, null]],
+  [onEmpty.book, onThreeRows.book, onReversed.book].map((one) => [one.getSheets().length, one.getSheetByName('回答') !== null, one.getSheetByName('回答').getFormUrl()]),
+  [
+    [8, true, null],
+    [8, true, null],
+    [8, true, null],
+  ],
 )
 
 // ---- ⑦ URL 欄 ----------------------------------------------------------------
 
-check(
-  '⑦ フォームを作ると、条件入力の C9 に配る用、C10 に編集用の URL が入る（見出しはそのまま）',
-  book.getSheetByName('条件入力').getRange(9, 1, 2, 3).getValues(),
-  [
-    ['配布用googleフォームurl:', '', form.getPublishedUrl()],
-    ['編集用googleフォームurl:', '', form.getEditUrl()],
-  ],
-)
+check('⑦ フォームを作ると、条件入力の C9 に配る用、C10 に編集用の URL が入る（見出しはそのまま）', book.getSheetByName('条件入力').getRange(9, 1, 2, 3).getValues(), [
+  ['配布用googleフォームurl:', '', form.getPublishedUrl()],
+  ['編集用googleフォームurl:', '', form.getEditUrl()],
+])
 
 check(
   '⑦ 止まったときは、URL 欄は空のままである（フォームが作られていない）',
   [onEmpty.book, onThreeRows.book, onReversed.book].map((one) => one.getSheetByName('条件入力').getRange(9, 3, 2, 1).getValues()),
-  [[[''], ['']], [[''], ['']], [[''], ['']]],
+  [
+    [[''], ['']],
+    [[''], ['']],
+    [[''], ['']],
+  ],
 )
 
 // 5 行目・6 行目（7・8 行目）は営業時刻として読む — 多すぎる行は名指しで止まる。9 行目より下は読まない。
-const onSixRows = stoppedOn('six-days', [
-  ...lastYearRows,
-  ['2025-11-05', '08:00', '08:00', '08:00', '08:00', '15:00'],
-  ['2025-11-06', '08:00', '08:00', '08:00', '08:00', '15:00'],
-])
+const onSixRows = stoppedOn('six-days', [...lastYearRows, ['2025-11-05', '08:00', '08:00', '08:00', '08:00', '15:00'], ['2025-11-06', '08:00', '08:00', '08:00', '08:00', '15:00']])
 
-check(
-  '⑦ 「日ごとの営業時刻」に 6 行（8 行目まで）書けば、6 行として名指しして止まる — URL 欄の 9 行目は数えない',
-  [onSixRows.stopped?.includes('6 行です'), onSixRows.madeForms],
-  [true, 0],
-)
+check('⑦ 「日ごとの営業時刻」に 6 行（8 行目まで）書けば、6 行として名指しして止まる — URL 欄の 9 行目は数えない', [onSixRows.stopped?.includes('6 行です'), onSixRows.madeForms], [true, 0])

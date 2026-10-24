@@ -10,17 +10,15 @@
  */
 
 import { sheetColumns, sheetSection } from './core.ts'
-import {
-  cookAnswers, eachFilledRow, prepCleanupItems, readDate, readStudentId, readText, readTime, toMinutes, whereIs,
-} from './input-types.ts'
+import { cookAnswers, eachFilledRow, prepCleanupItems, readDate, readStudentId, readText, readTime, toMinutes, whereIs } from './input-types.ts'
 import { checkKind, internalError } from './sheet-layout.ts'
 import type { Candidate, Cell, Conditions, Day, Placement, Row, Slot, TimeKey, Wish } from './types.ts'
 
 /** 人のその日が、午前・午後・準備・片付けのどれに入っているか（→ 規則 3 の ①）。 */
-export type DayState = { morning: boolean, afternoon: boolean, prep: boolean, cleanup: boolean }
+export type DayState = { morning: boolean; afternoon: boolean; prep: boolean; cleanup: boolean }
 
 /** 準備・片付けの帯 1 つ（→ prepCleanupBands）。 */
-export type Band = { role: string, from: TimeKey, to: TimeKey }
+export type Band = { role: string; from: TimeKey; to: TimeKey }
 
 /** 規則が名指しする役割名。割り当ての「役割」の値と突き合わせる（→ 3 の「規則が名指しする役割名」）。 */
 export const ruleRoles = {
@@ -110,23 +108,21 @@ export function countViolations(assignments: Row[] | undefined, conditions: Part
 
     // 規則 1 — 希望の時間の外に置いていない
     if (!wished[key]) {
-      violations.push(violationRow(
-        labelOf('rule1'),
-        wishBy[one.studentId]
-          ? '希望していない時間に入っています'
-          : '希望していない時間に入っています（この人の回答がありません）',
-        one,
-      ))
+      violations.push(violationRow(labelOf('rule1'), wishBy[one.studentId] ? '希望していない時間に入っています' : '希望していない時間に入っています（この人の回答がありません）', one))
     }
 
     // 規則 4 — 調理責任者の枠に置く人は 3 年生または 4 年生である
     if (one.role === ruleRoles.cookLeader) {
-      cookLeaderGradeBroken(one, conditions, wishBy).forEach((row) => violations.push(row))
+      cookLeaderGradeBroken(one, conditions, wishBy).forEach((row) => {
+        violations.push(row)
+      })
     }
 
     // 規則 5 — 調理の枠に置く人は 調理担当ですか？ が はい である
     if (cookRoles.indexOf(one.role) !== -1) {
-      cookAnswerBroken(one, wishBy).forEach((row) => violations.push(row))
+      cookAnswerBroken(one, wishBy).forEach((row) => {
+        violations.push(row)
+      })
     }
 
     // 規則ではない — 同じ人が同じ 30 分枠に二重に入っている
@@ -152,25 +148,14 @@ export function cookLeaderGradeBroken(one: Placement, conditions: Partial<Condit
 
   const wish = wishBy[one.studentId]
   if (wish && allowed.indexOf(wish.grade) !== -1) return []
-  return [violationRow(
-    labelOf('rule4'),
-    `${ruleRoles.cookLeader}にできる学年（${allowed.join('・')}）ではありません`
-      + `（今: ${wish ? wish.grade : 'この人の回答がありません'}）`,
-    one,
-  )]
+  return [violationRow(labelOf('rule4'), `${ruleRoles.cookLeader}にできる学年（${allowed.join('・')}）ではありません` + `（今: ${wish ? wish.grade : 'この人の回答がありません'}）`, one)]
 }
 
 /** 規則 5 を 1 行ぶん見る（希望の `調理担当ですか？`）。 */
 export function cookAnswerBroken(one: Placement, wishBy: Record<string, Wish>): Row[] {
   const wish = wishBy[one.studentId]
   if (wish && wish.canCook) return []
-  return [violationRow(
-    labelOf('rule5'),
-    wish
-      ? `調理担当ではない人が${one.role}に入っています`
-      : `調理担当か分からない人が${one.role}に入っています（この人の回答がありません）`,
-    one,
-  )]
+  return [violationRow(labelOf('rule5'), wish ? `調理担当ではない人が${one.role}に入っています` : `調理担当か分からない人が${one.role}に入っています（この人の回答がありません）`, one)]
 }
 
 /** 条件入力の「調理責任者の学年」が空で、数えられないときの文。 */
@@ -197,14 +182,19 @@ export function countPrepCleanupBroken(placed: Placement[], conditions: Partial<
   const boundary = conditions.prepCleanupRule?.noonBoundary || ''
   if (boundary === '') throw new Error(noonBoundaryMissingText())
 
-  const perDay: Record<string, DayState & { date: string, studentId: string, name: string }> = {}
+  const perDay: Record<string, DayState & { date: string; studentId: string; name: string }> = {}
   const order: string[] = []
   placed.forEach((one) => {
     const key = `${one.date} ${one.studentId}`
     if (!perDay[key]) {
       perDay[key] = {
-        date: one.date, studentId: one.studentId, name: one.name,
-        morning: false, afternoon: false, prep: false, cleanup: false,
+        date: one.date,
+        studentId: one.studentId,
+        name: one.name,
+        morning: false,
+        afternoon: false,
+        prep: false,
+        cleanup: false,
       }
       order.push(key)
     }
@@ -222,9 +212,16 @@ export function countPrepCleanupBroken(placed: Placement[], conditions: Partial<
     const day = perDay[key]
     const broken = prepCleanupDetail(day, boundary)
     if (!broken) return
-    violations.push(violationRow(labelOf('rule3'), broken, {
-      date: day.date, start: '', end: '', role: '', studentId: day.studentId, name: day.name,
-    }))
+    violations.push(
+      violationRow(labelOf('rule3'), broken, {
+        date: day.date,
+        start: '',
+        end: '',
+        role: '',
+        studentId: day.studentId,
+        name: day.name,
+      }),
+    )
   })
   return violations
 }
@@ -304,14 +301,10 @@ export function readAssignments(rows: Row[], conditions: Partial<Conditions>): P
 export function checkOnSlot(source: string, rowIndex: number, one: Placement, days: Day[] | undefined): void {
   const day = (days || []).filter((candidate) => candidate.date === one.date)[0]
   if (!day) {
-    throw internalError(
-      `${whereIs(source, rowIndex)}の「${one.date}」が、条件入力の「日ごとの営業時刻」に無い`,
-    )
+    throw internalError(`${whereIs(source, rowIndex)}の「${one.date}」が、条件入力の「日ごとの営業時刻」に無い`)
   }
   if (day.slots.some((slot) => slot.start === one.start && slot.end === one.end)) return
-  throw internalError(
-    `${whereIs(source, rowIndex)}の ${one.start}-${one.end} が、その日の 30 分枠に無い`,
-  )
+  throw internalError(`${whereIs(source, rowIndex)}の ${one.start}-${one.end} が、その日の 30 分枠に無い`)
 }
 
 /**
@@ -323,9 +316,7 @@ export function wishesByStudentId(wishes: Wish[] | undefined): Record<string, Wi
   const byId: Record<string, Wish> = {}
   all.forEach((wish) => {
     if (byId[wish.studentId]) {
-      throw internalError(
-        `希望に学籍番号「${wish.studentId}」が 2 件ある（規則 2 で 1 人 1 件に畳まれていない）`,
-      )
+      throw internalError(`希望に学籍番号「${wish.studentId}」が 2 件ある（規則 2 で 1 人 1 件に畳まれていない）`)
     }
     byId[wish.studentId] = wish
   })
@@ -341,7 +332,9 @@ export function wishedSlots(candidates: Candidate[] | undefined): Record<string,
   const wished: Record<string, boolean> = {}
   all.forEach((candidate) => {
     const slots = candidate.slots || []
-    slots.forEach((slot) => { wished[slotKey(candidate.studentId, candidate.date, slot.start, slot.end)] = true })
+    slots.forEach((slot) => {
+      wished[slotKey(candidate.studentId, candidate.date, slot.start, slot.end)] = true
+    })
   })
   return wished
 }
@@ -354,16 +347,16 @@ export function slotKey(studentId: string, date: string, start: string, end: str
 /** 違反 1 件を、検証結果シートの行にする。「あと何人」は未充足の側が使うので空。 */
 export function violationRow(label: string, detail: string, at: Placement): Row {
   const found: Record<string, Cell> = {
-    '種別': checkKind.violation,
-    '日': at.date,
-    '開始': at.start,
-    '終了': at.end,
-    '役割': at.role,
-    '学籍番号': at.studentId,
-    '氏名': at.name,
-    '内容': `${label}: ${detail}`,
-    'あと何人': '',
-    '候補': '', // 希望から入れられる人は build が入れる（→ core.ts の withCandidates）
+    種別: checkKind.violation,
+    日: at.date,
+    開始: at.start,
+    終了: at.end,
+    役割: at.role,
+    学籍番号: at.studentId,
+    氏名: at.name,
+    内容: `${label}: ${detail}`,
+    あと何人: '',
+    候補: '', // 希望から入れられる人は build が入れる（→ core.ts の withCandidates）
   }
   return sheetColumns('検証結果').map((name) => found[name])
 }

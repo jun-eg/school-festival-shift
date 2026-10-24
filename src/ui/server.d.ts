@@ -10,6 +10,6 @@ declare namespace google.script {
     /** 配る画像の中身を組む（→ src/shell/menu.ts の exportImagesFromDialog）。成功ハンドラに DistributionImage[] が渡る。 */
     exportImagesFromDialog(): void
     /** 選んだ画像でフォームを作る（→ src/shell/build-form.ts の createFormFromPicker）。成功ハンドラに BuiltForm が渡る。 */
-    createFormFromPicker(picked: { base64: string, mimeType: string, fileName: string }): void
+    createFormFromPicker(picked: { base64: string; mimeType: string; fileName: string }): void
   }
 }

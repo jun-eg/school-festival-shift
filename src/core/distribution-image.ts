@@ -15,20 +15,20 @@
 import { gridNamedColumns, missingDayText, roleColorOf } from './assignment-grid.ts'
 import { internalError } from './sheet-layout.ts'
 import type { Layout } from './sheet-layout.ts'
-import type { Cell, Day, Grid, Row } from './types.ts'
+import type { Day, Grid, Row } from './types.ts'
 
 /** 配る画像の表（→ distributionTable）。色は役割の色で、塗らない役割は null である。 */
 export type ImageTable = {
   fileName: string
   title: string
   times: string[]
-  rows: { name: string, cells: { role: string, color: string | null }[] }[]
+  rows: { name: string; cells: { role: string; color: string | null }[] }[]
 }
 
 /** 塗る図形（→ distributionDrawing）。ブラウザ側のダイアログが canvas に塗る。 */
-export type Box = { x: number, y: number, w: number, h: number, fill: string }
-export type Line = { x1: number, y1: number, x2: number, y2: number }
-export type DrawnText = { x: number, y: number, text: string, size: number, bold: boolean, align: 'left' | 'center', maxWidth: number }
+export type Box = { x: number; y: number; w: number; h: number; fill: string }
+export type Line = { x1: number; y1: number; x2: number; y2: number }
+export type DrawnText = { x: number; y: number; text: string; size: number; bold: boolean; align: 'left' | 'center'; maxWidth: number }
 export type Drawing = {
   width: number
   height: number
@@ -36,7 +36,7 @@ export type Drawing = {
   boxes: Box[]
   lines: Line[]
   texts: DrawnText[]
-  colors: { line: string, text: string }
+  colors: { line: string; text: string }
 }
 
 /** 日ごとの画像 1 枚ぶん（→ distributionImages）。空の日は drawing が null である。 */
@@ -115,17 +115,11 @@ export function distributionTable(header: Row, dataRows: Row[], day: Day, label:
 
     const name = String(row[nameColumn] || '').trim()
     if (name === '') {
-      throw new Error(
-        `シート「${label}」の ${rowIndex + 2} 行目（学籍番号「${String(row[studentIdColumn] || '')}」）の氏名が空のため、画像にできません。`
-          + '「回答」シートにその学籍番号があるかを確かめてから、メニューの「生成」を押してください',
-      )
+      throw new Error(`シート「${label}」の ${rowIndex + 2} 行目（学籍番号「${String(row[studentIdColumn] || '')}」）の氏名が空のため、画像にできません。` + '「回答」シートにその学籍番号があるかを確かめてから、メニューの「生成」を押してください')
     }
     const blank = times.map((time, index) => (time === '' && roles[index] !== '' ? index : -1)).filter((index) => index !== -1)
     if (blank.length > 0) {
-      throw new Error(
-        `シート「${label}」の ${named.length + blank[0] + 1} 列目の時刻の見出しが空のため、画像にできません`
-          + `（${rowIndex + 2} 行目に「${roles[blank[0]]}」が入っています）。メニューの「生成」を押してください`,
-      )
+      throw new Error(`シート「${label}」の ${named.length + blank[0] + 1} 列目の時刻の見出しが空のため、画像にできません` + `（${rowIndex + 2} 行目に「${roles[blank[0]]}」が入っています）。メニューの「生成」を押してください`)
     }
     rows.push({ name: name, cells: roles.map((role) => ({ role: role, color: roleColorOf(role) })) })
   })
@@ -150,10 +144,7 @@ export function distributionTable(header: Row, dataRows: Row[], day: Day, label:
  */
 export function distributionDrawing(table: ImageTable): Drawing {
   const m = imageMetrics
-  const nameWidth = Math.max(
-    m.minNameWidth,
-    ...table.rows.map((row) => estimateTextWidth(row.name, m.fontSize) + m.cellPadding * 2),
-  )
+  const nameWidth = Math.max(m.minNameWidth, ...table.rows.map((row) => estimateTextWidth(row.name, m.fontSize) + m.cellPadding * 2))
   const tableWidth = nameWidth + m.slotWidth * table.times.length
   const titleWidth = estimateTextWidth(table.title, m.titleSize)
   const width = m.padding * 2 + Math.max(tableWidth, titleWidth)
@@ -163,9 +154,17 @@ export function distributionDrawing(table: ImageTable): Drawing {
 
   const boxes: (Omit<Box, 'fill'> & { fill: string | null })[] = [{ x: 0, y: 0, w: width, h: height, fill: m.background }]
   const lines: Line[] = []
-  const texts: DrawnText[] = [{
-    x: m.padding, y: m.padding + m.titleSize / 2, text: table.title, size: m.titleSize, bold: true, align: 'left', maxWidth: width - m.padding * 2,
-  }]
+  const texts: DrawnText[] = [
+    {
+      x: m.padding,
+      y: m.padding + m.titleSize / 2,
+      text: table.title,
+      size: m.titleSize,
+      bold: true,
+      align: 'left',
+      maxWidth: width - m.padding * 2,
+    },
+  ]
 
   const left = m.padding
   const slotX = (index: number) => left + nameWidth + m.slotWidth * index
@@ -173,24 +172,48 @@ export function distributionDrawing(table: ImageTable): Drawing {
 
   boxes.push({ x: left, y: top, w: tableWidth, h: m.rowHeight, fill: m.headerFill })
   texts.push({
-    x: left + m.cellPadding, y: top + m.rowHeight / 2, text: '名前', size: m.fontSize, bold: true, align: 'left', maxWidth: nameWidth - m.cellPadding * 2,
+    x: left + m.cellPadding,
+    y: top + m.rowHeight / 2,
+    text: '名前',
+    size: m.fontSize,
+    bold: true,
+    align: 'left',
+    maxWidth: nameWidth - m.cellPadding * 2,
   })
   table.times.forEach((time, index) => {
     texts.push({
-      x: slotX(index) + m.slotWidth / 2, y: top + m.rowHeight / 2, text: time, size: m.fontSize, bold: true, align: 'center', maxWidth: m.slotWidth - m.cellPadding,
+      x: slotX(index) + m.slotWidth / 2,
+      y: top + m.rowHeight / 2,
+      text: time,
+      size: m.fontSize,
+      bold: true,
+      align: 'center',
+      maxWidth: m.slotWidth - m.cellPadding,
     })
   })
 
   table.rows.forEach((row, rowIndex) => {
     const y = rowY(rowIndex + 1)
     texts.push({
-      x: left + m.cellPadding, y: y + m.rowHeight / 2, text: row.name, size: m.fontSize, bold: false, align: 'left', maxWidth: nameWidth - m.cellPadding * 2,
+      x: left + m.cellPadding,
+      y: y + m.rowHeight / 2,
+      text: row.name,
+      size: m.fontSize,
+      bold: false,
+      align: 'left',
+      maxWidth: nameWidth - m.cellPadding * 2,
     })
     row.cells.forEach((cell, index) => {
       if (cell.role === '') return
       boxes.push({ x: slotX(index), y: y, w: m.slotWidth, h: m.rowHeight, fill: cell.color })
       texts.push({
-        x: slotX(index) + m.slotWidth / 2, y: y + m.rowHeight / 2, text: cell.role, size: m.fontSize, bold: false, align: 'center', maxWidth: m.slotWidth - m.cellPadding,
+        x: slotX(index) + m.slotWidth / 2,
+        y: y + m.rowHeight / 2,
+        text: cell.role,
+        size: m.fontSize,
+        bold: false,
+        align: 'center',
+        maxWidth: m.slotWidth - m.cellPadding,
       })
     })
   })
@@ -204,7 +227,12 @@ export function distributionDrawing(table: ImageTable): Drawing {
   }
 
   return {
-    width: width, height: height, scale: imageScale, boxes: boxes.filter((box): box is Box => Boolean(box.fill)), lines: lines, texts: texts,
+    width: width,
+    height: height,
+    scale: imageScale,
+    boxes: boxes.filter((box): box is Box => Boolean(box.fill)),
+    lines: lines,
+    texts: texts,
     colors: { line: m.gridLine, text: m.text },
   }
 }
@@ -214,7 +242,7 @@ export function distributionDrawing(table: ImageTable): Drawing {
  * 1 枚ごとに { label, fileName, title, times, rows, drawing } を返す。1 人も入っていない日も rows を空にして返す。
  * 4 枚とも空なら（生成の前に押したとき）止まる。
  */
-export function distributionImages(grids: { layout: Layout, grid: Grid }[], days: Day[]): DistributionImage[] {
+export function distributionImages(grids: { layout: Layout; grid: Grid }[], days: Day[]): DistributionImage[] {
   const images = grids
     .slice()
     .sort((a, b) => a.layout.grid!.dayIndex - b.layout.grid!.dayIndex)
@@ -227,7 +255,11 @@ export function distributionImages(grids: { layout: Layout, grid: Grid }[], days
       }
       const table = distributionTable(one.grid.header, one.grid.rows, day, label)
       return {
-        label: label, fileName: table.fileName, title: table.title, times: table.times, rows: table.rows,
+        label: label,
+        fileName: table.fileName,
+        title: table.title,
+        times: table.times,
+        rows: table.rows,
         drawing: table.rows.length === 0 ? null : distributionDrawing(table),
       }
     })
