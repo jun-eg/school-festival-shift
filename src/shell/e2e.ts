@@ -6,7 +6,7 @@
  * 手元の検査と同じ関数を、実機の SpreadsheetApp の上で走らせて、同じ結果になるかを見るためにある。
  */
 
-import { clearForNextYearOn } from './clear-for-next-year.ts'
+import { clearForNextYearOn, unlinkAnswersOn } from './clear-for-next-year.ts'
 import { runOnActiveSpreadsheet } from './shell.ts'
 import { checkStructure } from './verify-structure.ts'
 
@@ -25,4 +25,9 @@ export function e2eCheckStructure() {
 /** 来年用に空にする本体を、確認なしで呼ぶ。返すのは外したフォームの URL とやったことの記録である。 */
 export function e2eClearForNextYear() {
   return clearForNextYearOn(SpreadsheetApp.getActive())
+}
+
+/** 「回答」とフォームの紐付けだけを外す。「回答」が無い・紐付いていなければ何もせず null を返す（npm run e2e の頭の後始末）。 */
+export function e2eUnlinkAnswers() {
+  return unlinkAnswersOn(SpreadsheetApp.getActive())
 }

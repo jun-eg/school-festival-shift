@@ -60,6 +60,16 @@ export function clearForNextYearOn(spreadsheet: Spreadsheet): Cleared {
 }
 
 /**
+ * 「回答」の紐付けだけを外す（E2E の頭と終わりの後始末用 → shell/e2e.ts）。何も消さない。
+ * 「回答」が無い（空に戻した直後のシート 1 枚だけ）・紐付いていないときは何もせず null を返す。
+ * 外したフォームの URL を返す。フォームが開けなければ、clearForNextYearOn と同じ文で止まる。
+ */
+export function unlinkAnswersOn(spreadsheet: Spreadsheet): string | null {
+  if (!spreadsheet.getSheetByName(findLayout('回答').name)) return null
+  return unlinkAnswerForm(spreadsheet, [])
+}
+
+/**
  * 回答シートに紐付いたフォームから、回答先を外す（スコープは forms のままで足りる）。
  * フォームが開けないとき（もうゴミ箱にある・持ち主でない）は、手で外す場所を名指しして止まる。
  */
