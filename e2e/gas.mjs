@@ -3,7 +3,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { workDir } from './env.mjs'
+import { sharedDir } from './env.mjs'
 import { api } from './google.mjs'
 
 /** 1 日に打つ scripts.run の上限（再試行を含む）。Apps Script の日次クォータよりずっと下に置く。 */
@@ -12,21 +12,58 @@ export const dailyLimit = 100
 /** 1 回の呼び出しを待つ上限。Apps Script 側の実行上限（6 分）より短く、buildTemplate（数十秒）には十分。 */
 export const callTimeoutMs = 180_000
 
-const quotaFile = path.join(workDir, 'quota.json')
+/** 控えの既定の置き場。worktree をまたいで 1 つ（~/.config/sfs-e2e/quota.json）。検査は別の置き場を渡す。 */
+export const defaultQuotaFile = path.join(sharedDir, 'quota.json')
 
-/** 今日の分に 1 回足す。上限を超えるなら、打たずに止まる。 */
-export function countCall() {
-  const today = new Date().toISOString().slice(0, 10)
-  fs.mkdirSync(workDir, { recursive: true })
-  let state = { date: today, count: 0 }
+/** 日付の区切りは日本時間の 0 時（= UTC の 15 時）。日本時間は夏時間が無いので、9 時間足して UTC の日付を取る。 */
+export function jstDate(now = new Date()) {
+  return new Date(now.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+const sleeper = new Int32Array(new SharedArrayBuffer(4))
+const lockStaleMs = 10_000
+
+/** 読んでから書くまでの間に別のプロセスが書かないよう、控えのそばの mkdir（原子的）を排他に使う。持ち主が落ちて残ったものは 10 秒で奪う。 */
+function withLock(file, fn) {
+  const lockDir = `${file}.lock`
+  const deadline = Date.now() + 30_000
+  for (;;) {
+    try {
+      fs.mkdirSync(lockDir)
+      break
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+      try {
+        if (Date.now() - fs.statSync(lockDir).mtimeMs > lockStaleMs) fs.rmSync(lockDir, { recursive: true, force: true })
+      } catch {}
+      if (Date.now() > deadline) throw new Error(`控えのロックが取れない（${lockDir}）`)
+      Atomics.wait(sleeper, 0, 0, 20)
+    }
+  }
   try {
-    const saved = JSON.parse(fs.readFileSync(quotaFile, 'utf8'))
-    if (saved.date === today) state = saved
-  } catch {}
-  if (state.count >= dailyLimit) throw new Error(`今日の scripts.run が上限（${dailyLimit} 回）に達した。明日やり直す（${quotaFile}）`)
-  state.count += 1
-  fs.writeFileSync(quotaFile, JSON.stringify(state))
-  return state.count
+    return fn()
+  } finally {
+    fs.rmSync(lockDir, { recursive: true, force: true })
+  }
+}
+
+/** 今日の分に 1 回足す。上限を超えるなら、打たずに止まる。控えは worktree をまたいで 1 つ（日本時間の 0 時に 0 へ戻る）。 */
+export function countCall(file = defaultQuotaFile, now = new Date(), limit = dailyLimit) {
+  const today = jstDate(now)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  return withLock(file, () => {
+    let state = { date: today, count: 0 }
+    try {
+      const saved = JSON.parse(fs.readFileSync(file, 'utf8'))
+      if (saved.date === today && Number.isInteger(saved.count)) state = saved
+    } catch {}
+    if (state.count >= limit) throw new Error(`今日の scripts.run が上限（${limit} 回）に達した。控えは worktree をまたいで 1 つで、日本時間の 0 時（明日の 0:00）に 0 へ戻るので、その後にやり直す（${file}）`)
+    state.count += 1
+    const tmp = `${file}.${process.pid}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(state))
+    fs.renameSync(tmp, file)
+    return state.count
+  })
 }
 
 /**
