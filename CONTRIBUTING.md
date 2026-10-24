@@ -19,10 +19,21 @@ git config core.hooksPath .githooks
 （中身は [`scripts/README.md`](scripts/README.md) の「リンクの検査」「要約の検査」）。**同じ検査が PR でも回る**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
 **止まったときの直し方は [`docs/README.md`](docs/README.md) の「古さの check」。**
 
+## コードを回すには、3 手で足りる
+
+```
+.node-version の Node を入れる（22）
+npm ci
+npm test
+```
+
+**依存は 0 なので `npm ci` は何も入れない**（`package-lock.json` と食い違っていないことを見るだけである）。
+**`npm test` が `src/*.test.mjs` を全部回し、1 本でも落ちたら終了コード 1 で止まる。**
+
 ## コードの中身は `src/README.md` を読む
 
-**スクリプトの構成・シートの定義・テンプレートの作り方・確かめ方は、[`src/README.md`](src/README.md) が持つ。**
-**ここには写さない**（**二重に持つと片方が古くなる**）。
+**スクリプトの構成・シートの定義・テンプレートの作り方・確かめ方の中身は、[`src/README.md`](src/README.md) が持つ。**
+**上の 3 手だけは入口としてここに持つ。それ以外は写さない**（**二重に持つと片方が古くなる**）。
 
 ## コードを直したら、テンプレート側のスクリプトを差し替える
 

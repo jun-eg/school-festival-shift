@@ -764,24 +764,13 @@
 ## 確かめ方
 
 ```
-node src/sheet-layout.test.mjs
-node src/assignment-grid.test.mjs
-node src/input-types.test.mjs
-node src/core.test.mjs
-node src/take-in.test.mjs
-node src/expand.test.mjs
-node src/generate.test.mjs
-node src/count-violations.test.mjs
-node src/name-unmet.test.mjs
-node src/fairness-metrics.test.mjs
-node src/form-definition.test.mjs
-node src/shell.test.mjs
-node src/verify-structure.test.mjs
-node src/build-template.test.mjs
-node src/build-form.test.mjs
-node src/distribution-image.test.mjs
-node src/clear-for-next-year.test.mjs
+npm test
 ```
+
+**`src/*.test.mjs` を全部回す**（Node の `node --test`。一覧を別に持たないので、検査を足しても抜けない）。
+**回す前に `.node-version` の Node を入れ、`npm ci` を 1 回やる**（→ [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
+1 本ずつ回したいときは `node --test src/<名前>.test.mjs`。
+**ルートの `package.json` は `"type": "module"` だが、`src/*.js` は Apps Script の素のスクリプト（CommonJS として `require` される）なので、`src/package.json` で `"type": "commonjs"` に戻してある**（`.claspignore` で上げない。ESM 化は [#302](https://github.com/jun-eg/school-festival-shift/issues/302)）。
 
 **依存はゼロである**（Node の標準だけを使う）。**何も書き換えない。**
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。

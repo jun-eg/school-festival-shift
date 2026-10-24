@@ -1,0 +1,11 @@
+{
+  "name": "school-festival-shift",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"src/*.test.mjs\""
+  }
+}

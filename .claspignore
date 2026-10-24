@@ -2,3 +2,4 @@
 **/*.test.mjs
 **/*.md
 **/.gitignore
+**/package.json
