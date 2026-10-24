@@ -27,8 +27,9 @@ npm run e2e
 | 4 | `e2eGenerate`（**所要時間を毎回出す**） | 同じモックと条件入力を [`build`](../src/core/core.ts) に通した出力（違反 0・未充足の名指し・割り当て・指標）。マス目・検証結果・指標のシートの中身も |
 | 5 | `exportImagesFromDialog` | 同じ出力から組んだマス目を [`distributionImages`](../src/core/distribution-image.ts) に通した値 |
 | 6 | `createFormFromPicker`（1 画素の画像。作る前に回答の行は空にする） | [`formItemsFor`](../src/core/form-definition.ts) が組む設問の題と記録 |
-| 7 | `e2eClearForNextYear`（回答を入れ直してから） | 1 の直後の各シートの値（「回答」の後ろ 4 列の見出しだけ、表の既定の名前 `列 7`〜`列 10` で返る） |
-| 8 | Node 側が Drive API で、作ったフォームをゴミ箱へ（[`drive.mjs`](drive.mjs)） | — |
+| 7 | `e2eClearForNextYear`（回答を入れ直してから。フォームが作った「回答」は表で、SpreadsheetApp は表を外せないので、シートを作り直す → #347） | 1 の直後の各シートの値と、8 枚の並び・保護・幅・固定（「回答」の後ろ 4 列の見出しも空。許す例外は無い） |
+| 7b | `createFormFromPicker`（空にしたファイルで、もう一度。来年の担当者がやること） | 6 と同じ設問の題。作り直した「回答」がフォームの作るシートに置き換わる |
+| 8 | Node 側が Drive API で、作ったフォームをゴミ箱へ（1 つ目は空にした後に、2 つ目は最後に）（[`drive.mjs`](drive.mjs)） | — |
 
 **実機の生成の所要時間は、実行のたびに出力へ残る**（`生成の所要時間（実機）: スクリプトの中で … 秒`。合格の線は 360 秒）。人が測った 2026-09-22 の値（項目 14）が最後で、以後はこの出力が持つ。
 

@@ -7,7 +7,7 @@
 //   生成       … 同じモックと条件入力を src/core/ の build に通した出力（手元 generate ／ count-violations ／ name-unmet がコアを見る）
 //   画像       … 同じ出力から組んだマス目を distributionImages に通した値（手元 distribution-image）
 //   フォーム   … formItemsFor が組む設問の題と記録（手元 build-form）
-//   来年用に空 … buildTemplate 直後の各シートの値（手元 clear-for-next-year ／ テンプレートの形に戻る）
+//   来年用に空 … buildTemplate 直後の各シートの値と構造（手元 clear-for-next-year ／ テンプレートの形に戻る。空にしたファイルで、もう一度フォームを作る）
 // 画面でしか分からないもの（メニューの見た目・ダイアログ・初回承認・toast・onEdit・保護の見え方）はここでは見ない（→ src/real-device-log.md）。
 //
 // 入れるデータは data/ のモックだけで、氏名・学籍番号は作りものである。条件入力には手を入れない（buildTemplate の初期値のまま）。
@@ -76,6 +76,7 @@ function assertNamed(message, breakages) {
 
 describe('実機の 1 本の流れ', () => {
   let template
+  let templateStructure
   let generated
   let built
   let formFileId
@@ -86,6 +87,7 @@ describe('実機の 1 本の流れ', () => {
     await resetSpreadsheet(id)
     await call('buildTemplate')
     template = Object.fromEntries(await Promise.all(sheetNames.map(async (name) => [name, await readSheet(id, name)])))
+    templateStructure = await readStructure(id)
   })
 
   test('モックを回答シートに置いた（氏名・学籍番号は data/ の作りもの。外した 3 人は展開で止まる人）', async () => {
@@ -263,24 +265,40 @@ describe('実機の 1 本の流れ', () => {
     const cleared = await call('e2eClearForNextYear')
     assert.ok(cleared.formUrl?.startsWith('https://docs.google.com/forms/'), '外したフォームの URL が返る')
     assert.ok(cleared.log.some((line) => line.startsWith('「回答」とフォームの紐付けを外した')))
-    assert.ok(cleared.log.includes(`「回答」の回答を ${answerCount} 行消した`))
+    assert.ok(cleared.log.includes(`「回答」の回答を ${answerCount} 行消した（表になっているので、シートを作り直した）`))
     if (linkedBefore !== null) {
       const unlinked = await api('GET', `https://forms.googleapis.com/v1/forms/${formFileId}`)
       assert.equal(unlinked.json.linkedSheetId, undefined, 'フォームの回答先が外れた')
     }
     for (const name of sheetNames.filter((one) => one !== '回答')) assert.deepEqual(await readSheet(id, name), template[name], `${name} が buildTemplate 直後の値に戻った`)
-    // 「回答」は、フォームが作ったシートが表（テーブル）になっていて、空けた見出しは既定の名前（列 7〜列 10）で返る。値としては空ではないので、そこだけ許す
-    const [answerHeader, ...answerRows] = await readSheet(id, '回答')
-    assert.deepEqual(answerRows, [], '回答の行が消えた')
-    const named = sheetLayout[1].sections[0].columns.length
-    assert.deepEqual(answerHeader.slice(0, named), template['回答'][0], '回答の頭 6 列の見出しが残った')
-    assert.ok(
-      answerHeader.slice(named).every((cell, i) => cell === '' || cell === `列 ${named + i + 1}`),
-      `回答の後ろ 4 列の見出しが空になった（既定の名前は許す）: ${answerHeader.slice(named)}`,
-    )
+    // 「回答」も、buildTemplate 直後と同じ（後ろ 4 列の見出しも空）。許す例外は無い。
+    // フォームが作ったシートは表（テーブル）で、SpreadsheetApp は表を外せず、見出しを空けても既定の名前（列 7〜列 10）が入り直す。だから作り直している（#347）
+    assert.deepEqual(await readSheet(id, '回答'), template['回答'], '回答が buildTemplate 直後の値に戻った（後ろ 4 列の見出しは空）')
+    assert.deepEqual(await readStructure(id), templateStructure, '8 枚の並び・保護・幅・固定が buildTemplate 直後と同じ（作り直した「回答」も）')
+    // このフォームはここで捨てる（次の test で、空にしたファイルにもう 1 つ作る）
+    assert.equal(await trashForm(formFileId), 'trashed')
+    forgetForm()
   })
 
-  test('フォームをゴミ箱へ移した（Node 側の Drive API。スクリプトは Drive を掴まない）', async () => {
+  test('空にしたファイルで「フォームを作る」がもう一度通る（来年の担当者がやること）。作り直した「回答」がフォームの作るシートに置き換わる', async () => {
+    const items = formItemsFor(expected.days)
+    const again = await call('createFormFromPicker', [{ base64: rosterPng, mimeType: 'image/png', fileName: 'roster.png' }])
+    rememberForm(again.editUrl)
+    formFileId = formFileIdOf(again.editUrl)
+    assert.ok(formFileId)
+    assert.notEqual(again.editUrl, built.editUrl, '新しいフォームができた')
+    const questions = items.filter((item) => item.kind !== formItemKind.image)
+    assert.deepEqual((await readValues(id, "'回答'!A1:J1"))[0], [sheetLayout[1].sections[0].columns[0], ...questions.map((item) => item.title)])
+    assert.deepEqual(
+      (await readStructure(id)).map((s) => s.title),
+      sheetNames,
+      '8 枚が構成の並びのまま',
+    )
+    const urls = (await readValues(id, `'${formUrlBlock.sheet}'!C${formUrlBlock.row}:C${formUrlBlock.row + 1}`)).flat()
+    assert.deepEqual(urls, [again.url, again.editUrl])
+  })
+
+  test('最後のフォームをゴミ箱へ移した（Node 側の Drive API。スクリプトは Drive を掴まない）', async () => {
     assert.equal(await trashForm(formFileId), 'trashed')
     forgetForm()
   })
