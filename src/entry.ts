@@ -15,17 +15,18 @@
 import { createFormFromPicker } from './shell/build-form.ts'
 import { buildTemplate } from './shell/build-template.ts'
 import { clearForNextYear } from './shell/clear-for-next-year.ts'
-import { createForm, exportImages, exportImagesFromDialog, onEdit, onOpen, runGeneration } from './shell/menu.ts'
+import { createForm, exportImages, exportImagesFromDialog, onEdit, onOpen, runGeneration, showVersion } from './shell/menu.ts'
 
 export const entryPoints = {
   // トリガー
   onOpen,
   onEdit,
-  // メニュー「シフト」の 4 項目
+  // メニュー「シフト」の 5 項目
   createForm,
   runGeneration,
   exportImages,
   clearForNextYear,
+  showVersion,
   // HTML から google.script.run で呼ばれる
   exportImagesFromDialog,
   createFormFromPicker,

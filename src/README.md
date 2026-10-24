@@ -30,7 +30,8 @@
 | [`export-images.html`](ui/export-images.html) | **配る画像を書き出すダイアログ 1 枚。**コアが組んだ図形を `<canvas>` に塗って PNG にするだけである（→ 6 の #5）。外から読み込むファイルは 0 個である | **殻** |
 | [`menu.ts`](shell/menu.ts) | **担当者が開いたときに出るメニュー 1 つ**（`onOpen`）と、**マス目を書き換えたときに走る口 1 つ**（`onEdit`）。**どちらも単純トリガーである** | **殻** |
 | [`appsscript.json`](appsscript.json) | マニフェスト。**要求する権限スコープを手で 3 つ書いてある**（→ 下の「要求するのは 3 スコープである」） | — |
-| `*.test.ts` | **手元で回す検査。**Apps Script には上げない（`.claspignore` で外してある） | — |
+| [`version.ts`](shell/version.ts) | **このスクリプトの版**（ビルドが HEAD のタグ、無ければ短い SHA を定数に埋める）。**メニュー末尾の「バージョン」が画面の隅に出す**（→ [ADR dev-env-0001](../docs/agent/ADR/dev-env/0001-配布はsrcの20ファイルではなくdistの4つになった.md)） | **殻** |
+| `*.test.ts` | **手元で回す検査。**Apps Script には貼らない（貼るのは `dist/` の 4 つだけで、`*.test.ts` は `dist/` に入らない） | — |
 | [`real-device-log.md`](real-device-log.md) | **本物のスプレッドシートの上で見た結果。**実機でしか分からないものの名指しと、**下の「確かめ方」の表との対応**も持つ（→ [#167](https://github.com/jun-eg/school-festival-shift/issues/167)） | — |
 
 **コアの側は `SpreadsheetApp` を 1 度も掴まない**（→ 6 の #8・下の「コアと殻の境目」）。
@@ -135,7 +136,7 @@
 | [`core/`](core/) | 上の表のコア 12 本（[`assignment-grid.ts`](core/assignment-grid.ts) と [`distribution-image.ts`](core/distribution-image.ts) を含む）と、コアの入出力の型だけを置く [`types.ts`](core/types.ts)（値を 1 つも持たない） | `core/` の中の `import` だけ |
 | [`shell/`](shell/) | 殻（[`shell.ts`](shell/shell.ts)・[`verify-structure.ts`](shell/verify-structure.ts)・[`build-template.ts`](shell/build-template.ts)・[`build-form.ts`](shell/build-form.ts)・[`clear-for-next-year.ts`](shell/clear-for-next-year.ts)）と、メニュー・トリガー（[`menu.ts`](shell/menu.ts)） | `SpreadsheetApp` などの Apps Script のグローバルと `core/` |
 | [`ui/`](ui/) | ダイアログの HTML 2 枚と、その TypeScript（ブラウザで動く。`import` は型だけ（`import type`）で、ビルドが型を剥がして HTML に差し込む）。`google.script.run` が呼ぶ関数の型は [`server.d.ts`](ui/server.d.ts) | ブラウザのグローバルと `google.script.run` |
-| [`entry.ts`](entry.ts) | **Apps Script が名前で呼ぶ関数の一覧**（`onOpen` ／ `onEdit` ／ メニューの 4 項目 ／ HTML の呼び先 ／ 手で実行する `buildTemplate`） | `shell/` |
+| [`entry.ts`](entry.ts) | **Apps Script が名前で呼ぶ関数の一覧**（`onOpen` ／ `onEdit` ／ メニューの 5 項目 ／ HTML の呼び先 ／ 手で実行する `buildTemplate`） | `shell/` |
 
 **[`boundary.test.ts`](boundary.test.ts) が、`core/` から `core/` の外への `import` と、`core/` の中の Apps Script のグローバル（`SpreadsheetApp` など）の参照を落とす。**
 **[`entry.test.ts`](entry.test.ts) が、`entry.ts` の一覧と、`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` の食い違いを名指しで落とす。**
@@ -516,6 +517,7 @@ HTML の `<script src>` は、ビルドが [`ui/`](ui/) の JS の中身に差�
 何が入っていないかを名指しで出す**（→ 上の「段は 6 つで、中身は全部入っている」）。
 **「画像を書き出す」の中身も入っている**（→ 下の「配る画像は、日ごとに 4 枚である」）。**押すと書き出すダイアログが開く。**
 **3 項目とも中身が入ったので、「まだ作っていない」と言う項目は残っていない。**
+**末尾の「バージョン」は、貼った版（タグ、無ければ短い SHA）を画面の隅に出すだけの項目で、押さなくても困らない**（担当者の操作は増えない → ADR dev-env-0001）。
 
 **4 つ目の「来年用に空にする」だけは、2 の一覧の操作ではない**（→ [ADR tech-requirements-0018](../docs/agent/ADR/tech-requirements/0018-配布はテンプレートのコピーだけでは決まっておらず本線のcopyリンクと予備の空にしたコピーの2本になった.md)）。
 **引き継ぎの予備で、前年の担当者が自分のファイルのコピーの上で 1 回だけ押す。****本線（ルートの [`README.md`](../README.md) の `/copy` リンク）では押さないので、担当者の操作は増えていない。**
@@ -713,20 +715,12 @@ HTML の `<script src>` は、ビルドが [`ui/`](ui/) の JS の中身に差�
 
 1. Google ドライブで**スプレッドシートを 1 つ**作り、**名前を付ける**
 2. **拡張機能 → Apps Script** を開く
-3. `src/` の **`.js` 18 本**（`*.test.mjs` を除いた全部）を、同じ名前のファイルとして貼る（エディタ上では `.gs` になる）。
-   `sheet-layout` ／ `input-types` ／ `core` ／ `take-in` ／ `expand` ／ `generate` ／ `count-violations` ／ `name-unmet` ／
-   `fairness-metrics` ／ `assignment-grid` ／ `form-definition` ／ `shell` ／ `verify-structure` ／ `build-template` ／
-   `build-form` ／ `menu` ／ `distribution-image` ／ `clear-for-next-year`。
-   **`clear-for-next-year` を除く 17 本で実機に貼って走らせてある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」）。
-   **18 本目はまだ実機で見ていない**（→ [`real-device-log.md`](real-device-log.md) の項目 24）。
-   **[`form-picker.html`](ui/form-picker.html) と [`export-images.html`](ui/export-images.html) の 2 枚も貼る** — エディタの**「＋」→「HTML」**で
-   `form-picker` ／ `export-images` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）。
-   **1 つ貼り忘れれば、走らせたときに名指しで止まる**（→「コアと殻の境目」の最後）。
-   **日本語の名前でも通ることは実機で見たが、英字にそろえてある**
-   （→ [#175](https://github.com/jun-eg/school-festival-shift/issues/175)・上の「名前の線」）。
-   **関数名も同じで、日本語のままでもメニューから呼べることを実機で見たうえで英字にしてある**
-   （→ [#178](https://github.com/jun-eg/school-festival-shift/issues/178)）。
-   **貼る順は問わない**（→「コアと殻の境目」の最後）
+3. `npm run build` が `dist/` に出す **4 つ**を貼る（`dist/` は git に入れない。貼る前にタグを打つ → ルートの [`CONTRIBUTING.md`](../CONTRIBUTING.md) の「手で貼る」）。
+   - **`main.gs`**: エディタの `.gs` 1 本の中身にする（`src/` の TypeScript を全部束ねた 1 本である）。**ほかの `.gs` は置かない**
+   - **`form-picker.html` と `export-images.html`**: エディタの**「＋」→「HTML」**で `form-picker` ／ `export-images` という名前で作り、中身を写す（**拡張子は Apps Script が付ける**）
+   - **`appsscript.json`**: 手順 5 で写す
+   **`main.gs` に束ねたので、貼り忘れた `.gs` が走らせたときに名指しで止まる形は無くなった**（HTML の貼り忘れは、開いたときに止まる）。
+   **20 ファイルを 1 つずつ貼った実機の記録は残してある**（2026-09-23 → [`real-device-log.md`](real-device-log.md) の「[指標から画像まで 1 周通した](real-device-log.md#指標から画像まで-1-周通した223)」。**見たものを後から書き換えない**）。**4 つを貼った実機の記録は [#331](https://github.com/jun-eg/school-festival-shift/issues/331) が持つ**
 4. **Apps Script プロジェクトにも名前を付ける**（初期値は `無題のプロジェクト` である）
 5. **プロジェクトの設定 →「`appsscript.json` マニフェスト ファイルをエディタで表示する」**を入れ、
    [`appsscript.json`](appsscript.json) の中身を写す
@@ -749,30 +743,20 @@ HTML の `<script src>` は、ビルドが [`ui/`](ui/) の JS の中身に差�
    [#136](https://github.com/jun-eg/school-festival-shift/issues/136) ／ 6-1 の #3）。
    **作った後にコードを直したら、テンプレートのスクリプトを差し替える**（→ ルートの [`CONTRIBUTING.md`](../CONTRIBUTING.md)）
 
-### clasp を本筋にしない
+### clasp を本筋にしない — テンプレートへの差し替えの話である
 
-**clasp（`clasp push`）でも入る。** それでも**手貼りを原本にする。**
+**テンプレート（jun-eg のドライブ）への差し替えは、`clasp push` でも入る。** それでも**手貼りを原本にする**（→ [ADR dev-env-0001](../docs/agent/ADR/dev-env/0001-配布はsrcの20ファイルではなくdistの4つになった.md)）。
+**検証用スプレッドシートへの `clasp push` ・ `clasp run` は別の話で、開発側の本線である**（→ [#307](https://github.com/jun-eg/school-festival-shift/issues/307)）。
 
 | | |
 | --- | --- |
-| **貼るのにインストールが 1 つも要らなかった** | 実機でなぞった結果、**ブラウザだけで 4 ファイルが入った**（当時のファイル数である）**。**clasp は Node と npm と `clasp login` を要求する |
-| **`.clasp.json` がリポジトリに無い** | **スプレッドシートごとに違う**ので入れない（`.gitignore` に置いてある）。**clasp を使う人は毎回これを作る**ことになる |
-| **貼るのは 1 回だけである** | テンプレートを作るのは**用意する側が 1 回**で、担当者ではない。**繰り返さない作業に道具を増やさない** |
-| **ファイル名が 1 対 1 で対応する** | **貼った名前がそのまま付く**ので、リポジトリの `.js` と Apps Script の `.gs` が名前で突き合わせられる（**日本語の名前でもそのまま通った** → [`real-device-log.md`](real-device-log.md)。**いまは英字である** → [#175](https://github.com/jun-eg/school-festival-shift/issues/175)） |
+| **`.clasp.json` がリポジトリに無い** | **スプレッドシートごとに違う**ので入れない（`.gitignore` に置いてある）。**clasp を使う人は毎回これを作る**ことになる。**残る理由はこれである** |
+| **貼る物が 4 つに減った** | 貼る手間はファイル数では測れなくなった（以前は 20 本で、clasp の旨味だった）。**手貼りでも `main.gs` ・ HTML 2 枚 ・ マニフェストの 4 回で済む** |
+| **（落とした）インストールが 0 で済む** | ビルドに Node と esbuild が要る（→ [#300](https://github.com/jun-eg/school-festival-shift/issues/300) ・ [#302](https://github.com/jun-eg/school-festival-shift/issues/302)）ので、**差し替える側には成り立たない**。**担当者に要求するものが 0 のことは変わらない**（担当者はテンプレートをコピーするだけである） |
+| **（落とした）貼るのは 1 回だけである** | タグごとに貼る形にした（→ CONTRIBUTING.md）。**繰り返す作業になった**が、貼り替えは 4 回で、clasp を要求するほどではない |
+| **（落とした）ファイル名が 1 対 1 で対応する** | `main.gs` 1 本になったので、リポジトリの `.ts` と Apps Script の `.gs` は名前で突き合わせられない。**代わりに版（タグ）で突き合わせる** |
 
-**却下ではない** — clasp を使いたい実装者が使うのは構わない。**手順の原本がどちらかを決めただけである。**
-**`src/` のファイルが増えたら、この判断は見直す。****4 つから 16 になったが、動かしていない**
-（`core.ts` と `shell.ts` → [#137](https://github.com/jun-eg/school-festival-shift/issues/137)、
-`verify-structure.ts` → [#138](https://github.com/jun-eg/school-festival-shift/issues/138)、
-`input-types.ts` → [#140](https://github.com/jun-eg/school-festival-shift/issues/140)、
-`count-violations.ts` → [#141](https://github.com/jun-eg/school-festival-shift/issues/141)、
-`name-unmet.ts` → [#142](https://github.com/jun-eg/school-festival-shift/issues/142)、
-`take-in.ts` → [#146](https://github.com/jun-eg/school-festival-shift/issues/146)、
-`expand.ts` → [#149](https://github.com/jun-eg/school-festival-shift/issues/149)、
-`generate.ts` → [#151](https://github.com/jun-eg/school-festival-shift/issues/151)、
-`fairness-metrics.ts` → [#154](https://github.com/jun-eg/school-festival-shift/issues/154)、
-`form-definition.ts` と `build-form.ts` ＋ `form-picker.html` → [#144](https://github.com/jun-eg/school-festival-shift/issues/144)）
-— **貼る回数はまだ手で追える**し、**貼るのが 1 回だけであることも、インストールが 0 であることも変わっていない。**
+**却下ではない** — clasp を使いたい実装者が使うのは構わない（`rootDir` は `dist`）。**手順の原本がどちらかを決めただけである。**
 **clasp の導入を担当者に要求することは、どちらにしても無い。**
 
 ## 確かめ方
@@ -838,7 +822,7 @@ npm test
 | [`clear-for-next-year.test.ts`](shell/clear-for-next-year.test.ts) | **偽のフォームと偽のスプレッドシートの上で、1 年使い終わったファイルを空にする。****フォームとの紐付けが外れ、回答の行と今年の題が消えるか**／**割り当て 4 枚・検証結果・指標がテンプレートの形に戻るか**（値・時刻の見出し・手直しの印・色・氏名のプルダウン・前に見たマス目の控え）／**条件入力は 9〜10 行目の URL だけが空き、ほかのセルが 1 つも動かないか**／**空にしたファイルで「フォームを作る」がもう一度通るか**／**フォームが開けなければ何も消さずに名指しして止まり、紐付いていなければ止まらないか**／**8 枚の保護が残るか** | 25 |
 | [`boundary.test.ts`](boundary.test.ts) | **`core/` の `import` が `core/` の中だけを指すか／`core/` が `SpreadsheetApp` などの Apps Script のグローバルを参照しないか**（コメントと文字列の中の名前は数えない）／**検出そのものが、`shell/` への `import`・`entry.ts` への `import`・パッケージの `import`・グローバルの参照を止めるか**（偽の書き方で確かめる） | 7 |
 | [`typecheck.test.ts`](typecheck.test.ts) | **型検査の設定が止めるべき書き方を止めるか**（わざと悪い 1 本を `tsc` に食わせる）。①悪い書き方が無ければ通る ／ ②**es2019 に無い API（`structuredClone` ・ `replaceAll`）で落ちる** ／ ③**`enum` で落ちる**（`erasableSyntaxOnly`） ／ ④**型だけの import を `import type` にしないと落ちる**（`verbatimModuleSyntax`） |
-| [`entry.test.ts`](entry.test.ts) | **[`entry.ts`](entry.ts) の一覧が、トリガー・`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` と過不足なく一致するか／ビルドが出す `dist` が 4 つで、`main.gs` の最上位の `function` が一覧どおりか／出した `main.gs` を読み込むと `onOpen` がメニュー「シフト」の 4 項目を出し、呼び先がどれも最上位の関数か／出した HTML が外から読み込む `script` を持たず、[`ui/`](ui/) の JS が入っているか**／**食い違いの検出が、足りない名前と余計な名前を名指しするか** | 13 |
+| [`entry.test.ts`](entry.test.ts) | **[`entry.ts`](entry.ts) の一覧が、トリガー・`menuItems`・HTML の `google.script.run` の呼び先・`buildTemplate` と過不足なく一致するか／ビルドが出す `dist` が 4 つで、`main.gs` の最上位の `function` が一覧どおりか／出した `main.gs` を読み込むと `onOpen` がメニュー「シフト」の 5 項目を出し、呼び先がどれも最上位の関数か／出した HTML が外から読み込む `script` を持たず、[`ui/`](ui/) の JS が入っているか**／**食い違いの検出が、足りない名前と余計な名前を名指しするか／ビルドが版（タグ、無ければ短い SHA）を `main.gs` の定数に埋め、メニューの「バージョン」が出すか** | 19 |
 
 **この 20 本で分かるのは、手元で回る範囲だけである。**
 **実機でしか分からないものの名指しと、実機で見た結果は
