@@ -97,15 +97,30 @@ def program(tokens):
 
 
 def git_global_option_values(tokens):
-    """`git -c k=v push` の `-c` の値（`core.hooksPath=` で hook の置き場を差し替える抜け道を見るため）。"""
+    """サブコマンドの手前の `-c k=v` と `--config-env k=v` の値（`core.hooksPath` で hook の置き場を差し替える抜け道を見るため）。
+
+    `-C dir` のように値を取るオプションは値ごと飛ばし、サブコマンドの手前まで読む（git_subcommand と同じ）。
+    """
+    takes_value = ("-C", "--git-dir", "--work-tree", "--namespace", "--exec-path")
     values = []
     i = 1
-    while i < len(tokens) and tokens[i].startswith("-"):
-        if tokens[i] == "-c" and i + 1 < len(tokens):
+    while i < len(tokens):
+        token = tokens[i]
+        if token in ("-c", "--config-env") and i + 1 < len(tokens):
             values.append(tokens[i + 1])
             i += 2
             continue
-        i += 1
+        if token.startswith("--config-env="):
+            values.append(token.split("=", 1)[1])
+            i += 1
+            continue
+        if token in takes_value:
+            i += 2
+            continue
+        if token.startswith("-"):
+            i += 1
+            continue
+        break
     return values
 
 
@@ -116,7 +131,7 @@ def is_no_verify(arg):
 
 def git_subcommand(tokens):
     """`git -C dir push ...` のような前置きオプションを飛ばして (サブコマンド, 残り) を返す。"""
-    takes_value = ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path")
+    takes_value = ("-C", "-c", "--config-env", "--git-dir", "--work-tree", "--namespace", "--exec-path")
     i = 1
     while i < len(tokens):
         token = tokens[i]

@@ -7,8 +7,10 @@
 # 環境変数での skip は置かない（Claude が設定できてしまう）。CI では回さない（CI に鍵を置かない）。
 #
 # push される範囲は stdin の `<local ref> <local sha> <remote ref> <remote sha>` から取る。
-#   remote sha がゼロ（新しい branch）なら、origin/main（無ければ main）との merge-base から local sha まで。
-#   remote sha がこの repo に無い（取り込んでいない）ときも同じ。branch の削除（local sha がゼロ）は見ない。
+#   remote sha がゼロ（新しい branch）か、この repo に無い（取り込んでいない）ときは、
+#   `git rev-list <local sha> --not --remotes=<remote 名>`（hook の第 1 引数）で、どの remote ref にも無い commit だけを取り、
+#   その最古の commit の親から local sha まで。空なら見ない。クッションから切った branch の初回 push で、
+#   merge 済みの commit まで読まないため。branch の削除（local sha がゼロ）は見ない。
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
@@ -17,7 +19,9 @@ ZERO=0000000000000000000000000000000000000000
 # 検査ファイル（git の glob）
 TEST_PATHS=':(glob)src/**/*.test.ts :(glob)scripts/**/*.test.mjs :(glob)e2e/**/*.test.mjs :(glob)e2e/**/*.e2e.mjs'
 # 検査を弱める設定。差分の +/- の行に test などが出るときだけ見る
-CONFIG_PATHS='package.json .github/workflows/ci.yml'
+CONFIG_PATHS='package.json'
+# ci.yml は差分が 1 行でもあれば読ませる（if: false や on: の削除は語で拾えない）
+ALWAYS_PATHS='.github/workflows/ci.yml'
 CONFIG_WORDS='test|e2e|skip|todo|continue-on-error|glob'
 
 # hook は GIT_DIR などを子に渡す。claude の中で git を呼ぶので外す
@@ -29,20 +33,12 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "$local_sha" ] || continue
   [ "$local_sha" != "$ZERO" ] || continue
 
-  base=""
   if [ "$remote_sha" != "$ZERO" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
     base="$remote_sha"
   else
-    for trunk in origin/main main; do
-      if git rev-parse --verify -q "$trunk^{commit}" >/dev/null; then
-        base=$(git merge-base "$trunk" "$local_sha" 2>/dev/null) || base=""
-        [ -z "$base" ] || break
-      fi
-    done
-  fi
-  if [ -z "$base" ]; then
-    echo "pre-push: push の範囲の起点（origin/main か main との merge-base）が取れない。git fetch origin してから打ち直す。" >&2
-    exit 1
+    oldest=$(git rev-list --reverse "$local_sha" --not --remotes="$1" | head -n 1)
+    [ -n "$oldest" ] || continue
+    base=$(git rev-parse --verify -q "$oldest^" 2>/dev/null) || base=$(git hash-object -t tree /dev/null)
   fi
   [ "$base" != "$local_sha" ] || continue
   range="$base..$local_sha"
@@ -55,6 +51,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 $f"
     fi
   done
+  # shellcheck disable=SC2086
+  files="$files
+$(git diff --name-only "$range" -- $ALWAYS_PATHS)"
   files=$(printf '%s\n' "$files" | sed '/^$/d')
   [ -n "$files" ] || continue
 

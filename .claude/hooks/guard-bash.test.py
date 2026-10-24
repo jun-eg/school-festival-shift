@@ -52,6 +52,9 @@ DENY = [
     "git push --no-ver origin foo",
     "git -C /tmp/x push --no-verify origin foo",
     "git -c core.hooksPath=/dev/null push origin foo",
+    "git -C /tmp/x -c core.hooksPath=/dev/null push origin foo",
+    "git --config-env=core.hooksPath=V push origin foo",
+    "git --config-env core.hooksPath=V push origin foo",
     "cd /tmp && git push origin foo --no-verify",
     # main への push（issue #320）
     "git push origin main",
