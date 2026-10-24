@@ -1,5 +1,14 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npm run format)",
+      "Bash(npm run build)",
+      "Bash(npm run e2e)",
+      "Bash(npm run 判定)"
+    ],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push --force-with-lease:*)",
