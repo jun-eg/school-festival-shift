@@ -13,8 +13,8 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 読み込む, 取り出す } from './判定の入力.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
@@ -78,11 +78,15 @@ class 偽の範囲 {
   setBorder() {
     return this
   }
+  // 名前の選択肢（→ shell の putNameDropdowns）。入力規則そのものは見ない。
+  setDataValidation() {
+    return this
+  }
   // 結合はテンプレートの組み立てが置く（→ build-template.test.mjs の ⑧）。ここでは見ない。
   merge() {
     return this
   }
-  // 手直しの印はセルのメモ（→ src/assignment-grid.js の fixedNote）。見るのは値だけなので、読めば空、書けば捨てる。
+  // 手直しの印はセルのメモ（→ src/core/assignment-grid.ts の fixedNote）。見るのは値だけなので、読めば空、書けば捨てる。
   getNotes() {
     return this.getValues().map((行) => 行.map(() => ''))
   }
@@ -106,7 +110,7 @@ class 偽の保護 {
     this.warningOnly = 値
     return this
   }
-  // 割り当ての 4 枚は「持ち主だけ」、条件入力は入力欄を外す（→ src/build-template.js の applyProtection ／ issue #234）。
+  // 割り当ての 4 枚は「持ち主だけ」、条件入力は入力欄を外す（→ src/shell/build-template.ts の applyProtection ／ issue #234）。
   // この手は保護の中身を見ないので、受けて捨てる。
   getEditors() {
     return []
@@ -365,11 +369,28 @@ const 偽のUI = {
 const 帳簿 = {}
 const 作られたフォーム = []
 
-const 文脈 = vm.createContext({
+Object.assign(globalThis, {
   SpreadsheetApp: {
     ProtectionType: { SHEET: 'SHEET' },
     BorderStyle: { SOLID_THICK: 'SOLID_THICK' },
     flush() {},
+    newDataValidation() {
+      const 組み立て = {
+        requireValueInRange() {
+          return 組み立て
+        },
+        setAllowInvalid() {
+          return 組み立て
+        },
+        setHelpText() {
+          return 組み立て
+        },
+        build() {
+          return {}
+        },
+      }
+      return 組み立て
+    },
     getActive() {
       return 帳簿['this-spreadsheet']
     },
@@ -413,13 +434,9 @@ const 文脈 = vm.createContext({
       return { 中身, mimeType, fileName }
     },
   },
-  console: { log() {} },
 })
-for (const 相対 of 宣言.入力.src) {
-  vm.runInContext(読む(相対), 文脈, { filename: path.basename(相対) })
-}
-const { onOpen, createForm, createFormFromPicker, buildTemplateInto, run } = 文脈
-const { menuItems, sheetLayout } = vm.runInContext('({ menuItems, sheetLayout })', 文脈)
+const 文脈 = await 読み込む(宣言.入力.src)
+const { onOpen, createForm, createFormFromPicker, buildTemplateInto, run, menuItems, sheetLayout } = 取り出す(文脈, ['onOpen', 'createForm', 'createFormFromPicker', 'buildTemplateInto', 'run', 'menuItems', 'sheetLayout'])
 
 // ---- 入力を置く --------------------------------------------------------------
 
@@ -456,11 +473,6 @@ const モックの表 = CSVを読む(読む(宣言.入力.回答))
 const モックの見出し = モックの表[0]
 const モックの行 = モックの表.slice(1).map(回答シートに貼る形)
 
-/** 「日ごとの営業時刻」に入れる 4 行（→ 宣言の「入力」）。始まりの 4 つは営業開始。 */
-function 営業時刻の行() {
-  return Object.entries(宣言.入力.条件入力.日ごとの営業時刻).map(([日, [開始, 終了]]) => [日, 開始, 開始, 開始, 開始, 終了])
-}
-
 // ---- 経路を 1 本通す ---------------------------------------------------------
 
 const 見たもの = { 止まった: [] }
@@ -471,11 +483,7 @@ function 経路を通す() {
   帳簿['this-spreadsheet'] = 帳
   buildTemplateInto(帳)
 
-  // フォームを作る前に「日ごとの営業時刻」を入れる（入力なので数えない）。
-  const 条件 = 帳.getSheetByName('条件入力')
-  営業時刻の行().forEach((行, i) => {
-    条件.getRange(3 + i, 1, 1, 行.length).setValues([行])
-  })
+  // 条件入力は書き換えない。テンプレートの初期値（前回の値）のままフォームを作る（→ 宣言の「置き方」）。
 
   // 段 1 — 開くとメニューが出て、押すと名簿の画像を選ぶ画面が開く。
   try {
@@ -505,7 +513,7 @@ function 経路を通す() {
   }
 
   // 段 7〜10 — 殻の 1 本をそのまま走らせる。数えるのは型 #6 が出るまでなので、
-  // 「展開する」の段を差し替えて取り込んだ型を受け取る（→ core.js の build）。
+  // 「展開する」の段を差し替えて取り込んだ型を受け取る（→ core.ts の build）。
   try {
     見たもの.notBuilt = run(帳, {
       展開する: (希望) => {

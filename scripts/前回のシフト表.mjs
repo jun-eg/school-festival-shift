@@ -13,8 +13,8 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { 読み込む, 取り出す } from './判定の入力.mjs'
 import { 営業時刻の行 } from './前回の5時刻.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
@@ -25,12 +25,8 @@ const 宣言 = JSON.parse(読む('scripts/前回のシフト表の宣言.json'))
 
 // ---- 実装を読む ------------------------------------------------------------
 
-const 文脈 = vm.createContext({})
-for (const 名 of ['sheet-layout.js', 'input-types.js', 'core.js', 'assignment-grid.js', 'distribution-image.js']) {
-  vm.runInContext(読む(path.join('src', 名)), 文脈, { filename: 名 })
-}
-const { toDays, toAssignmentGrid, distributionTable } = 文脈
-const { dayLabels, assignmentColumns } = vm.runInContext('({ dayLabels, assignmentColumns })', 文脈)
+const 文脈 = await 読み込む(['src/core/sheet-layout.ts', 'src/core/input-types.ts', 'src/core/assignment-grid.ts', 'src/core/distribution-image.ts'])
+const { toDays, toAssignmentGrid, distributionTable, dayLabels, assignmentColumns } = 取り出す(文脈, ['toDays', 'toAssignmentGrid', 'distributionTable', 'dayLabels', 'assignmentColumns'])
 
 const 分にする = (時刻) => Number(時刻.split(':')[0]) * 60 + Number(時刻.split(':')[1])
 

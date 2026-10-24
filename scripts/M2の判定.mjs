@@ -21,7 +21,7 @@ import { 読む, 宣言, 実装の文脈, 取り出す, 判定の入力 } from '
 // ---- 実装を読む ------------------------------------------------------------
 // 文脈と入力は scripts/判定の入力.mjs が組む（まとまりと散らし.mjs と同じ案の上で読むため）。
 
-const 文脈 = 実装の文脈()
+const 文脈 = await 実装の文脈()
 const { build, builtInSteps, coreSteps, takeConditions, readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind, violationRules, violationsNotCounted, ruleRoles } = 取り出す(文脈, [
   'build',
   'builtInSteps',
@@ -77,7 +77,7 @@ const 一周 = 一周する(入力)
 const 出力 = 一周.出力
 
 // ---- 検証結果を種別で分ける ------------------------------------------------
-// 列の並びは src/sheet-layout.js が持つ。列の番号をここに書かない。
+// 列の並びは src/core/sheet-layout.ts が持つ。列の番号をここに書かない。
 
 const 検証結果の列 = sheetColumns('検証結果')
 const 列番号 = (名) => 検証結果の列.indexOf(名)
@@ -87,7 +87,7 @@ const 検証結果 = 出力['検証結果']
 const 違反の行 = 検証結果.filter((行) => 値(行, '種別') === checkKind.violation)
 const 未充足の行 = 検証結果.filter((行) => 値(行, '種別') === checkKind.unmet)
 
-/** 違反を内容の頭の規則名で分ける（→ src/count-violations.js の violationRow）。 */
+/** 違反を内容の頭の規則名で分ける（→ src/core/count-violations.ts の violationRow）。 */
 function 違反の内訳() {
   const 内訳 = violationRules.map((規則) => ({
     label: 規則.label,
@@ -121,7 +121,7 @@ function 案の不足() {
   const 置いた = 置いた人数()
   const 不足 = []
   let 需要のべ = 0
-  // 人数を決めたもとごとの内訳（ラベルは src/name-unmet.js の unmetSources → issue #210）。
+  // 人数を決めたもとごとの内訳（ラベルは src/core/name-unmet.ts の unmetSources → issue #210）。
   const のべの内訳 = {}
   let 需要の枠に置いた = 0
   const 超過 = []

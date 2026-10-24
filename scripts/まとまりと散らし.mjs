@@ -10,7 +10,7 @@
 //   散らし … その日に候補枠を持つ人のうち、何人が置かれ、1 人あたり何時間になったか
 //
 // 違反と未充足は scripts/M2の判定.mjs が判定する（同じ数を 2 か所で判定しない）。
-// 例外の名前は src/generate.js の runExceptions をそのまま読む（2 か所に持つと片方が古くなる）。
+// 例外の名前は src/core/generate.ts の runExceptions をそのまま読む（2 か所に持つと片方が古くなる）。
 // 読むだけ。合格の線を外したら終了コード 1。
 
 import { 読む, 実装の文脈, 取り出す, 判定の入力 } from './判定の入力.mjs'
@@ -19,7 +19,7 @@ const 宣言 = JSON.parse(読む('scripts/まとまりと散らしの宣言.json
 
 // ---- 実装を読む ------------------------------------------------------------
 
-const 文脈 = 実装の文脈()
+const 文脈 = await 実装の文脈()
 const { build, takeConditions, takeIn, expand, sheetColumns, allNeeds, requiredAt, rolesInOrder, roleSlotKey, peopleToPlace, canStandAt, prepCleanupStaysPossible, prepCleanupNotBothBands, prepCleanupRoles, noonBoundaryToPlaceBy, minRunSlotsToPlaceBy, runExceptions, slotMinutes } = 取り出す(文脈, [
   'build',
   'takeConditions',
@@ -71,7 +71,7 @@ const 枠の人数 = {}
   枠の人数[鍵] = (枠の人数[鍵] || 0) + 1
 })
 
-/** 置く前の人（→ src/generate.js）。「その日に置ける人」を見るのに使う。 */
+/** 置く前の人（→ src/core/generate.ts）。「その日に置ける人」を見るのに使う。 */
 const 置く前の人 = peopleToPlace(候補, 希望)
 const 人を引く = {}
 置く前の人.forEach((一人) => {
@@ -106,7 +106,7 @@ function 塊を切る(一日, 学籍番号) {
 const 長さ = (一つ) => 一つ.終わり - 一つ.始め + 1
 
 /**
- * 塊の端を 1 つ見て、そこで止まった名前を返す（→ src/generate.js の runExceptions）。
+ * 塊の端を 1 つ見て、そこで止まった名前を返す（→ src/core/generate.ts の runExceptions）。
  * null は伸ばせたのに伸びていない端で、線に当てる「名前の付かない短い塊」はこれを数える。
  */
 function 端の名前(一日, 一つ, 向き) {
@@ -139,7 +139,7 @@ function 中央(数の列) {
   return 並び.length % 2 === 1 ? 並び[Math.floor(半)] : (並び[半 - 1] + 並び[半]) / 2
 }
 
-/** 枠の数を時間にする（枠の刻みは src/input-types.js が持つ）。 */
+/** 枠の数を時間にする（枠の刻みは src/core/input-types.ts が持つ）。 */
 const 時間で = (枠の数) => (枠の数 * slotMinutes) / 60
 
 // ---- 散らしを数える --------------------------------------------------------
@@ -283,7 +283,7 @@ function 主処理() {
   })
 
   console.log('')
-  console.log('最小の長さに届かない塊の内訳（例外の名前は src/generate.js の runExceptions が持つ）')
+  console.log('最小の長さに届かない塊の内訳（例外の名前は src/core/generate.ts の runExceptions が持つ）')
   例外の内訳.forEach((一つ) => {
     console.log(`  ・${一つ.what}: ${一つ.件数} 件`)
     console.log(`      ${一つ.why}`)
