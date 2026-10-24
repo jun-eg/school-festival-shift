@@ -103,7 +103,7 @@ function usedBook(id) {
 /** 条件入力のセルを、URL 欄の C 列を除いて全部写す。 */
 function inputCellsExceptUrls(book) {
   const sheet = book.getSheetByName('条件入力')
-  const urlKeys = formUrlBlock.rows.map((one, i) => `${formUrlBlock.row + i},${formUrlBlock.urlColumn}`)
+  const urlKeys = formUrlBlock.rows.map((_one, i) => `${formUrlBlock.row + i},${formUrlBlock.urlColumn}`)
   return [...sheet.cells.entries()].filter(([key]) => urlKeys.indexOf(key) === -1).sort()
 }
 

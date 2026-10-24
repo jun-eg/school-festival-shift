@@ -42,7 +42,9 @@ function emptyTemplate() {
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
-      section.columns.forEach((columnName, i) => sheet.put(columnNameRow, section.startColumn + i, columnName))
+      section.columns.forEach((columnName, i) => {
+        sheet.put(columnNameRow, section.startColumn + i, columnName)
+      })
     })
     return sheet
   })

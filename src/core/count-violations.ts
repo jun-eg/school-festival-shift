@@ -113,12 +113,16 @@ export function countViolations(assignments: Row[] | undefined, conditions: Part
 
     // 規則 4 — 調理責任者の枠に置く人は 3 年生または 4 年生である
     if (one.role === ruleRoles.cookLeader) {
-      cookLeaderGradeBroken(one, conditions, wishBy).forEach((row) => violations.push(row))
+      cookLeaderGradeBroken(one, conditions, wishBy).forEach((row) => {
+        violations.push(row)
+      })
     }
 
     // 規則 5 — 調理の枠に置く人は 調理担当ですか？ が はい である
     if (cookRoles.indexOf(one.role) !== -1) {
-      cookAnswerBroken(one, wishBy).forEach((row) => violations.push(row))
+      cookAnswerBroken(one, wishBy).forEach((row) => {
+        violations.push(row)
+      })
     }
 
     // 規則ではない — 同じ人が同じ 30 分枠に二重に入っている

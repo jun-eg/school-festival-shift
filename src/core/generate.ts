@@ -598,7 +598,9 @@ export function wantedBandSlots(board: Board, needs: HeldNeed[], person: Person,
 export function placeInBand(board: Board, needs: HeldNeed[], person: Person, day: Day, role: string): void {
   const wanted = wantedBandSlots(board, needs, person, day, role)
   const slots = wanted.length > 0 ? wanted : [freeBandSlots(person, day, role)[0]]
-  slots.forEach((slot) => place(board, person, day.date, slot, role))
+  slots.forEach((slot) => {
+    place(board, person, day.date, slot, role)
+  })
 }
 
 /**
@@ -683,7 +685,7 @@ export function fixedToPlace(fixed: Row[] | undefined, days: Day[]): FixedLine[]
  * 文はそのままセルのメモと検証結果の「内容」に出る（→ assignment-grid.ts の conflictNote）ので、
  * 違反の頭の名前（→ violationRules）は付けず、作成者が読んで分かる一文にする（→ issue #249）。
  */
-export function whyFixedCannotStay(one: FixedLine, person: Person | undefined, wish: Wish | undefined, conditions: Partial<Conditions> | undefined, boundary: string, alreadyClaimed: boolean | undefined): string | null {
+export function whyFixedCannotStay(one: FixedLine, person: Person | undefined, wish: Wish | undefined, conditions: Partial<Conditions> | undefined, _boundary: string, alreadyClaimed: boolean | undefined): string | null {
   if (!one.slot) {
     return `営業時刻が変わったため、${one.date} の ${one.start === '' ? '（空）' : one.start} の列がなくなりました`
   }
@@ -752,7 +754,9 @@ export function releaseFixesBreakingRule3(board: Board, people: Person[], days: 
           })
           return
         }
-        taken.forEach((one) => place(board, person, day.date, one.slot, one.role))
+        taken.forEach((one) => {
+          place(board, person, day.date, one.slot, one.role)
+        })
       }
     })
   })
@@ -865,7 +869,9 @@ export function assignmentRows(needs: HeldNeed[], days: Day[], people: Person[])
         if (role) here.push({ role: role, person: person })
       })
       here.sort((a, b) => roleRank(order, a.role) - roleRank(order, b.role) || a.person.order - b.person.order)
-      here.forEach((one) => rows.push(assignmentRow(day.date, slot, one.role, one.person.studentId)))
+      here.forEach((one) => {
+        rows.push(assignmentRow(day.date, slot, one.role, one.person.studentId))
+      })
     })
   })
 

@@ -80,10 +80,14 @@ function emptyTemplate() {
     layout.sections.forEach((section) => {
       if (layout.hasSectionHeadings) sheet.put(1, section.startColumn, section.heading)
       const columnNameRow = layout.hasSectionHeadings ? 2 : 1
-      section.columns.forEach((columnName, i) => sheet.put(columnNameRow, section.startColumn + i, columnName))
+      section.columns.forEach((columnName, i) => {
+        sheet.put(columnNameRow, section.startColumn + i, columnName)
+      })
     })
     if (layout.name === formUrlBlock.sheet) {
-      formUrlBlock.rows.forEach((one, i) => sheet.put(formUrlBlock.row + i, formUrlBlock.labelColumn, one.label))
+      formUrlBlock.rows.forEach((one, i) => {
+        sheet.put(formUrlBlock.row + i, formUrlBlock.labelColumn, one.label)
+      })
     }
     if (layout.name === handoverBlock.sheet) {
       sheet.put(handoverBlock.row, handoverBlock.labelColumn, handoverBlock.label).put(handoverBlock.row, handoverBlock.urlColumn, handoverBlock.url)
@@ -106,10 +110,14 @@ function filledBook() {
     [4, 8, 10, 18, 18, 20],
   ].forEach((row, i) => {
     conditions.put(3 + i, 1, new Date(2025, 10, row[0]))
-    row.slice(1).forEach((hour, j) => conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0)))
+    row.slice(1).forEach((hour, j) => {
+      conditions.put(3 + i, 2 + j, new Date(1899, 11, 30, hour, 0, 0))
+    })
   })
   // 役割と必要人数（H〜L）— 1 行だけ。時間帯を空けた行はその日の調理帯に効く（→ 5-1 の #2）
-  ;['', '', '', '調理', 2].forEach((value, j) => conditions.put(3, 8 + j, value))
+  ;['', '', '', '調理', 2].forEach((value, j) => {
+    conditions.put(3, 8 + j, value)
+  })
   // 調理責任者の学年（N）— 2 行
   conditions.put(3, 14, 3).put(4, 14, ' 4 ')
   // 準備・片付けのルール（V〜W）— 1 行
@@ -133,7 +141,9 @@ function filledBook() {
     '8:00-22:00',
     '8:00-15:00',
   ]
-  answerRow.forEach((value, j) => answers.put(2, 1 + j, value))
+  answerRow.forEach((value, j) => {
+    answers.put(2, 1 + j, value)
+  })
 
   // 前の周の割り当て 1 セル（4 列目 ＝ 08:00-08:30）。メモが無いので機械が置いたセルである（→ ⑧）。
   const prepDay = book.getSheetByName(dayLabels[0])
@@ -816,7 +826,11 @@ function dropdownBook() {
     [new Date(2025, 8, 23, 18, 0, 0), 'ESA0000001', '佐藤花', '1年生', 'いいえ', ''],
     [new Date(2025, 8, 23, 19, 0, 0), 'ESA0000002', '佐藤花', '2年生', 'いいえ', ''],
     [new Date(2025, 8, 24, 9, 0, 0), 'eck2626643', ' 森田咲良 ', '2年生', 'いいえ', ''],
-  ].forEach((row, i) => row.concat(wishes).forEach((value, j) => answers.put(3 + i, 1 + j, value)))
+  ].forEach((row, i) => {
+    row.concat(wishes).forEach((value, j) => {
+      answers.put(3 + i, 1 + j, value)
+    })
+  })
   return book
 }
 

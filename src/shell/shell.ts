@@ -504,7 +504,9 @@ export function fillStudentIds(spreadsheet: Spreadsheet, range: Range): StudentI
   if (changedRows.length === 0) return result
 
   sheet.getRange(top, studentIdColumn, bottom - top + 1, 1).setValues(studentIds)
-  changedRows.forEach((row) => markFixedCells(sheet.getRange(row, studentIdColumn)))
+  changedRows.forEach((row) => {
+    markFixedCells(sheet.getRange(row, studentIdColumn))
+  })
   return result
 }
 
@@ -619,7 +621,9 @@ function keepSeenGrid(sheet: Sheet, seen: SeenGrid | null): void {
     const value = JSON.stringify(seen)
     if (found.length > 0) found[0].setValue(value)
     else sheet.addDeveloperMetadata(seenGridKey, value)
-    found.slice(1).forEach((one) => one.remove())
+    found.slice(1).forEach((one) => {
+      one.remove()
+    })
   } catch {
     found.forEach((one) => {
       try {
@@ -633,7 +637,9 @@ function keepSeenGrid(sheet: Sheet, seen: SeenGrid | null): void {
 
 /** 塗ったマス目 4 枚の控えを置き直す（→ run ／ recountSpreadsheet）。 */
 function keepSeenGrids(spreadsheet: Spreadsheet, grids: GridOf[]): void {
-  grids.forEach((one) => keepSeenGrid(findSheet(spreadsheet, one.layout.name), seenGrid(one.grid.header, one.grid.rows)))
+  grids.forEach((one) => {
+    keepSeenGrid(findSheet(spreadsheet, one.layout.name), seenGrid(one.grid.header, one.grid.rows))
+  })
 }
 
 /**

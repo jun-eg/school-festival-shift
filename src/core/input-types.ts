@@ -490,7 +490,7 @@ export function readTime(source: string, columns: string[], row: Row, rowIndex: 
 /** 人数のセル。数のまま来る（→ shell.ts の normalizeValue）。 */
 function readCount(source: string, columns: string[], row: Row, rowIndex: number, columnName: string): number {
   const cell = cellOf(source, columns, row, rowIndex, columnName)
-  if (typeof cell.value !== 'number' || !isFinite(cell.value) || Math.floor(cell.value) !== cell.value || cell.value < 1) {
+  if (typeof cell.value !== 'number' || !Number.isFinite(cell.value) || Math.floor(cell.value) !== cell.value || cell.value < 1) {
     throw new Error(`${cell.where}は 1 以上の整数で書いてください（今: ${showBlankValue(cell.value)}）`)
   }
   return cell.value

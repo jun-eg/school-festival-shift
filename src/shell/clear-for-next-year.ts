@@ -48,8 +48,12 @@ export function clearForNextYearOn(spreadsheet: Spreadsheet): Cleared {
   const log: string[] = []
   const formUrl = unlinkAnswerForm(spreadsheet, log)
   clearAnswers(spreadsheet, log)
-  gridLayouts(assignmentName).forEach((layout) => clearGrid(findSheet(spreadsheet, layout.name), layout, log))
-  ;['検証結果', '指標'].forEach((name) => clearOutput(spreadsheet, findLayout(name), log))
+  gridLayouts(assignmentName).forEach((layout) => {
+    clearGrid(findSheet(spreadsheet, layout.name), layout, log)
+  })
+  ;['検証結果', '指標'].forEach((name) => {
+    clearOutput(spreadsheet, findLayout(name), log)
+  })
   clearFormUrls(spreadsheet, log)
   return { formUrl: formUrl, log: log }
 }
@@ -124,7 +128,9 @@ function clearGrid(sheet: Sheet, layout: Layout, log: string[]): void {
   sheet
     .getDeveloperMetadata()
     .filter((one) => one.getKey() === seenGridKey)
-    .forEach((one) => one.remove())
+    .forEach((one) => {
+      one.remove()
+    })
   log.push(`「${layout.name}」を空にした（${people} 行）`)
 }
 

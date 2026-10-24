@@ -54,7 +54,7 @@ function show(images: DistributionImage[]) {
     section.appendChild(heading)
 
     if (!image.drawing) {
-      var empty = document.createElement('p')
+      const empty = document.createElement('p')
       empty.className = 'note'
       empty.textContent = 'この日はシフトが入っていないため、画像はありません。'
       section.appendChild(empty)

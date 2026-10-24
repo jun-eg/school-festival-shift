@@ -275,7 +275,9 @@ function 主処理() {
   if (時刻の検め.外れ.length === 0) {
     console.log('  OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
   } else {
-    時刻の検め.外れ.forEach((一つ) => console.log(`  NG   5 時刻が期待と違う: ${一つ}`))
+    時刻の検め.外れ.forEach((一つ) => {
+      console.log(`  NG   5 時刻が期待と違う: ${一つ}`)
+    })
   }
   console.log('       値の出どころ（どの行から出たか）は node scripts/前回の5時刻.mjs が出す')
 

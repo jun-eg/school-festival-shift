@@ -69,7 +69,9 @@ const lastYearRows = [
 function putBusinessHours(book, rows) {
   const sheet = book.getSheetByName('条件入力')
   sheet.getRange(3, 1, 4, 6).setValues(Array.from({ length: 4 }, () => Array(6).fill('')))
-  rows.forEach((row, i) => sheet.getRange(3 + i, 1, 1, row.length).setValues([row]))
+  rows.forEach((row, i) => {
+    sheet.getRange(3 + i, 1, 1, row.length).setValues([row])
+  })
   return book
 }
 

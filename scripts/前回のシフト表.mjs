@@ -66,7 +66,9 @@ const 枠に落ちなかった区間 = []
         枠に落ちなかった区間.push(`${一件.date} ${一件.start}-${一件.end} ${一件.role}`)
         return
       }
-      重なる枠.forEach((枠) => 行.push(割り当ての行(一件.date, 枠, 一件.role, 一人.memberId, 一人.name)))
+      重なる枠.forEach((枠) => {
+        行.push(割り当ての行(一件.date, 枠, 一件.role, 一人.memberId, 一人.name))
+      })
     })
   })
 })
@@ -120,22 +122,22 @@ const 敷いた = 日ごと.map((一日, i) => {
 /** マス目の埋まったセルを（氏名・時刻・役割）にする。 */
 function マス目の三つ組(マス目) {
   const 組 = []
-  マス目.rows.forEach((一行) =>
+  マス目.rows.forEach((一行) => {
     一行.slice(2).forEach((役割, j) => {
       if (役割 !== '') 組.push(`${一行[1]} ${マス目.header[2 + j]} ${役割}`)
-    }),
-  )
+    })
+  })
   return 組.sort()
 }
 
 /** 配る画像の表を（名前・時刻・役割）にする。 */
 function 画像の三つ組(表) {
   const 組 = []
-  表.rows.forEach((一行) =>
+  表.rows.forEach((一行) => {
     一行.cells.forEach((セル, j) => {
       if (セル.role !== '') 組.push(`${一行.name} ${表.times[j]} ${セル.role}`)
-    }),
-  )
+    })
+  })
   return 組.sort()
 }
 
@@ -175,7 +177,9 @@ console.log('敷いた形（1 日 1 枚。行が人、列が 30 分枠、セル�
 console.log('')
 console.log('1 セルに 2 役割になるセル（マス目は 1 セル 1 役割である → 5 の #8）')
 if (重なり.length === 0) console.log('  無し')
-重なり.forEach((一つ) => console.log(`  ${一つ}`))
+重なり.forEach((一つ) => {
+  console.log(`  ${一つ}`)
+})
 if (重なり.length > 0) {
   console.log('  ※ 敷くほうからは後ろの 1 件を外した。記録は 1 文字も書き換えていない（→ 宣言の決め）')
 }

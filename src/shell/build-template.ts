@@ -197,7 +197,9 @@ function replaceValues(sheet: Sheet, row: number, startColumn: number, values: C
  * 「持ち主だけ」は編集者を全部外す（持ち主と、走らせている人は外れない）。
  */
 export function applyProtection(sheet: Sheet, layout: Layout, log: string[]): void {
-  sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((existing) => existing.remove())
+  sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach((existing) => {
+    existing.remove()
+  })
 
   if (!layout.protect) return
 

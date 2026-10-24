@@ -46,11 +46,17 @@ class 偽の範囲 {
     return 表
   }
   setValues(表) {
-    表.forEach((行, i) => 行.forEach((値, j) => this.シート.cells.set(`${this.行 + i},${this.列 + j}`, 値)))
+    表.forEach((行, i) => {
+      行.forEach((値, j) => {
+        this.シート.cells.set(`${this.行 + i},${this.列 + j}`, 値)
+      })
+    })
     return this
   }
   clearContent() {
-    this.位置().forEach((鍵) => this.シート.cells.delete(鍵))
+    this.位置().forEach((鍵) => {
+      this.シート.cells.delete(鍵)
+    })
     return this
   }
   setFontWeight() {
@@ -467,7 +473,9 @@ function 経路を通す() {
 
   // フォームを作る前に「日ごとの営業時刻」を入れる（入力なので数えない）。
   const 条件 = 帳.getSheetByName('条件入力')
-  営業時刻の行().forEach((行, i) => 条件.getRange(3 + i, 1, 1, 行.length).setValues([行]))
+  営業時刻の行().forEach((行, i) => {
+    条件.getRange(3 + i, 1, 1, 行.length).setValues([行])
+  })
 
   // 段 1 — 開くとメニューが出て、押すと名簿の画像を選ぶ画面が開く。
   try {
@@ -491,7 +499,9 @@ function 経路を通す() {
   // 段 6 — 回答が積まれる。判定ではモックの 50 行を貼る。
   if (見たもの.回答シート) {
     見たもの.回答シートの見出し = 見たもの.回答シート.getRange(1, 1, 1, モックの見出し.length).getValues()[0]
-    モックの行.forEach((行, i) => 見たもの.回答シート.getRange(2 + i, 1, 1, 行.length).setValues([行]))
+    モックの行.forEach((行, i) => {
+      見たもの.回答シート.getRange(2 + i, 1, 1, 行.length).setValues([行])
+    })
   }
 
   // 段 7〜10 — 殻の 1 本をそのまま走らせる。数えるのは型 #6 が出るまでなので、
@@ -606,11 +616,11 @@ const 段の見方 = {
   値の表現を揃える: () => {
     const 行 = 見たもの.回答の行 ?? []
     const 揃っていない = []
-    行.forEach((一行, i) =>
+    行.forEach((一行, i) => {
       一行.forEach((セル, j) => {
         if (typeof セル !== 'string' && typeof セル !== 'number') 揃っていない.push(`${i + 2} 行目 ${j + 1} 列目`)
-      }),
-    )
+      })
+    })
     const 日時 = 行.map((一行) => 一行[0])
     const 日時でない = 日時.filter((値) => !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(値)))
     return {

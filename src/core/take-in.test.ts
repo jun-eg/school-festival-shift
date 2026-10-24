@@ -144,7 +144,8 @@ check(
   (() => {
     const rowsById = {}
     mockRows.forEach((row) => {
-      ;(rowsById[row[1]] = rowsById[row[1]] || []).push(row)
+      rowsById[row[1]] = rowsById[row[1]] || []
+      rowsById[row[1]].push(row)
     })
     const resubmitted = Object.keys(rowsById).filter((id) => rowsById[id].length > 1)
     const oldest = resubmitted.filter((id) => {

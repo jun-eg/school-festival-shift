@@ -76,7 +76,9 @@ export function inputNames(): string[] {
       })
       return
     }
-    layout.sections.forEach((section) => names.push(layout.hasSectionHeadings ? (section.heading as string) : layout.name))
+    layout.sections.forEach((section) => {
+      names.push(layout.hasSectionHeadings ? (section.heading as string) : layout.name)
+    })
   })
   return names
 }

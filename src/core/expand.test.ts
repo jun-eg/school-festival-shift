@@ -140,7 +140,7 @@ check(
 const sweep: string[] = []
 for (let hour = 0; hour <= 23; hour++) {
   ;['00', '05', '30', '59'].forEach((minute) => {
-    sweep.push(`${hour}:${minute}-${hour + 1 > 23 ? 23 : hour + 1}:${minute}`)
+    sweep.push(`${hour}:${minute}-${Math.min(hour + 1, 23)}:${minute}`)
     sweep.push(`${hour}:${minute}-${hour}:${minute}`)
   })
 }

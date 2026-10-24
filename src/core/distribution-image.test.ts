@@ -121,11 +121,11 @@ function triplesOfGrid(grid) {
 }
 function triplesOfImage(image) {
   const triples: string[] = []
-  image.rows.forEach((row) =>
+  image.rows.forEach((row) => {
     row.cells.forEach((cell, index) => {
       if (cell.role !== '') triples.push(`${row.name} ${image.times[index]} ${cell.role}`)
-    }),
-  )
+    })
+  })
   return triples.sort()
 }
 

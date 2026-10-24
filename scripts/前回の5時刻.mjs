@@ -304,7 +304,9 @@ function 主処理() {
   if (検め.外れ.length === 0) {
     console.log('  OK   算出した値が、宣言の期待値と 1 つも違わない')
   } else {
-    検め.外れ.forEach((一つ) => console.log(`  NG   ${一つ}`))
+    検め.外れ.forEach((一つ) => {
+      console.log(`  NG   ${一つ}`)
+    })
     console.log(`       ${宣言.算出した値の期待値.ここが外れたら}`)
   }
 
@@ -326,7 +328,9 @@ function 主処理() {
   if (本文に無い言葉.length === 0) {
     console.log(`  OK   ${宣言.本文.載っているはずの言葉.join(' / ')} は ${宣言.本文.ファイル} に載っている`)
   } else {
-    本文に無い言葉.forEach((言葉) => console.log(`  NG   ${宣言.本文.ファイル} に載っていない: ${言葉}`))
+    本文に無い言葉.forEach((言葉) => {
+      console.log(`  NG   ${宣言.本文.ファイル} に載っていない: ${言葉}`)
+    })
   }
 
   const 落ちた = 検め.落ちた || 本文に無い言葉.length !== 0

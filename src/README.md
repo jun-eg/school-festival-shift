@@ -797,6 +797,12 @@ npm test
 **`src/` の `.ts` は `import` で直接読むので、数字に `src/` のファイルも載る。**
 全件一致なら終了コード 0、1 つでも外れたら 1 で落ちる。
 
+### lint と書式
+
+**`npm run lint` が Biome の `biome check`（lint と書式の検査だけ。書き換えない）、`npm run format` が `biome format --write`（書式だけ書き換える）。**
+対象は `src/` と `scripts/` の `.ts` ・ `.js` ・ `.mjs`（HTML は対象外）。設定は [`biome.jsonc`](../biome.jsonc)。
+**書式はいまのまま**（セミコロン無し・シングルクォート・2 スペース・長い行を折らない）で、**未使用の変数・import は落とす**。外した規則には理由をコメントで残してある。
+
 ### 型を検査する
 
 **`npm run typecheck` が `tsc --noEmit` を 3 つの設定で回す**（出力は無く、変換は esbuild が持つ → [`build.mjs`](../build.mjs)）。

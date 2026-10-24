@@ -39,7 +39,10 @@ function whyItStopped(work) {
 /** 型の中に出てくる名前を全部集める。 */
 function namesIn(value, found?) {
   const names = found || []
-  if (Array.isArray(value)) value.forEach((item) => namesIn(item, names))
+  if (Array.isArray(value))
+    value.forEach((item) => {
+      namesIn(item, names)
+    })
   else if (value && typeof value === 'object') {
     Object.keys(value).forEach((name) => {
       if (names.indexOf(name) === -1) names.push(name)

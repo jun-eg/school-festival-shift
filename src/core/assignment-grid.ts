@@ -486,7 +486,9 @@ export function violationCells(header: Row, dataRows: Row[], day: Day | undefine
     const start = at(violation, '開始')
     rows.forEach((row) => {
       if (start === '') {
-        whoColumns.forEach((column) => mark(row, column))
+        whoColumns.forEach((column) => {
+          mark(row, column)
+        })
         return
       }
       if (columnOf[start] !== undefined) mark(row, columnOf[start])

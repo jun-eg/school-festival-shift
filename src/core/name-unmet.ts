@@ -86,7 +86,9 @@ export function allNeeds(conditions: Partial<Conditions> | undefined): HeldNeed[
   const held: Record<string, unknown> = conditions || {}
   const needs: HeldNeed[] = []
   unmetSources.forEach((source) => {
-    ;((held[source.key] || []) as Need[]).forEach((need) => needs.push({ source: source, need: need }))
+    ;((held[source.key] || []) as Need[]).forEach((need) => {
+      needs.push({ source: source, need: need })
+    })
   })
   return needs
 }
