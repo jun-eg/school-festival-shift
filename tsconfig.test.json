@@ -1,0 +1,10 @@
+{
+  "//": "検査（*.test.ts ・ test/）。Node の型（node:test など）が要るので、本番の側とは別に見る。",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "google-apps-script"],
+    "noImplicitAny": false
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["src/ui/**"]
+}

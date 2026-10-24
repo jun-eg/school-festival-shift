@@ -22,14 +22,14 @@ git config core.hooksPath .githooks
 ## コードを回すには、3 手で足りる
 
 ```
-.node-version の Node を入れる（22）
+.node-version の Node を入れる（22.18 以上）
 npm ci
 npm test
 ```
 
-**`npm ci` が入れるのは開発者の道具（`devDependencies` の `esbuild`）だけで、担当者に要求するものは 0 のままである。**
+**`npm ci` が入れるのは開発者の道具（`devDependencies` の `esbuild` ・ `typescript` ・ 型の定義）だけで、担当者に要求するものは 0 のままである。**
 Apps Script に貼る物を作るのは `npm run build` で、`dist/` に出る（リポジトリには入れない）。
-**`npm test` が `src/**/*.test.mjs` を全部回し、1 本でも落ちたら終了コード 1 で止まる。**
+**`npm test` は、先に型を検査し（`npm run typecheck` ＝ `tsc --noEmit`）、通ったら `src/**/*.test.ts` を全部回す。型が 1 件でも外れるか、検査が 1 本でも落ちたら終了コード 1 で止まる。**
 
 ## コードの中身は `src/README.md` を読む
 
@@ -52,7 +52,7 @@ Apps Script に貼る物を作るのは `npm run build` で、`dist/` に出る�
    - **足したファイルは、同じ名前で足す。****消したファイルは、Apps Script 側でも消す**（残すと古い関数が同じ名前で黙って勝つ — `.gs` は 1 つのグローバルを共有する）
    - **[`src/appsscript.json`](src/appsscript.json) が変わったら、マニフェストも写す。****スコープが変わったなら**、[`src/README.md`](src/README.md) の「手で書いた以上、自動では増えない」の 3 つを一緒に動かす（**[`README.md`](README.md) に貼ってある承認の画像も撮り直す**）
 4. **保存する**（`Ctrl + S`）
-5. **[`src/sheet-layout.js`](src/core/sheet-layout.js) が変わったら、エディタで `buildTemplate` を 1 回実行する。** **足りないものだけを足す**ので、何度走らせてもよい。
+5. **[`src/sheet-layout.ts`](src/core/sheet-layout.ts) が変わったら、エディタで `buildTemplate` を 1 回実行する。** **足りないものだけを足す**ので、何度走らせてもよい。
    **見出しが構成と違うと、上書きせずに名指しで止まる** — そのセルを手で構成どおりに直してから、もう 1 回走らせる
 6. **スプレッドシートを開き直し、メニュー「シフト」が出ることを見る**
 

@@ -4,26 +4,31 @@
 //   使い方: npm run build
 //
 // 出すのは 4 つで、dist/ は git に入れない（貼る前に毎回これを走らせる）。
-//   dist/main.gs            src/entry.js から辿れる全部を 1 本にしたもの（esbuild の iife）
-//   dist/export-images.html ┐ src/ui/*.html の <script src="…"></script> を、src/ui/*.js の中身に差し替えたもの
+//   dist/main.gs            src/entry.ts から辿れる全部を 1 本にしたもの（esbuild の iife。型は esbuild が剥がすだけで、検査は npm run typecheck）
+//   dist/export-images.html ┐ src/ui/*.html の <script src="…"></script> を、src/ui/*.ts を変換した中身に差し替えたもの
 //   dist/form-picker.html   ┘
 //   dist/appsscript.json    src/appsscript.json の写し
 //
 // iife の中の関数は Apps Script から名前で引けないので、src/entry.js が並べた名前ぶんの function 宣言を
 // main.gs の最上位に足す（本体は iife の中の同じ名前の関数を呼ぶだけである）。
+//
+// target は es2019 である。Apps Script の V8 に合わせて落としてあり、tsconfig.json の lib（es2019）と揃えている。
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { build as esbuild } from 'esbuild'
+import { build as esbuild, transformSync } from 'esbuild'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const bundleName = 'shiftBundle'
 const htmlNames = ['export-images', 'form-picker']
 
-/** src/entry.js が並べた、Apps Script が名前で呼ぶ関数の名前。 */
+/** Apps Script の V8 に合わせて落とす構文の水準。tsconfig.json の lib と揃える。 */
+export const target = 'es2019'
+
+/** src/entry.ts が並べた、Apps Script が名前で呼ぶ関数の名前。 */
 export async function entryNames() {
-  const entry = await import(pathToFileURL(path.join(root, 'src/entry.js')).href)
+  const entry = await import(pathToFileURL(path.join(root, 'src/entry.ts')).href)
   return Object.keys(entry.entryPoints)
 }
 
@@ -31,11 +36,11 @@ export async function entryNames() {
 export async function renderMain() {
   const names = await entryNames()
   const result = await esbuild({
-    entryPoints: [path.join(root, 'src/entry.js')],
+    entryPoints: [path.join(root, 'src/entry.ts')],
     bundle: true,
     format: 'iife',
     globalName: bundleName,
-    target: 'es2020',
+    target,
     charset: 'utf8',
     write: false,
     banner: { js: '// src/ から npm run build で作ったファイル。ここを直さず、src/ を直す。' },
@@ -48,11 +53,22 @@ export async function renderMain() {
   return result.outputFiles[0].text
 }
 
-/** HTML 1 枚の中身。<script src="X.js"></script> を、src/ui/X.js の中身を入れた <script> に差し替える。 */
+/**
+ * ダイアログの script 1 本。src/ui/X.ts の型を剥がして JS にする。
+ * 関数 1 つにくるむ（format: iife）のは、tsc が ES モジュールとして見る .ts（import type を持つ）を、
+ * ページに置く普通の script に戻すためである。最上位の var がページのグローバルに漏れることもなくなる。
+ */
+export function renderScript(file) {
+  const source = fs.readFileSync(path.join(root, 'src/ui', file), 'utf8')
+  const result = transformSync(source, { loader: 'ts', format: 'iife', target, charset: 'utf8' })
+  return result.code.replace(/\n$/, '')
+}
+
+/** HTML 1 枚の中身。<script src="X.ts"></script> を、src/ui/X.ts を変換した中身を入れた <script> に差し替える。 */
 export function renderHtml(name) {
   const html = fs.readFileSync(path.join(root, 'src/ui', `${name}.html`), 'utf8')
   return html.replace(/^( *)<script src="([^"]+)"><\/script>$/gm, (all, indent, file) => {
-    const script = fs.readFileSync(path.join(root, 'src/ui', file), 'utf8').replace(/\n$/, '')
+    const script = renderScript(file)
     const body = script.split('\n').map((line) => (line === '' ? line : `${indent}  ${line}`)).join('\n')
     return `${indent}<script>\n${body}\n${indent}</script>`
   })

@@ -1,0 +1,10 @@
+{
+  "//": "ダイアログの script（ブラウザで動く側）。dom を入れ、google.script.run の型を足す。core ・ shell の側には dom を入れない。",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2019", "dom"],
+    "types": ["google.script.client-side"]
+  },
+  "include": ["*.ts"],
+  "exclude": []
+}

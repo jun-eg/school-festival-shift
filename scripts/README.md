@@ -77,19 +77,19 @@ node scripts/M1①の判定.mjs
 
 | | |
 | --- | --- |
-| **入力** | [`data/`](../data/) の確定シフトのモック 4 本 ＋ **型そのもの**（[`src/input-types.js`](../src/core/input-types.js)・[`src/sheet-layout.js`](../src/core/sheet-layout.js)） |
+| **入力** | [`data/`](../data/) の確定シフトのモック 4 本 ＋ **型そのもの**（[`src/input-types.ts`](../src/core/input-types.ts)・[`src/sheet-layout.ts`](../src/core/sheet-layout.ts)） |
 | **宣言** | [`M1①の宣言.json`](M1①の宣言.json)。**ここが原本である。スクリプトは線も置き方も持たない** |
 | **数えるもの** | **5-1 の型に乗らなかった行**（**1 つだけ**）。**日ごとと通しで出す** — **4 日とも通しで判定できる**（→ 7） |
 | **当て方** | `date` ＋ 区間 ＋ `role` を**型 #2／#4 の行の形**に、`date` ＋ 区間を**型 #1 の 30 分枠**に、`memberId` を**型 #6 の識別キー**に当てる |
 | **見ないもの** | `slotId`・氏名・`creationResult`（**型に無い項目**）／ 学年・調理可否（**確定シフト側に当たる項目が無い**） |
 
-**型は書き直さない。**[`src/input-types.js`](../src/core/input-types.js) を `SpreadsheetApp` 無しでそのまま走らせて、
+**型は書き直さない。**[`src/input-types.ts`](../src/core/input-types.ts) を `SpreadsheetApp` 無しでそのまま走らせて、
 確定シフトの行を通す。**止まったら、型が言った理由ごと「乗らなかった行」に数える。**
 
 **数えるのは生成した案ではない。****前回の記録は入力で、見るのは型に乗るかだけである**（→ 5-4）。
 **前回の記録が規則 3 の ①〜⑤ を満たしていないこと ◎ は、ここに効かない**
 （**規則が違ったのではなく、前回の実行が規則に届かなかった** → [`ADR tech-requirements/0003`](../docs/agent/ADR/tech-requirements/0003-準備と片付けの規則が降りた先から戻りM2の数えに入った.md)）。
-**違反を数えるのは [`src/count-violations.js`](../src/core/count-violations.js) の側で、入力は生成した案である。**
+**違反を数えるのは [`src/count-violations.ts`](../src/core/count-violations.ts) の側で、入力は生成した案である。**
 
 **端が枠に揃わない行は、乗った側でも内訳に出す** —
 **`2025-11-03 12:00-12:40` の `クリーンパトロール` 3 行**は、**指定枠と同じ向き（重なる枠を取る）で `12:00` と `12:30` の 2 枠に乗る**（→ 7）。
@@ -110,7 +110,7 @@ node scripts/M1②の判定.mjs
 | **宣言** | [`M1②の宣言.json`](M1②の宣言.json)。**ここが原本である。スクリプトは線も経路も持たない** |
 | **数えるもの** | **経路の段のうち、スクリプトが運べなかったもの**（**1 つだけ**）。**あわせて「2 の一覧に無い操作」も数える**（→ issue #148 の受け入れ条件「メニュー 1 回で閉じている」） |
 | **数えないもの** | **メニューを押す操作と名簿の画像を選ぶ操作**（**入力である** → 2 の一覧 3）／ **条件入力**（同 5）／ **入る側がフォームに答える操作** ／ **中身の入っていない段**（**「まだ作っていない」は人の手ではない**） |
-| **見ないもの** | **本物の Google の上で通るか**（→ [`src/real-device-log.md`](../src/real-device-log.md) の項目 10〜12）／ **フォームが 4 の表と一致するか**（仕様 #2。[`src/form-definition.test.mjs`](../src/core/form-definition.test.mjs)）／ **畳み方そのもの**（[`src/take-in.test.mjs`](../src/core/take-in.test.mjs)） |
+| **見ないもの** | **本物の Google の上で通るか**（→ [`src/real-device-log.md`](../src/real-device-log.md) の項目 10〜12）／ **フォームが 4 の表と一致するか**（仕様 #2。[`src/form-definition.test.ts`](../src/core/form-definition.test.ts)）／ **畳み方そのもの**（[`src/take-in.test.ts`](../src/core/take-in.test.ts)） |
 
 **入力は「複製したフォーム」ではない。** **テンプレートのスクリプトが 4 の定義から作ったフォームの回答スプレッドシートである**（→ 6 の #6）。
 **完成品を複製した場合とは、回答先の紐付けが手作業で残るかどうかが変わる**（→ 経路の段 4）。
@@ -139,7 +139,7 @@ node scripts/生成の所要時間.mjs
 | --- | --- |
 | **入力** | [`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) の **50 行** ＋ **実装そのもの**（[`src/`](../src/) の 9 ファイル）＋ 条件入力の 6 区画（**「日ごとの営業時刻」は [`前回の5時刻.mjs`](前回の5時刻.mjs) が算出する。残りは宣言が持つ**） |
 | **宣言** | [`生成の所要時間の宣言.json`](生成の所要時間の宣言.json)。**ここが原本である。スクリプトは上限も置き方も持たない** |
-| **測るもの** | **[`src/core.js`](../src/core/core.js) の `build` を 1 周する時間（秒）**と、**段ごとの内訳**。**20 回回して中央値・最小・最大を出す** |
+| **測るもの** | **[`src/core.ts`](../src/core/core.ts) の `build` を 1 周する時間（秒）**と、**段ごとの内訳**。**20 回回して中央値・最小・最大を出す** |
 | **あわせて出すもの** | **回答の行を複製して人数を増やした側**（枠は 88 のまま）。**実機が何倍遅ければ上限に当たるか**を、余裕の倍率で出す |
 | **測らないもの** | **`SpreadsheetApp` の往復**（殻の側。**実機でしか分からない** → [`src/real-device-log.md`](../src/real-device-log.md)）／ **実機（Apps Script の V8）での速さ** ／ **指標を出す段**（まだ中身が無い → [#154](https://github.com/jun-eg/school-festival-shift/issues/154)）／ **案の中身**（違反 0 か・名指しされているかは **M2 の判定**である → [#153](https://github.com/jun-eg/school-festival-shift/issues/153)） |
 
@@ -149,7 +149,7 @@ node scripts/生成の所要時間.mjs
 **そのうえで段ごとの内訳を出すのは、当たったときに見る先が分かれるからである** —
 **生成の段が重ければ方式の話**（6 の #3）**になり、他の段が重ければそこの話になる。**
 
-**終端 ≤ 始端を書いた 3 人は、展開の段が名指しして止まる**（→ 3 の境界値・[`src/expand.js`](../src/core/expand.js)）。
+**終端 ≤ 始端を書いた 3 人は、展開の段が名指しして止まる**（→ 3 の境界値・[`src/expand.ts`](../src/core/expand.ts)）。
 **外さないと 1 周が途中で止まって時間が測れない**ので、**外してから回し、外した人を名指しで出す**
 （**39 人のうち 36 人で組んでいる**）。
 
@@ -178,8 +178,8 @@ node scripts/M2の判定.mjs
 **未充足の行をそのまま数えない。** **名指しした側に名指しを採点させることになり、何件出ても 0 件になる。**
 **案の側の不足を数え直して、検証結果の行と両方向で突き合わせる** —
 **不足が有るのに名指しが無い ／ 名指しは有るが `あと何人` が食い違う ／ 不足が無いのに名指しが有る、の 3 つを出す。**
-**要る人数は [`src/name-unmet.js`](../src/core/name-unmet.js) の `requiredAt` が、置いた行の読み方は
-[`src/count-violations.js`](../src/core/count-violations.js) の `readAssignments` が持つ**（**書き直さない**）。
+**要る人数は [`src/name-unmet.ts`](../src/core/name-unmet.ts) の `requiredAt` が、置いた行の読み方は
+[`src/count-violations.ts`](../src/core/count-violations.ts) の `readAssignments` が持つ**（**書き直さない**）。
 **数えて突き合わせるところだけが、この手の仕事である。**
 
 **件数とは別に、2 つの数えが同じ需要に乗っているかを見る** —
@@ -187,7 +187,7 @@ node scripts/M2の判定.mjs
 **揃わなければ、0 件が出ていても判定として信用できないので、件数の合否を言わずに落ちる。**
 
 **規則 3 の ⑥ を数えていないことは、出力に出す**（**原本は
-[`src/count-violations.js`](../src/core/count-violations.js) の `violationsNotCounted`**）。
+[`src/count-violations.ts`](../src/core/count-violations.ts) の `violationsNotCounted`**）。
 **①〜⑤ が入ったことで M2 の合格の線は動いている**ので、**含まないことを隠さない**のがここの仕事である（→ 5-4）。
 
 **終端 ≤ 始端を書いた 3 人は、展開の段が名指しして止まる**（→ 所要時間の実測と同じ扱い）。
@@ -232,12 +232,12 @@ node scripts/M4の判定.mjs
 **セルは（シート・学籍番号・見出しの時刻）で当てる。行の位置でも列の位置でも当てない** —
 **締切後の提出で人が増えると行がずれる**（行は学籍番号の順である）。**ずれても数えが崩れないことが、ここで踏まれる。**
 
-**手直しは [`src/generate.test.mjs`](../src/core/generate.test.mjs) の ⑦ と同じ密度で選ぶ**（7 つに 1 つを回し、11 に 1 つを空にする）。
+**手直しは [`src/generate.test.ts`](../src/core/generate.test.ts) の ⑦ と同じ密度で選ぶ**（7 つに 1 つを回し、11 に 1 つを空にする）。
 **あちらはコアだけで通し、こちらは殻・メモ・メニュー・画像まで通す。**
 **そのうえで 1 つだけ狙って置く** — **締切後に出し直した人の、出し直しで希望から外れた日のセルである。**
 **置けば規則 1 の違反になるので、再実行で名指しで返らなければならない。****「名指しで返されたものは除く」を一度も踏まないまま 0 を出さないためである。**
 
-**0 が数えた結果であることは、殻から手直しの読みを外して確かめた** — **戻ったセルが 337 になり、狙った手直しの見張りも外れて落ちた**（2026-09-23。[`src/shell.js`](../src/shell/shell.js) は戻してある）。
+**0 が数えた結果であることは、殻から手直しの読みを外して確かめた** — **戻ったセルが 337 になり、狙った手直しの見張りも外れて落ちた**（2026-09-23。[`src/shell.ts`](../src/shell/shell.ts) は戻してある）。
 
 ## まとまりと散らしの数え
 
@@ -257,7 +257,7 @@ node scripts/まとまりと散らし.mjs
 | **合格の線** | **例外に名前の付かない「最小の長さに届かない塊」が 0 件**。**短い塊そのものは 0 でなくてよい**（0 件を線にすると、希望が 30 分しか無い人を置けなくなる） |
 | **線を当てないもの** | **違反と未充足**（→ **M2 の判定**。**同じ数を 2 か所で判定しない**）／ **例外の件数**／ **1 日の上限**（置くかどうかが決まっていない → 5-5 の「散らし」） |
 
-**例外の名前を、この手が持たない。** **[`src/generate.js`](../src/core/generate.js) の `runExceptions` をそのまま読む**
+**例外の名前を、この手が持たない。** **[`src/generate.ts`](../src/core/generate.ts) の `runExceptions` をそのまま読む**
 （**帯の切れ目 ／ 希望の切れ目 ／ 需要の切れ目 ／ 規則 3 の端 ／ そこしか置けないとき**）。
 **塊 1 件の前と後ろの端を見て、どれにも当たらない端が 1 つでもあれば「例外に名前が付かない」に数える** —
 **その端は、その人がその枠で空いていて、その役割に置けて、まだ人数も足りていない端である**（生成が伸ばせたはずの所である）。
@@ -287,7 +287,7 @@ node scripts/前回のシフト表.mjs
 | | |
 | --- | --- |
 | **入力** | [`data/`](../data/) の確定シフトのモック 4 本（**読むのは `date`・`start`・`end`・`role`・`memberId`・`name`**）。**枠は [`前回の5時刻.mjs`](前回の5時刻.mjs) が算出する 5 時刻から刻む** |
-| **宣言** | [`前回のシフト表の宣言.json`](前回のシフト表の宣言.json)。**ここが原本である。スクリプトは敷き方も期待値も持たない** — 敷くのは [`src/assignment-grid.js`](../src/core/assignment-grid.js) をそのまま走らせる |
+| **宣言** | [`前回のシフト表の宣言.json`](前回のシフト表の宣言.json)。**ここが原本である。スクリプトは敷き方も期待値も持たない** — 敷くのは [`src/assignment-grid.ts`](../src/core/assignment-grid.ts) をそのまま走らせる |
 | **出すもの** | **日ごとの 行 / 列 / 埋まったセル / 氏名の種類 / 役割**と、**1 セルに 2 役割になるセルの名指し** |
 | **見るもの** | ① 行数が記録の `results` と合うか（**25 / 21 / 36 / 11**） ② **氏名で引くと何行潰れるか**（**0 / 3 / 3 / 2** → [`ADR tech-requirements-0004`](../docs/agent/ADR/tech-requirements/0004-同じ仮名の4組は別人で確定シフトの実人数は40だった.md)） ③ 区間が 1 本も枠から落ちていないか ④ 役割名の顔ぶれが 8 つか |
 
@@ -336,11 +336,11 @@ node scripts/要約の検査.mjs --stamp docs/design-doc.md   # 見直した要�
 | **要約の検査** | **`docs/agent/` を触った PR**（**原本が動けば、要約も見直す**）。**pre-commit と CI でも回る** |
 | **前回の 5 時刻の算出** | [`data/`](../data/) の確定シフトを触った PR（**行が動けば 5 時刻も動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **7 の「前回の 5 時刻の置き方」・4-2** を触った PR。**M2 の判定と生成の所要時間の実測は、走らせると中でこれを通る** |
 | **件数の検算** | [`data/`](../data/) を触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **4-5・7** か [`data/前回の確定シフト.md`](../data/前回の確定シフト.md) の**件数を触った PR** |
-| **M1 ① の判定** | [`data/`](../data/) の確定シフトを触った PR ／ **[`src/input-types.js`](../src/core/input-types.js)・[`src/sheet-layout.js`](../src/core/sheet-layout.js) を触った PR**（**型が動いたら、前回の記録が乗るかも動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **5-1・7** を触った PR |
+| **M1 ① の判定** | [`data/`](../data/) の確定シフトを触った PR ／ **[`src/input-types.ts`](../src/core/input-types.ts)・[`src/sheet-layout.ts`](../src/core/sheet-layout.ts) を触った PR**（**型が動いたら、前回の記録が乗るかも動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **5-1・7** を触った PR |
 | **M1 ② の判定** | **[`src/`](../src/) の経路のファイルを触った PR**（**宣言の `入力.src` の 12 本。経路が動いたら、手が入る箇所も動く**）／ [`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) を触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **2 の一覧・4-1・4-2・7** を触った PR |
 | **生成の所要時間の実測** | **コアの段を触った PR**（**宣言の `入力.実装` の 9 本。段が動いたら、秒も動く**）／ [`data/`](../data/) を触った PR（**希望データのモックも、確定シフトも** — **確定シフトが動けば 5 時刻が動き、枠が動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **6-1 の #2・6 の #3・7** を触った PR |
-| **前回のシフト表の敷き直し** | **[`src/assignment-grid.js`](../src/core/assignment-grid.js)・[`src/sheet-layout.js`](../src/core/sheet-layout.js) を触った PR**（**敷き方かシートの構成が動いたら、記録の載り方も動く**）／ [`data/`](../data/) の確定シフトを触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **8 の 1** を触った PR |
-| **まとまりと散らしの数え** | **[`src/generate.js`](../src/core/generate.js) を触った PR**（**置き方が動いたら、塊も散らしも動く**）／ [`data/`](../data/) を触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **5-5・5-1 の #7** を触った PR |
+| **前回のシフト表の敷き直し** | **[`src/assignment-grid.ts`](../src/core/assignment-grid.ts)・[`src/sheet-layout.ts`](../src/core/sheet-layout.ts) を触った PR**（**敷き方かシートの構成が動いたら、記録の載り方も動く**）／ [`data/`](../data/) の確定シフトを触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **8 の 1** を触った PR |
+| **まとまりと散らしの数え** | **[`src/generate.ts`](../src/core/generate.ts) を触った PR**（**置き方が動いたら、塊も散らしも動く**）／ [`data/`](../data/) を触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **5-5・5-1 の #7** を触った PR |
 | **M2 の判定** | **コアの段を触った PR**（**宣言の `入力.実装` の 9 本。段が動いたら、件数も動く**）／ [`data/`](../data/) を触った PR（**希望データのモックも、確定シフトも** — **確定シフトが動けば 5 時刻が動き、帯も件数も動く**）／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **3 の規則・5-4・7** を触った PR |
 | **M4 の判定** | **[`src/`](../src/) の殻・コア・メニューを触った PR**（**宣言の `入力.実装` の 15 本。読み書きか固定の扱いが動いたら、戻るセルも動く**）／ [`data/前回の希望データ-モック.csv`](../data/前回の希望データ-モック.csv) を触った PR ／ [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の **2 の一覧 7〜10・5 の #11・5-3・7** を触った PR |
 
@@ -358,7 +358,7 @@ node scripts/要約の検査.mjs --stamp docs/design-doc.md   # 見直した要�
 | 疑う先 | どういうときか | 動かす先 |
 | --- | --- | --- |
 | **記録の読み直し** | 乗らなかった行が [`data/前回の確定シフト.md`](../data/前回の確定シフト.md) の「揃っていないところ」と重なるとき | **転記のほう。**ただし**揃えない・振り直さない・畳まない**（→ 4-5・7） |
-| **型を直す** | 記録がそのまま転記されていて、それでも型が受け取れない形のとき | **[`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の 5-1（判断）→ ADR ＋ 更新ログ → [`src/input-types.js`](../src/core/input-types.js)。****判断を動かさずにコードだけ直さない** |
+| **型を直す** | 記録がそのまま転記されていて、それでも型が受け取れない形のとき | **[`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) の 5-1（判断）→ ADR ＋ 更新ログ → [`src/input-types.ts`](../src/core/input-types.ts)。****判断を動かさずにコードだけ直さない** |
 | **判定の置き方を直す** | 記録にも型にも触らずに消えるとき（営業時刻の置き方・重なる枠を取る向き） | **[`M1①の宣言.json`](M1①の宣言.json)。**変えた置き方と、なぜ変えたかを併記する |
 
 **M1 ② で人の手が出たときも同じである。****実装を直すのか選定を動かすのかを、この手は決めない。**
@@ -379,8 +379,8 @@ node scripts/要約の検査.mjs --stamp docs/design-doc.md   # 見直した要�
 
 | 疑う先 | どういうときか | 動かす先 |
 | --- | --- | --- |
-| **生成（置き方）** | **違反が出たとき。**生成は「破るくらいなら置かない」ので、**1 件でもあれば置き方の側が規則を見落としている** | **[`src/generate.js`](../src/core/generate.js)。**ただし**規則は動かさない** — 規則は [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) 3 が、適用の順序は 5-5 が持つ |
-| **数える側** | **名指しされていない未充足か、空の名指しが出たとき。****不足と名指しが食い違っている** | **[`src/name-unmet.js`](../src/core/name-unmet.js)（名指し）か [`src/count-violations.js`](../src/core/count-violations.js) の `readAssignments`（置いた行の読み）。**需要の形は 5-1 の #2・#4 が、引き上げ方は規則 6 が持つ |
+| **生成（置き方）** | **違反が出たとき。**生成は「破るくらいなら置かない」ので、**1 件でもあれば置き方の側が規則を見落としている** | **[`src/generate.ts`](../src/core/generate.ts)。**ただし**規則は動かさない** — 規則は [`docs/agent/tech-requirements.md`](../docs/agent/tech-requirements.md) 3 が、適用の順序は 5-5 が持つ |
+| **数える側** | **名指しされていない未充足か、空の名指しが出たとき。****不足と名指しが食い違っている** | **[`src/name-unmet.ts`](../src/core/name-unmet.ts)（名指し）か [`src/count-violations.ts`](../src/core/count-violations.ts) の `readAssignments`（置いた行の読み）。**需要の形は 5-1 の #2・#4 が、引き上げ方は規則 6 が持つ |
 | **判定の置き方を直す** | **生成にも数える側にも触らずに消えるとき**（条件入力の 5 区画・外した 3 人の扱い） | **[`M2の宣言.json`](M2の宣言.json)。**変えた置き方と、なぜ変えたかを併記する。**合格の線そのものは動かさない** — 線は 7 の M2 が持つ |
 | **5 時刻の算出** | **帯の内訳が変わると消えるとき**（**準備帯・片付け帯の枠数に効く件**） | **[`前回の5時刻の宣言.json`](前回の5時刻の宣言.json) の `算出の規則` か `決め`。**先に `node scripts/前回の5時刻.mjs` を走らせて、**どの値がどの行から出たか**を見る。**枠が 88 のままかも一緒に見る** |
 
