@@ -1,6 +1,6 @@
 ---
 source: agent/tech-requirements.md
-source-hash: 53deb51ace426343d69b4bcee7b9fbd50eaeb161
+source-hash: e21dc71c78f75c5d69f9d6a7b681d1f268870a34
 ---
 
 # 技術の要件定義の要約 — 割り当てを「白紙から組む」から「仮完成に赤を入れる」に変える

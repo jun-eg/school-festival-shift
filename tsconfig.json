@@ -1,0 +1,19 @@
+{
+  "//": "Apps Script の V8 で動く側（src/core ・ src/shell ・ src/entry.ts）。tsc --noEmit で型だけを見る（変換は esbuild → build.mjs）。lib は es2019 に落としてあり、dom も node も入れない（structuredClone のような手元でしか動かない API を弾く）。",
+  "compilerOptions": {
+    "target": "es2019",
+    "lib": ["es2019"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["google-apps-script"],
+    "strict": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/core/**/*.ts", "src/shell/**/*.ts", "src/entry.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

@@ -8,7 +8,7 @@
       作り終えたら、画像を選ぶ中身を閉じて、作り終えた中身だけを出す（→ issue #244）。
       別のダイアログを開かないのは、この経路で開く画面を 1 枚に保つためである（→ scripts/M1②の宣言.json）。
       外から読み込むファイルは 0 個である（→ 6 の #5）。
-      下の script の src は、ビルドが src/ui/form-picker.js の中身に差し替える（→ build.mjs）。出来上がりの HTML は外から読み込むものを持たない。
+      下の script の src は、ビルドが src/ui/form-picker.ts の中身に差し替える（→ build.mjs）。出来上がりの HTML は外から読み込むものを持たない。
     -->
     <style>
       body {
@@ -42,6 +42,6 @@
       <p class="note">2 つの URL は「条件入力」シートの 9〜10 行目にも残っています。</p>
     </div>
 
-    <script src="form-picker.js"></script>
+    <script src="form-picker.ts"></script>
   </body>
 </html>

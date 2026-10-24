@@ -5,8 +5,8 @@
     <meta charset="utf-8" />
     <!--
       「画像を書き出す」で出る画面（→ issue #157）。外から読み込むファイルは 0 個である（→ 6 の #5）。
-      下の script の src は、ビルドが src/ui/export-images.js の中身に差し替える（→ build.mjs）。出来上がりの HTML は外から読み込むものを持たない。
-      ここは塗るだけで、何をどこに描くかは distribution-image.js が図形の一覧で渡す（検査で形まで見るため）。
+      下の script の src は、ビルドが src/ui/export-images.ts の中身に差し替える（→ build.mjs）。出来上がりの HTML は外から読み込むものを持たない。
+      ここは塗るだけで、何をどこに描くかは distribution-image.ts が図形の一覧で渡す（検査で形まで見るため）。
     -->
     <style>
       body {
@@ -30,6 +30,6 @@
     <p><button id="saveAll" hidden></button></p>
     <div id="images"></div>
 
-    <script src="export-images.js"></script>
+    <script src="export-images.ts"></script>
   </body>
 </html>
