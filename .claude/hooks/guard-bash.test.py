@@ -147,6 +147,20 @@ for cmd in ALLOW:
     if d is not None: fails.append(("should allow", cmd))
     print(f"{mark} allow | {cmd}")
 
+# settings.json の allow に npm scripts が入っていて、deny は残っている（確認ダイアログ無しで回せる形）
+SETTINGS = os.path.join(HERE, "..", "settings.json")
+with open(SETTINGS, encoding="utf-8") as f:
+    perms = json.load(f)["permissions"]
+for rule in ["Bash(npm test)", "Bash(npm run typecheck)", "Bash(npm run lint)", "Bash(npm run format)",
+             "Bash(npm run build)", "Bash(npm run e2e)", "Bash(npm run 判定)"]:
+    ok = rule in perms.get("allow", [])
+    if not ok: fails.append(("settings.json allow に無い", rule))
+    print(f"{'OK  ' if ok else 'FAIL'} allow-rule | {rule}")
+for rule in ["Bash(git push --force:*)", "Bash(git commit --amend:*)", "Bash(git reset --hard:*)"]:
+    ok = rule in perms.get("deny", [])
+    if not ok: fails.append(("settings.json deny から消えている", rule))
+    print(f"{'OK  ' if ok else 'FAIL'} deny-rule  | {rule}")
+
 print()
 print(f"{TARGET}: {len(DENY)+len(ALLOW)} cases, {len(fails)} failures")
 for kind, cmd in fails:
