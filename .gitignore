@@ -1,2 +1,14 @@
 # worktree の置き場。作業ツリーそのものなので、リポジトリに入れない（→ CLAUDE.md）
 .claude/worktrees/
+
+# 秘密情報。リポジトリに入れない（中身は .githooks/pre-commit の秘密の検査も止める → scripts/README.md）
+.env
+.env.*
+!.env.example
+.clasprc.json
+creds.json
+*-creds.json
+client_secret*.json
+
+# guard-bash の検査を回すと Python が作る
+__pycache__/
