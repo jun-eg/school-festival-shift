@@ -4,6 +4,7 @@
       "Bash(git push --force:*)",
       "Bash(git push --force-with-lease:*)",
       "Bash(git push -f:*)",
+      "Bash(git push --no-verify:*)",
       "Bash(git commit --amend:*)",
       "Bash(git reset --hard:*)",
       "Bash(git push origin main:*)",

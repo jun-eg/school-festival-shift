@@ -15,6 +15,17 @@
 git config core.hooksPath .githooks
 ```
 
-**これで commit のたびに [`.githooks/pre-commit`](.githooks/pre-commit) が走り、相対リンクの実在と要約の古さを見る**
-（中身は [`scripts/README.md`](scripts/README.md) の「リンクの検査」「要約の検査」）。**同じ検査が PR でも回る**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
+**これで commit のたびに [`.githooks/pre-commit`](.githooks/pre-commit) が走り、落ちる状態の commit は止まる**
+（何を回すかは hook を読む。中身は [`scripts/README.md`](scripts/README.md)）。**同じ検査が PR でも回る**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
 **止まったときの直し方は [`docs/README.md`](docs/README.md) の「古さの check」。**
+**トークン・鍵・`.env` は commit しない。** `.gitignore` が名指しし、pre-commit の `秘密の検査` が中身を止める。
+
+**同じ設定で `git push` の前に [`.githooks/pre-push`](.githooks/pre-push) も走る。** 検査ファイル・検査を弱める設定（`package.json` の test 系 script、`ci.yml`）に差分が無い push は、何も呼ばずに通る（1 秒未満）。
+差分があるときだけ `claude -p --agent test-diff-reviewer` が差分を読み、検査を消す・緩める変更に根拠（同じ push の実装の変更、issue の「決めたこと」）が無ければ止める。
+**`claude`（Claude Code）が PATH に要る。** 無ければ入れ方を出して止まる。**人が承知で抜けるのは `git push --no-verify` だけ**（Claude には [`guard-bash`](.claude/README.md) が打たせない）。CI では回さない。
+
+## 揃えてあるもの
+
+**Node は [`.node-version`](.node-version) の版を使う**（検査の手と CI が同じ版で回る）。
+**Dependabot が月 1 で GitHub Actions の更新 PR を 1 本作る**（[`.github/dependabot.yml`](.github/dependabot.yml)。`package.json` を置いたら npm も足す）。
+**[`.editorconfig`](.editorconfig) が改行・字下げ（space・2）・文字コードを揃え、[`.vscode/extensions.json`](.vscode/extensions.json) が EditorConfig の拡張を勧める。**

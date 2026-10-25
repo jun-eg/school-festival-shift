@@ -1,0 +1,19 @@
+# エディタが違っても改行・字下げ・文字コードを揃える。
+# 書式を直す道具（formatter）を入れたら、字下げはその設定と同じにする。変えるときは両方直す。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# md の行末の空白 2 つは改行の意味を持つことがあるので削らない
+[*.md]
+trim_trailing_whitespace = false
+
+# guard-bash.py・guard-bash.test.py は 4 字下げ
+[*.py]
+indent_size = 4
