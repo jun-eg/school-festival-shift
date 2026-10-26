@@ -38,7 +38,7 @@ export async function entryNames() {
 
 /**
  * 貼る物に載せる版。HEAD に付いた git のタグ（複数ならバージョン順の最後）、無ければ短い SHA（追跡ファイルに未 commit の変更があれば末尾に -dirty）、git が使えなければ 'unknown'。
- * タグの無い dist/ を貼らない決まりは CONTRIBUTING.md が持つ。ここはタグが無くても止まらず、SHA で版を名指しする。
+ * タグの無い dist/ を貼らない決まりは src/README.md が持つ。ここはタグが無くても止まらず、SHA で版を名指しする。
  */
 export function resolveVersion(cwd = root) {
   const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: envWithoutGit() }).trim()
