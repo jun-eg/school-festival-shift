@@ -1,6 +1,127 @@
-# 開発する人へ
+<h1 align="center">学祭シフト（school-festival-shift）</h1>
+
+<p align="center">
+  学祭の模擬店のシフトを、Google スプレッドシートの上で仮完成まで自動で組む仕組み（開発する人の入口）
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Google_Apps_Script-4285F4?logo=google&logoColor=white" alt="Google Apps Script">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjun-eg%2Fschool-festival-shift%2Fmain%2Fpackage.json&query=%24.devDependencies.typescript&label=TypeScript&logo=typescript&logoColor=white&color=3178C6" alt="TypeScript">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjun-eg%2Fschool-festival-shift%2Fmain%2Fpackage.json&query=%24.engines.node&label=Node.js&logo=nodedotjs&logoColor=white&color=5FA04E" alt="Node.js">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjun-eg%2Fschool-festival-shift%2Fmain%2Fpackage.json&query=%24.devDependencies.esbuild&label=esbuild&logo=esbuild&logoColor=black&color=FFCF00" alt="esbuild">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjun-eg%2Fschool-festival-shift%2Fmain%2Fpackage.json&query=%24.devDependencies%5B%27%40biomejs%2Fbiome%27%5D&label=Biome&logo=biome&logoColor=white&color=60A5FA" alt="Biome">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjun-eg%2Fschool-festival-shift%2Fmain%2Fpackage.json&query=%24.devDependencies%5B%27%40google%2Fclasp%27%5D&label=clasp&logo=google&logoColor=white&color=4285F4" alt="clasp">
+  <img src="https://img.shields.io/badge/Google_Sheets-34A853?logo=googlesheets&logoColor=white" alt="Google Sheets">
+  <img src="https://img.shields.io/badge/Google_Forms-7248B9?logo=googleforms&logoColor=white" alt="Google Forms">
+  <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white" alt="GitHub Actions">
+  <img src="https://img.shields.io/badge/Dependabot-025E8C?logo=dependabot&logoColor=white" alt="Dependabot">
+  <img src="https://img.shields.io/badge/Claude_Code-D97757?logo=claude&logoColor=white" alt="Claude Code">
+</p>
+
+---
 
 **ここは入口である。** シフトを作る担当者の手順は [`README.md`](README.md) が持つ。
+
+## 概要
+
+### 誰の・何を・どうするシステム化か
+
+- **誰の**: 学祭の模擬店で、毎年入れ替わるシフト担当者。引き継がれるのは前年の表 1 枚と LINE の短い説明だけで、技術力は年で大きく振れる。シフトに入るメンバーは、体験を変えない側である
+- **何を**: 割り当て。検便・学年・時間の条件で候補が枯れる探索と、頭の中にしかない準備・片付けのルールで、3 日に分けて 3〜6 時間、20 回ほどやり直していた
+- **どうする**: 条件と希望をデータとして外に出し、条件を満たす仮完成を 1 案つくる。担当者は「白紙から組む人」から「例外だけ直す人」になり、手作業を 5〜15 分にする
+
+### なぜこの方法・この技術スタックか
+
+- **仮完成と手直し（全自動にしない）**: 担当者が語った理想が「仮完成を手で 5〜15 分直す」だった。見える化と制約チェッカーは前年に試して、時間が縮まなかった
+- **Google スプレッドシート ＋ Apps Script（Web アプリにしない）**: 担当者に要求してよいのは入力だけである。すでに触れているフォームとスプレッドシートの上なら、テンプレートのコピー 1 回と権限承認 1 回で始められ、インストールも新しい画面も要らない。氏名と学籍番号は担当者の Google アカウントの外へ出ない。集める口（Google フォーム）と配る口（LINE ノートに貼る画像）も動かさない
+- **自前の決定的な貪欲法（外部ソルバーを使わない）**: 解なしで止まらず、足りない所を名指しで返す必要がある。規模は 39 人・88 枠と小さい。外から読むものが無いので、年によって止まることもない
+- **TypeScript ＋ esbuild ＋ node:test**: シートに触らない純粋なコアと、`SpreadsheetApp` に触る殻を分け、実機なしで型と判定を手元と CI で回すためである。前年までの作り込みは翌年に渡らなかったが、それを引き継げるコードにする。esbuild で `dist/` の 4 つに束ね、貼る物を減らし、版をタグで読めるようにする
+- **Biome・GitHub Actions・Dependabot・Claude Code**: 開発する側だけの道具である。担当者に要求するものは 0 のまま
+
+上流は [ジャーニーマップ（作る側）](docs/journey/作る側.md)・[ジャーニーマップ（入る側）](docs/journey/入る側.md) → [HMW](docs/hmw.md) → [Design Doc](docs/design-doc.md) → [技術の要件定義](docs/tech-requirements.md) の順に辿れる。
+
+## 構成
+
+ソースは `src/` に置き、`npm run build` が `dist/` の 4 つに束ねる。テンプレートのスクリプトに貼り替えると、次にコピーした担当者に届く。
+
+```mermaid
+flowchart LR
+    SRC["src/<br/>(core・shell・ui)"] -->|npm run build| DIST["dist/ の 4 つ<br/>main.gs / export-images.html<br/>form-picker.html / appsscript.json"]
+    DIST -->|手で貼る / clasp push| TPL[("テンプレート<br/>(jun-eg が管理)")]
+    TPL -->|"/copy リンク"| COPY[("担当者のコピー<br/>(スプレッドシート + Apps Script)")]
+    COPY --> FORM[Google フォーム]
+    COPY --> SHEET[シフト表]
+    COPY --> IMG[配る画像]
+```
+
+- **コア**はシートに触らない純粋な関数、**殻**は `SpreadsheetApp` に触る部分である。境目と段の中身は [`src/README.md`](src/README.md) が持つ
+- 貼り替えの手順は下の「コードを直したら、テンプレート側のスクリプトを差し替える」を読む
+
+## 開発の流れ
+
+```mermaid
+flowchart LR
+    MAIN[main を最新に] --> WT[worktree を切る]
+    WT --> WORK[実装]
+    WORK --> PC{{pre-commit}}
+    PC --> PP{{pre-push}}
+    PP --> PR[PR]
+    PR --> CI["CI 3 job<br/>docs / code / hooks"]
+    CI --> MERGE[merge]
+    MERGE --> TAG[タグを打つ]
+    TAG --> SWAP[テンプレートの差し替え]
+```
+
+- worktree の切り方は [`CLAUDE.md`](CLAUDE.md)、hook が回す検査の中身は [`.githooks/pre-commit`](.githooks/pre-commit) と [`.github/workflows/ci.yml`](.github/workflows/ci.yml)、実行前の柵は [`.claude/README.md`](.claude/README.md) が持つ
+- merge のあとに、タグを打って貼り替えるまでが 1 周である（下の「コードを直したら、テンプレート側のスクリプトを差し替える」）
+
+## 技術スタック
+
+| レイヤー | 技術 |
+| --- | --- |
+| 実行環境 | Google Apps Script（担当者のスプレッドシートに付くスクリプト）／ 開発は Node.js |
+| 言語 | TypeScript |
+| ビルド | esbuild（`dist/` の 4 つに束ねる） |
+| lint と書式 | Biome ／ EditorConfig |
+| 型 | `tsc --noEmit` |
+| テスト | `node:test`（`src/`・`scripts/`・`e2e/` の `*.test.*`） |
+| E2E | 実機のスプレッドシートで回す任意の 1 本（[`e2e/README.md`](e2e/README.md)） |
+| CI | GitHub Actions（`docs`・`code`・`hooks` の 3 job） |
+| 依存の更新 | Dependabot（月 1） |
+| 開発の柵 | git hooks（`.githooks/`）／ Claude Code の hook（`.claude/`） |
+| 配布 | Google スプレッドシートのテンプレート ＋ clasp |
+
+## ディレクトリ構成
+
+```
+.
+├── src/
+│   ├── core/            # シートに触らない純粋な関数（段・シートの定義・フォームの定義）
+│   ├── shell/           # SpreadsheetApp に触る殻（シートの読み書き・メニュー・フォーム作成）
+│   └── ui/              # ダイアログの HTML（画像の書き出し・名簿の選択）
+├── scripts/             # 判定・文書の検査・秘密の検査（→ scripts/README.md）
+├── e2e/                 # 実機の E2E（任意。CI では回さない）
+├── docs/
+│   ├── agent/           # 原本（AI 用）。ADR・Design Doc・要件定義・画面の記録
+│   └── *.md             # 人が読む要約（原本から書く。手で直さない）
+├── .claude/             # Claude Code の設定・hook・skill・agent
+└── .githooks/           # pre-commit・pre-push
+```
+
+## コマンド
+
+| コマンド | 何をするか |
+| --- | --- |
+| `npm ci` | 開発者の道具を入れる |
+| `npm test` | 型を検査し、`*.test.*` を全部回す |
+| `npm run typecheck` | `tsc` で型だけを検査する |
+| `npm run lint` | Biome で検査する |
+| `npm run format` | Biome で書式を直す |
+| `npm run build` | Apps Script に貼る物を `dist/` に出す |
+| `npm run 判定` | M1〜M4 の判定と検算を回す |
+| `npm run e2e` | 実機の E2E を回す（任意） |
+
+---
 
 ## 何を作っているかは `docs/` の要約を読む
 
