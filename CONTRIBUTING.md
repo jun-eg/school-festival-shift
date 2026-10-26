@@ -106,8 +106,23 @@ flowchart LR
 
 ### Claude Code の skill と agent
 
-- **アイデア出しから要件定義まで**: `/user-journey-map` → `/hmw` → `/design-doc` → `/tech-requirements`。インタビューの質問は `/interview-questions`
-- **issue から PR まで**: `/issue-check` が解決策の妥当性を見て、`/implement` が実装・PR・レビュー・修正を回す（`main` への merge は人がやる）
+```mermaid
+flowchart LR
+    subgraph IDEA["何を作るか決める"]
+        UJM["/user-journey-map"] --> HMW["/hmw"] --> DD["/design-doc"] --> TR["/tech-requirements"]
+    end
+    TR --> ISSUE[issue を起票]
+    ISSUE --> CHECK["/issue-check<br/>(issue-reviewer)"]
+    subgraph IMPLEMENT["/implement"]
+        IMPL["implementer<br/>実装・commit"] --> PW["pr-writer<br/>PR 本文"] --> PRV{{pr-reviewer}}
+        PRV -->|"直しが要る（3 周まで）"| IMPL
+    end
+    CHECK --> IMPL
+    PRV -->|merge してよい| HUMAN[人がレビューして main へ merge]
+```
+
+- **何を作るか決める**: ジャーニーマップ → HMW → Design Doc → 技術の要件定義を、skill が 1 段ずつ組む。インタビューの質問は `/interview-questions`
+- **issue から PR まで**: `/issue-check` が解決策の妥当性を見て、`/implement` が実装・PR・レビュー・修正を回す。push・PR 作成は回す側だけが打ち、`main` への merge は人がやる
 
 定義は [`.claude/skills/`](.claude/skills/) と [`.claude/agents/`](.claude/agents/) にある。
 
