@@ -76,6 +76,28 @@ flowchart LR
 - worktree の切り方は [`CLAUDE.md`](CLAUDE.md) が持つ。`main` は手元にそのまま残る
 - merge のあとに、タグを打って貼り替えるまでが 1 周である
 
+### Claude Code の skill と agent
+
+```mermaid
+flowchart LR
+    subgraph IDEA["何を作るか決める"]
+        UJM["/user-journey-map"] --> HMW["/hmw"] --> DD["/design-doc"] --> TR["/tech-requirements"]
+    end
+    TR --> ISSUE[issue を起票]
+    ISSUE --> CHECK["/issue-check<br/>(issue-reviewer)"]
+    subgraph IMPLEMENT["/implement"]
+        IMPL["implementer<br/>実装・commit"] --> PW["pr-writer<br/>PR 本文"] --> PRV{{pr-reviewer}}
+        PRV -->|"直しが要る（3 周まで）"| IMPL
+    end
+    CHECK --> IMPL
+    PRV -->|merge してよい| HUMAN[人がレビューして main へ merge]
+```
+
+- **何を作るか決める**: ジャーニーマップ → HMW → Design Doc → 技術の要件定義を、skill が 1 段ずつ組む。インタビューの質問は `/interview-questions`
+- **issue から PR まで**: `/issue-check` が解決策の妥当性を見て、`/implement` が実装・PR・レビュー・修正を回す。push・PR 作成は回す側だけが打ち、`main` への merge は人がやる
+
+定義は [`.claude/skills/`](.claude/skills/) と [`.claude/agents/`](.claude/agents/) にある。
+
 ## 開発環境
 
 **人が読んで守る約束ではなく、守れていなければ機械が止める形にしてある。** 次の担当が手順を知らなくても、壊す前に止まる。
@@ -103,28 +125,6 @@ flowchart LR
 - **`npm run e2e` 1 つで、実機の Apps Script を無人で通しで回せる。** 検証用スプレッドシートに `clasp push` し、Apps Script Execution API で テンプレートを作る → モック投入 → 構造の検証 → 生成 → 画像 → フォームを作る → 来年用に空にする を順に呼ぶ
 - **見るのは「手元の検査と同じ入力で、同じ結果になるか」である。** 実機の結果を `node:test` で手元の検査の出力と突き合わせ、生成の所要時間も毎回出す
 - **任意である。** GCP プロジェクトと clasp のログインが要るので、CI と `npm test` には入れない。用意するものと流れは [`e2e/README.md`](e2e/README.md)、画面でしか分からないものは [`src/real-device-log.md`](src/real-device-log.md) が持つ
-
-### Claude Code の skill と agent
-
-```mermaid
-flowchart LR
-    subgraph IDEA["何を作るか決める"]
-        UJM["/user-journey-map"] --> HMW["/hmw"] --> DD["/design-doc"] --> TR["/tech-requirements"]
-    end
-    TR --> ISSUE[issue を起票]
-    ISSUE --> CHECK["/issue-check<br/>(issue-reviewer)"]
-    subgraph IMPLEMENT["/implement"]
-        IMPL["implementer<br/>実装・commit"] --> PW["pr-writer<br/>PR 本文"] --> PRV{{pr-reviewer}}
-        PRV -->|"直しが要る（3 周まで）"| IMPL
-    end
-    CHECK --> IMPL
-    PRV -->|merge してよい| HUMAN[人がレビューして main へ merge]
-```
-
-- **何を作るか決める**: ジャーニーマップ → HMW → Design Doc → 技術の要件定義を、skill が 1 段ずつ組む。インタビューの質問は `/interview-questions`
-- **issue から PR まで**: `/issue-check` が解決策の妥当性を見て、`/implement` が実装・PR・レビュー・修正を回す。push・PR 作成は回す側だけが打ち、`main` への merge は人がやる
-
-定義は [`.claude/skills/`](.claude/skills/) と [`.claude/agents/`](.claude/agents/) にある。
 
 ## 技術スタック
 
