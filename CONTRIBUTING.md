@@ -97,6 +97,12 @@ flowchart LR
 
 書き方の規約は [`docs/README.md`](docs/README.md)、ADR の規約は [`docs/agent/ADR/README.md`](docs/agent/ADR/README.md) が持つ。
 
+### 実機の E2E も回せる
+
+- **`npm run e2e` 1 つで、実機の Apps Script を無人で通しで回せる。** 検証用スプレッドシートに `clasp push` し、Apps Script Execution API で テンプレートを作る → モック投入 → 構造の検証 → 生成 → 画像 → フォームを作る → 来年用に空にする を順に呼ぶ
+- **見るのは「手元の検査と同じ入力で、同じ結果になるか」である。** 実機の結果を `node:test` で手元の検査の出力と突き合わせ、生成の所要時間も毎回出す
+- **任意である。** GCP プロジェクトと clasp のログインが要るので、CI と `npm test` には入れない。用意するものと流れは [`e2e/README.md`](e2e/README.md)、画面でしか分からないものは [`src/real-device-log.md`](src/real-device-log.md) が持つ
+
 ### Claude Code の skill と agent
 
 - **アイデア出しから要件定義まで**: `/user-journey-map` → `/hmw` → `/design-doc` → `/tech-requirements`。インタビューの質問は `/interview-questions`
