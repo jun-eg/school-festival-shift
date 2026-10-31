@@ -1,6 +1,6 @@
 ---
 name: issue-reviewer
-description: 起票済みの GitHub issue 1 本を読み、「書いてある解決策が、その issue の目的に対して妥当か」と、1 本 = PR 1 本の大きさだけを判定して返す。issue を書き換えない。/issue-check skill から 1 本ずつ呼ばれる。親 issue を渡されたときは sub-issue 全体で親の終わりの判定を満たすかも見る。
+description: 起票済みの GitHub issue 1 本を読み、「書いてある解決策が、その issue の目的に対して妥当か」と、1 本 = PR 1 本の大きさだけを判定して返す。issue を書き換えない。/flow issue-fix の周回から呼ばれる。親 issue を渡されたときは sub-issue 全体で親の終わりの判定を満たすかも見る。
 tools: Bash, Read, Grep, Glob
 model: fable
 color: yellow

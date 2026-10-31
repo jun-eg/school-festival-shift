@@ -5,7 +5,7 @@
 #   bash .claude/skills/flow/state.sh https://github.com/OWNER/REPO/issues/320
 #
 # 出るもの:
-#   issue          fetch.sh の結果そのまま（number, title, state, parent, subIssues, owner, repo）
+#   issue          flow/fetch.sh の結果そのまま（number, title, state, parent, subIssues, owner, repo）
 #   role           親 ／ 単独 ／ sub-issue
 #   cushion        親のとき: origin にある worktree-<親番号>-* の branch 名（無ければ null）
 #   mainPr         head がその branch で base が main の PR（無ければ null）
@@ -20,7 +20,7 @@ if [ -z "$arg" ]; then
   exit 2
 fi
 
-issue_json="$(bash "$here/../issue-check/fetch.sh" "$arg")"
+issue_json="$(bash "$here/fetch.sh" "$arg")"
 owner="$(jq -r .owner <<<"$issue_json")"
 repo="$(jq -r .repo <<<"$issue_json")"
 number="$(jq -r .number <<<"$issue_json")"
