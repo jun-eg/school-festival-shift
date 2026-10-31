@@ -2,7 +2,7 @@
 
 **ここにあるのは、作業の事故を「実行される前に」止める仕掛けである。** 読んで守る文章ではない。
 **成果物の書き方の規約は混ぜない。** それは [`docs/agent/ADR/README.md`](../docs/agent/ADR/README.md) と [`skills/`](skills/) が持つ。
-**[`agents/`](agents/) は subagent の定義で、使い方は対になる skill が持つ**（`agents/issue-reviewer.md` ↔ `skills/issue-check/`、`agents/implementer.md`・`agents/pr-writer.md`・`agents/pr-reviewer.md` ↔ `skills/implement/`。`agents/issue-fixer.md` は issue 1 本と配下の本文・タイトルを gh api で直し、sub-issue の追加と close もする（design-doc の段は書き換えず人に返す。リポジトリのファイルは書かない）。`agents/test-diff-reviewer.md` は skill でなく `.githooks/pre-push` が呼ぶ）。
+**[`agents/`](agents/) は subagent の定義で、使い方は対になる skill が持つ**（`agents/issue-reviewer.md` ↔ `skills/issue-check/`、`agents/implementer.md`・`agents/pr-writer.md`・`agents/pr-reviewer.md` ↔ `skills/flow/`（`implement.md`）。`agents/issue-fixer.md` は issue 1 本と配下の本文・タイトルを gh api で直し、sub-issue の追加と close もする（design-doc の段は書き換えず人に返す。リポジトリのファイルは書かない）。`agents/test-diff-reviewer.md` は skill でなく `.githooks/pre-push` が呼ぶ）。
 **人が読む要約・issue・PR 本文の書き方は [`docs/README.md`](../docs/README.md) が持つ。**
 **commit の直前に回る柵は [`.githooks/pre-commit`](../.githooks/pre-commit) が持つ**（何を止めるかは hook を読む。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）。
 **push の直前に回る柵は [`.githooks/pre-push`](../.githooks/pre-push) が持つ**（検査を消す・緩める差分を [`agents/test-diff-reviewer.md`](agents/test-diff-reviewer.md) に読ませる。差分が無ければ呼ばない。起こした経緯は [school-festival-shift#343](https://github.com/jun-eg/school-festival-shift/issues/343)）。

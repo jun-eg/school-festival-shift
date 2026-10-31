@@ -1,8 +1,3 @@
----
-name: issue-create
-description: 依頼の文から GitHub issue を起こす。`/issue-create <依頼の文>` と明示されたとき、「この依頼を issue にして」「issue を起こして」と言われたときに使う。本文は docs/README.md の「issue 本文」節と雛形に従い、起こす前に「issue 1 本の大きさ」の物差しを当てる。大きすぎれば親 1 本と sub-issue に分けて起こし、小さすぎれば起こさずに、まとめる先の issue とともに人に返す。起こした後の判定は /issue-check の手で、この skill は判定しない。
----
-
 # issue-create
 
 > 依頼を、1 本 = PR 1 本の大きさで issue にする。

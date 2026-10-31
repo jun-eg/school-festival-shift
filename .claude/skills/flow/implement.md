@@ -1,8 +1,3 @@
----
-name: implement
-description: GitHub issue 1 本を実装して PR にする。`/implement <issue 番号か URL>`（「/実装」と呼ばれたときも同じ）と明示されたとき、「この issue を実装して」「親 issue の sub-issue を順に実装して」と言われたときに使う。親 issue なら、親の番号を持つクッション branch を切り、sub-issue を親の「やること」の順に 1 本ずつ同期で実装・PR・レビュー・修正・merge して積み、最後に main 向けの PR を 1 本作って人に渡す。単独 issue ならその 1 本を実装して main 向けの PR を作る。subagent は implementer（sonnet）・pr-writer（opus）・pr-reviewer（opus）の 3 本で、push・PR 作成・merge はこの skill を回す側だけが打つ。main への merge は打たない。
----
-
 # implement
 
 > issue 1 本を「実装 → PR → レビュー → 修正 → merge」の形に乗せる。親 issue なら sub-issue ごとにこれを回し、クッション branch に積む。
@@ -10,7 +5,7 @@ description: GitHub issue 1 本を実装して PR にする。`/implement <issue
 手を 3 本に分ける。実装するのは `implementer`、PR 本文を書くのは `pr-writer`、差分を見るのは `pr-reviewer`
 （[`.claude/agents/`](../../agents/)）。**push・PR 作成・merge・issue の書き換えは、この skill を回している側だけが打つ。** subagent には打たせない。
 
-- **入力**: issue 番号か URL が 1 つ。`/implement 320`、`/implement https://github.com/<owner>/<repo>/issues/320`
+- **入力**: issue 番号か URL が 1 つ。`/flow implement 320`、`/flow implement https://github.com/<owner>/<repo>/issues/320`
 - **出力**: main 向けの PR 1 本（merge は人がやる）と、人への報告
 
 **merge してよいのは main 以外の branch（クッション branch）向けの PR だけ。** main 向けの PR に `gh pr merge` を打つと柵が止める（[`.claude/README.md`](../../README.md)）。
@@ -20,7 +15,7 @@ description: GitHub issue 1 本を実装して PR にする。`/implement <issue
 ### 1. 状態を取り、役割で分ける
 
 ```
-bash .claude/skills/implement/state.sh <番号か URL>
+bash .claude/skills/flow/state.sh <番号か URL>
 ```
 
 役割（`親` ／ `単独` ／ `sub-issue`）、クッション branch の有無、sub-issue ごとの branch と PR、main 向け PR の有無が JSON で出る。
@@ -121,7 +116,7 @@ gh pr create --base main --head <cushion> --title "<親 issue のタイトル>�
 
 `state.sh` の `mainPr` が既にあれば、作らずに本文を書き直す（`gh api -X PATCH repos/<owner>/<repo>/issues/<PR 番号> -F body=@<絶対パス>`）。書き直したら何をどう変えたかをコメントに残す。
 
-**main 向けの PR はレビューに回してよいが、merge は打たない。** 人がレビューし、issue を直し、もう一度 `/implement <親>` を打つ。
+**main 向けの PR はレビューに回してよいが、merge は打たない。** 人がレビューし、issue を直し、もう一度 `/flow implement <親>` を打つ。
 
 ### 4. 単独 issue: main 向けの PR を 1 本作る
 
@@ -149,4 +144,4 @@ sub-issue ごとに 1 行の表（単独なら 1 行）。
 - PR 本文の編集とコメントは `gh api`（REST）で、ファイルは `-F body=@path`（`gh pr edit`／`gh pr comment` は projectCards のエラーで落ちる）
 - レビューの返答は必ず PR コメントに残す。何を見て merge したかの跡
 - 止まる条件（終わりの判定を満たせない／3 周／CI が落ちる／issue から見直し）では merge せず、PR を開いたまま人に返す
-- 人がクッション PR に付けたレビューコメントへの対応は、この skill の範囲の外。issue を直してからもう一度 `/implement <親>` を打つ
+- 人がクッション PR に付けたレビューコメントへの対応は、この skill の範囲の外。issue を直してからもう一度 `/flow implement <親>` を打つ
