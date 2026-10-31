@@ -3,7 +3,8 @@
 > issue 1 本を「実装 → PR → レビュー → 修正 → merge」の形に乗せる。親 issue なら sub-issue ごとにこれを回し、クッション branch に積む。
 
 手を 3 本に分ける。実装するのは `implementer`、PR 本文を書くのは `pr-writer`、差分を見るのは `pr-reviewer`
-（[`.claude/agents/`](../../agents/)）。**push・PR 作成・merge・issue の書き換えは、この skill を回している側だけが打つ。** subagent には打たせない。
+（[`.claude/agents/`](../../agents/)）。**push・PR 作成・merge は、この段取りを回している側だけが打つ。** この 3 本には打たせない。
+**issue の書き換えは `issue-fixer` だけが `gh api` で打つ**（[`issue-fix.md`](issue-fix.md) の周回）。回す側も、この 3 本も、issue を書き換えない。
 
 - **入力**: issue 番号か URL が 1 つ。`/flow implement 320`、`/flow implement https://github.com/<owner>/<repo>/issues/320`
 - **出力**: main 向けの PR 1 本（merge は人がやる）と、人への報告
@@ -39,7 +40,7 @@ bash .claude/skills/flow/state.sh <番号か URL>
 - commit 末尾に付ける `Claude-Session:` の行
 - 「push・PR 作成・merge・issue の書き換えを打たないこと」
 
-返答が「終わりの判定を満たせない」なら、**ここで止めて人に返す。** 無理に合わせない。
+返答が「終わりの判定を満たせない」なら、無理に合わせず **2-6（issue-fix への分岐）へ**。その返答を所見として渡す。直ったら同じ implementer に **SendMessage** で、直った issue の要点と fixer のコメントを渡して再開させる（居なければ新しく立て、prompt に直した内容を入れる）。
 
 **2-2. push する。** `git push -u origin <branch>`。1 コマンドで、他の git と繋げない。
 
@@ -65,7 +66,7 @@ gh api repos/<owner>/<repo>/issues/<PR 番号>/comments -F body=@<絶対パス>
    | --- | --- |
    | merge してよい | 2-5 へ |
    | 直しが要る | 同じ implementer に **SendMessage** で「直し方」を渡し、直して commit させる（implementer が居なければ新しく立て、prompt に前回の所見と直し方を入れる）。`git push` して 1 に戻る（周回 +1） |
-   | issue から見直し | **止めて人に返す。** PR は開いたまま。食い違いを subagent の文のまま報告に載せる |
+   | issue から見直し | **2-6（issue-fix への分岐）へ。** PR は開いたまま。pr-reviewer の返答を所見として渡す。直ったら、直った issue と fixer のコメントを implementer に渡して周回を続ける |
 
    3 周目でも「直しが要る」なら、**merge せず PR を開いたまま人に返す。** 残った所見を報告に載せる。
 
@@ -76,6 +77,17 @@ gh pr checks <PR 番号> --watch
 ```
 
 落ちたら **merge せず、PR を開いたまま人に返す**。落ちたジョブ名とログの要点を報告に載せる。
+
+**2-6. issue-fix へ分岐する。** implementer の「終わりの判定を満たせない」と pr-reviewer の「issue から見直し」の入口。手順は [`issue-fix.md`](issue-fix.md) の「所見あり」入口（手順 2 から）に従い、渡す所見は上の返答をそのまま使う。
+
+| issue-fix の結果 | すること |
+| --- | --- |
+| 全 issue が妥当になった | 実装に戻る。2-1 から来たなら implementer を再開して 2-2 へ。2-4 から来たなら、直った issue と fixer のコメントを implementer に渡して直させ、`git push` して 2-4 の 1 に戻る。**issue-fix に入っても PR レビューの周回数は進めない**（直した後の次のレビューで +1） |
+| 「人に聞く」「目的から見直し」で止まった | **止めて人に返す。** PR は開いたまま。subagent の文のまま報告に載せる |
+| 3 周に達しても「直しが要る」 | **止めて人に返す。** PR は開いたまま。残った所見を報告に載せる |
+
+**issue-fix を経ずに implementer に issue の解釈を変えさせない。** issue と実装が食い違ったまま merge される。issue を正としてから実装する。
+tech-requirements.md のずれが所見で返ったら、implementer が同じ branch で ADR 付きで直す。
 
 ### 3. 親 issue: クッション branch に sub-issue を積む
 
@@ -132,16 +144,16 @@ sub-issue ごとに 1 行の表（単独なら 1 行）。
 | issue | branch | PR | レビュー周回 | 結果 |
 ```
 
-結果は `merge 済み` ／ `今回 merge` ／ `人に返す（理由）` ／ `閉じている`。続けて、「人に返す」の理由を 1〜2 行ずつ。「issue から見直し」が出た sub-issue は、何が食い違っているかを subagent の文のまま載せる。最後に main 向けの PR の URL。
+結果は `merge 済み` ／ `今回 merge` ／ `人に返す（理由）` ／ `閉じている`。続けて、「人に返す」の理由を 1〜2 行ずつ。issue-fix が止まった sub-issue は、何が食い違っているかを subagent の文のまま載せる。issue-fix で直した issue があれば、その番号と fixer のコメントの要点も載せる。最後に main 向けの PR の URL。
 
 ## 守ること
 
 - subagent は 1 本ずつ。並列に回さない。前の sub-issue の merge が次の前提になる
-- subagent に push・`gh pr create`・`gh pr merge`・`gh issue edit` を打たせない。打つのはこの skill を回す側
+- implementer・pr-writer・pr-reviewer に push・`gh pr create`・`gh pr merge`・issue の書き換えを打たせない。push・PR 作成・merge を打つのはこの段取りを回す側。issue の書き換えを打つのは issue-fixer だけ（`gh api`。`gh issue edit` は使わない）
 - main 向けの PR を merge しない。クッション向けだけ
 - `gh pr merge` は番号を付けて `--merge` で。`--delete-branch` を付けない
 - git を含む複合コマンドを打たない（`for`・変数・`xargs`・heredoc と混ぜると worktree の柵が止める）。1 コマンドずつ
 - PR 本文の編集とコメントは `gh api`（REST）で、ファイルは `-F body=@path`（`gh pr edit`／`gh pr comment` は projectCards のエラーで落ちる）
 - レビューの返答は必ず PR コメントに残す。何を見て merge したかの跡
-- 止まる条件（終わりの判定を満たせない／3 周／CI が落ちる／issue から見直し）では merge せず、PR を開いたまま人に返す
+- 「終わりの判定を満たせない」「issue から見直し」は人に返さず issue-fix（2-6）へ回す。人に返して止まるのは、issue-fix からの「人に聞く」「目的から見直し」、issue-fix の 3 周、PR レビューの 3 周、CI が落ちる、閉じた PR／issue のときだけ。merge せず PR を開いたまま返す
 - 人がクッション PR に付けたレビューコメントへの対応は、この skill の範囲の外。issue を直してからもう一度 `/flow implement <親>` を打つ
