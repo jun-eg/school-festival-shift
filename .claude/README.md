@@ -28,6 +28,9 @@
 （[issue #320](https://github.com/jun-eg/school-festival-shift/issues/320)）、前置一致では PR の base を判定できない。
 フックが `gh pr view <N> --json baseRefName` で base を引き、`main` なら止める。引けなければ止める側に倒す。
 番号の無い `gh pr merge` と REST の `pulls/<N>/merge` も止める（base の判定を素通りさせない）。
+**逆に `allow` には `gh pr merge` を入れてある。** 入れないと `/implement` のクッション向け merge が auto mode の判定で止まる。
+`settings.local.json` は gitignore されていて worktree ごとに置き直しになるので、どの worktree にも出てくる `settings.json` に置く（[x-like-digest#19](https://github.com/jun-eg/x-like-digest/issues/19)）。
+フックは `allow` より先に回るので、`main` 向けはこれまでどおり止まる。
 `main` への `git push` は refspec で見る。`git push origin main` だけは前置一致で拾えるので `deny` にもある。
 
 ## 例外：どうしても必要になったら
