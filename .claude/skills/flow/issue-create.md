@@ -1,13 +1,8 @@
----
-name: issue-create
-description: 依頼の文から GitHub issue を起こす。`/issue-create <依頼の文>` と明示されたとき、「この依頼を issue にして」「issue を起こして」と言われたときに使う。本文は docs/README.md の「issue 本文」節と雛形に従い、起こす前に「issue 1 本の大きさ」の物差しを当てる。大きすぎれば親 1 本と sub-issue に分けて起こし、小さすぎれば起こさずに、まとめる先の issue とともに人に返す。起こした後の判定は /issue-check の手で、この skill は判定しない。
----
-
 # issue-create
 
 > 依頼を、1 本 = PR 1 本の大きさで issue にする。
 
-起こした issue の点検は [`/issue-check`](../issue-check/SKILL.md) の手である。**起こす手と判定する手を分ける。** この skill は `issue-reviewer` を回さない。
+起こした issue の点検は [`/flow issue-fix`](issue-fix.md) の手である。**起こす手と判定する手を分ける。** この skill は `issue-reviewer` を回さない。
 
 - **入力**: 依頼の文（会話の中で決まった内容でもよい）。目的が読み取れなければ、起こす前に人に 1 つだけ聞く
 - **出力**: 起こした issue の番号と URL（親なら親と sub-issue の全部）、または「起こさない」理由とまとめる先
@@ -80,12 +75,12 @@ gh issue list --state open --search "<依頼の語>" --json number,title
 
 ### 6. 報告する
 
-起こしたもの（番号・タイトル・親子）か、起こさなかった理由とまとめる先を返す。続けて「`/issue-check <番号>` で点検できる」と添える。この skill が回しはしない。
+起こしたもの（番号・タイトル・親子）か、起こさなかった理由とまとめる先を返す。続けて「`/flow issue-fix <番号>` で点検できる」と添える。この skill が回しはしない。
 
 ## 守ること
 
 - 物差しと本文の規約は原本を開いて従う。この skill に定義や数値を写さない
-- 判定しない。`issue-reviewer` を回さず、`/issue-check` は人か、この skill を呼んだ側が打つ
+- 判定しない。`issue-reviewer` を回さず、`/flow issue-fix` は人か、この skill を呼んだ側が打つ
 - 書き換えてよいのは、今この skill が起こした issue だけ。既存の issue の本文・タイトル・ラベル・state は触らない
 - 小さすぎは起こさずに返す。人の確認なしに既存の issue へまとめない
 - 本文は `--body-file` か `-F body=@path`。`-f body=@path` は使わない

@@ -1,6 +1,6 @@
 ---
 name: pr-writer
-description: PR の本文を `.github/pull_request_template.md` の 3 節（困っていたこと・やったこと・確かめたこと）で 40 行以内に書き、ファイルに置いて返す。クッション branch 向け（`Refs #<sub>`）と main 向け（`Closes #<親>` と全 sub-issue）の 2 形。PR を作らない・書き換えない。/implement skill から PR 1 本ごとに呼ばれる。
+description: PR の本文を `.github/pull_request_template.md` の 3 節（困っていたこと・やったこと・確かめたこと）で 40 行以内に書き、ファイルに置いて返す。クッション branch 向け（`Refs #<sub>`）と main 向け（`Closes #<親>` と全 sub-issue）の 2 形。PR を作らない・書き換えない。/flow implement から PR 1 本ごとに呼ばれる。
 tools: Bash, Read, Grep, Glob, Write
 model: opus
 color: cyan
