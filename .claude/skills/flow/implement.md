@@ -68,7 +68,7 @@ gh api repos/<owner>/<repo>/issues/<PR 番号>/comments -F body=@<絶対パス>
    | 直しが要る | 同じ implementer に **SendMessage** で「直し方」を渡し、直して commit させる（implementer が居なければ新しく立て、prompt に前回の所見と直し方を入れる）。`git push` して 1 に戻る（周回 +1） |
    | issue から見直し | **2-6（issue-fix への分岐）へ。** PR は開いたまま。pr-reviewer の返答を所見として渡す。直ったら、直った issue と fixer のコメントを implementer に渡して周回を続ける |
 
-   3 周目でも「直しが要る」なら、**merge せず PR を開いたまま人に返す。** 残った所見を報告に載せる。
+   3 周目の判定が「直しが要る」か「issue から見直し」なら、**2-6 には回さず、merge せず PR を開いたまま人に返す。** 残った所見を報告に載せる。
 
 **2-5. CI を待つ。**
 
@@ -83,8 +83,10 @@ gh pr checks <PR 番号> --watch
 | issue-fix の結果 | すること |
 | --- | --- |
 | 全 issue が妥当になった | 実装に戻る。2-1 から来たなら implementer を再開して 2-2 へ。2-4 から来たなら、直った issue と fixer のコメントを implementer に渡して直させ、`git push` して 2-4 の 1 に戻る。**issue-fix に入っても PR レビューの周回数は進めない**（直した後の次のレビューで +1） |
-| 「人に聞く」「目的から見直し」で止まった | **止めて人に返す。** PR は開いたまま。subagent の文のまま報告に載せる |
-| 3 周に達しても「直しが要る」 | **止めて人に返す。** PR は開いたまま。残った所見を報告に載せる |
+| 「人に聞く」「目的から見直し」で止まった | **止めて人に返す。** PR があれば開いたまま。subagent の文のまま報告に載せる |
+| 3 周に達しても「直しが要る」 | **止めて人に返す。** PR があれば開いたまま。残った所見を報告に載せる |
+
+**issue-fix の周回数は、同じ issue について 2-1・2-4 からの入り直しをまたいで足し合わせる。** 合わせて 3 周に達したら、上の「3 周に達しても…」の行と同じに止めて人に返す。
 
 **issue-fix を経ずに implementer に issue の解釈を変えさせない。** issue と実装が食い違ったまま merge される。issue を正としてから実装する。
 tech-requirements.md のずれが所見で返ったら、implementer が同じ branch で ADR 付きで直す。
@@ -155,5 +157,5 @@ sub-issue ごとに 1 行の表（単独なら 1 行）。
 - git を含む複合コマンドを打たない（`for`・変数・`xargs`・heredoc と混ぜると worktree の柵が止める）。1 コマンドずつ
 - PR 本文の編集とコメントは `gh api`（REST）で、ファイルは `-F body=@path`（`gh pr edit`／`gh pr comment` は projectCards のエラーで落ちる）
 - レビューの返答は必ず PR コメントに残す。何を見て merge したかの跡
-- 「終わりの判定を満たせない」「issue から見直し」は人に返さず issue-fix（2-6）へ回す。人に返して止まるのは、issue-fix からの「人に聞く」「目的から見直し」、issue-fix の 3 周、PR レビューの 3 周、CI が落ちる、閉じた PR／issue のときだけ。merge せず PR を開いたまま返す
+- 「終わりの判定を満たせない」「issue から見直し」は人に返さず issue-fix（2-6）へ回す。人に返して止まるのは、issue-fix からの「人に聞く」「目的から見直し」、issue-fix の 3 周（入り直しをまたいで合算）、PR レビューの 3 周目の判定が「直しが要る」か「issue から見直し」のとき、CI が落ちる、閉じた PR／issue のときだけ。merge せず PR を開いたまま返す
 - 人がクッション PR に付けたレビューコメントへの対応は、この skill の範囲の外。issue を直してからもう一度 `/flow implement <親>` を打つ
