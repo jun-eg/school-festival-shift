@@ -1,6 +1,6 @@
 ---
 name: flow
-description: 段取りの入口。`/flow implement <issue 番号か URL>`（GitHub issue 1 本、親なら sub-issue を順に実装して PR にする。「/実装」「この issue を実装して」「親 issue の sub-issue を順に実装して」と言われたときも）、`/flow issue-create <依頼の文>`（依頼から issue を起こす。「この依頼を issue にして」「issue を起こして」と言われたときも）、`/flow issue-fix <issue 番号か URL>`（起票済みの issue を判定し、直しが要れば直して配下と親を再判定する。「この issue の解決策は目的に合っているか見て」と言われたときも）と明示されたときに使う。引数の 1 語目で開くファイルを選び、そのファイルの手順に従う。
+description: 段取りの入口。`/flow implement <issue 番号か URL>`（GitHub issue 1 本、親なら sub-issue を順に実装して PR にする。「/実装」「この issue を実装して」「親 issue の sub-issue を順に実装して」と言われたときも）、`/flow issue-create <依頼の文>`（依頼から issue を起こす。「この依頼を issue にして」「issue を起こして」と言われたときも）、`/flow issue-fix <issue 番号か URL>`（起票済みの issue を判定し、直しが要れば直して配下と親を再判定する。「この issue の解決策は目的に合っているか見て」と言われたときも）と明示されたときに使う。引数の 1 語目で開くファイルを選び、そのファイルの手順に従う。回す subagent は implementer・pr-writer・pr-reviewer・issue-fixer・issue-reviewer の 5 本。実装中に issue の穴が見つかったときは implement から issue-fix に回る。
 ---
 
 # flow
