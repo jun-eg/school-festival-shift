@@ -86,7 +86,7 @@ flowchart LR
     subgraph IDEA["何を作るか決める"]
         UJM["/user-journey-map"] --> HMW["/hmw"] --> DD["/design-doc"] --> TR["/tech-requirements"]
     end
-    TR --> ISSUE[issue を起票]
+    TR --> ISSUE["/issue-create<br/>(issue を起票)"]
     ISSUE --> CHECK["/issue-check<br/>(issue-reviewer)"]
     subgraph IMPLEMENT["/implement"]
         IMPL["implementer<br/>実装・commit"] --> PW["pr-writer<br/>PR 本文"] --> PRV{{pr-reviewer}}
