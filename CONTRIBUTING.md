@@ -29,7 +29,7 @@ git config core.hooksPath .githooks
 **template から作ったリポジトリは off から始まる。使い始めに 1 回だけ on にする。**
 GitHub のリポジトリの **Settings → General → Pull Requests** の **「Automatically delete head branches」** にチェックを入れる
 （REST では `delete_branch_on_merge`。`gh api repos/<owner>/<repo> --jq .delete_branch_on_merge` が `true` なら済んでいる）。
-**PR を merge すると、その head の remote branch が消える。** **Claude は remote の branch を消す形を打てない**（[`guard-bash`](.claude/README.md) が止める）ので、削除はこの設定だけが担う。
+**PR を merge すると、その head の remote branch が消える。** **Claude が remote の branch を消す主な形は [`guard-bash`](.claude/README.md) が止める**（拾えない形は README に列挙）ので、削除はこの設定が担う。
 local の branch と worktree は消えない。
 
 ## 揃えてあるもの

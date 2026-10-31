@@ -166,6 +166,9 @@ def check_git(tokens):
             # `--delete` と git が受ける一意な短縮（`--del` など）、`-d`、`-ud` の束
             if (arg.startswith("--d") and "--delete".startswith(arg)) or SHORT_WITH_D.match(arg):
                 return MSG_DELETE_BRANCH
+            # remote に無い ref を消す `--prune`、全 ref を合わせる `--mirror`（git が受ける一意な短縮も）
+            if (arg.startswith("--p") and "--prune".startswith(arg)) or (arg.startswith("--m") and "--mirror".startswith(arg)):
+                return MSG_DELETE_BRANCH
             # 送り元が空の refspec `:branch` は remote の branch を消す
             if arg.startswith(":") and len(arg) > 1:
                 return MSG_DELETE_BRANCH
@@ -266,6 +269,9 @@ def check_gh_pr_merge(args, repo):
         if arg in GH_MERGE_TAKES_VALUE:
             i += 2
             continue
+        if arg == "--delete-branch=false":
+            i += 1
+            continue
         if arg == "--delete-branch" or arg.startswith("--delete-branch=") or SHORT_WITH_D.match(arg):
             return MSG_DELETE_BRANCH
         if not arg.startswith("-") and number is None:
@@ -283,7 +289,7 @@ def check_gh_pr_merge(args, repo):
 
 def gh_api_deletes_ref(args):
     """`gh api` が branch の ref を DELETE する形か。GraphQL の `deleteRef` は mutation 名を含む引数で拾う。"""
-    if any("deleteRef" in t for t in args):
+    if any("deleteRef" in t or "updateRefs" in t for t in args):
         return True
     delete = False
     for i, t in enumerate(args):
