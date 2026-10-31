@@ -36,6 +36,7 @@
 （[issue #320](https://github.com/jun-eg/school-festival-shift/issues/320)）、前置一致では PR の base を判定できない。
 フックが `gh pr view <N> --json baseRefName` で base を引き、`main` なら止める。引けなければ止める側に倒す。
 番号の無い `gh pr merge` と REST の `pulls/<N>/merge` も止める（base の判定を素通りさせない）。
+remote の branch を消す形（`git push --delete`・`:branch`、`gh pr merge --delete-branch`、REST `git/refs/heads` の DELETE、GraphQL `deleteRef`）もフックが止める。消すのはリポジトリ設定（merge 時に head branch を自動削除）が担う。
 `main` への `git push` は refspec で見る。`git push origin main` だけは前置一致で拾えるので `deny` にもある。
 
 ## 例外：どうしても必要になったら

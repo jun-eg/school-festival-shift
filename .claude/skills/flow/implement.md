@@ -123,7 +123,7 @@ sub-issue ごとに `state.sh` の結果で分ける。
 gh pr merge <PR 番号> --merge
 ```
 
-`--delete-branch` を付けない（gh が default branch に切り替えようとして、main を持つ本体の worktree と衝突する）。`--squash`・`--rebase` も使わない。merge したら `git switch <cushion>`、続けて `git pull`（別々の 1 コマンドで）。sub-issue の branch は残してよい。
+`--delete-branch` を付けない（gh が default branch に切り替えようとして、main を持つ本体の worktree と衝突する。guard-bash も止める）。`--squash`・`--rebase` も使わない。merge したら `git switch <cushion>`、続けて `git pull`（別々の 1 コマンドで）。sub-issue の remote の branch はリポジトリ設定（Automatically delete head branches）が merge 時に消す。local の branch と worktree は消さない（次の sub-issue が土台に読む）。remote の branch を自分で消さない（`git push --delete`・`:branch`・REST・GraphQL は guard-bash が止める）。
 
 **3-3. 全部 merge したら main 向けの PR を作る。** pr-writer に `main 向け` で本文を書かせる（親と全 sub-issue の `Closes`、sub-issue ごとに 1 行と PR 番号。`mainPr` があればその PR 番号も渡す）。
 
@@ -156,7 +156,7 @@ sub-issue ごとに 1 行の表（単独なら 1 行）。
 - subagent は 1 本ずつ。並列に回さない。前の sub-issue の merge が次の前提になる
 - implementer・pr-writer・pr-reviewer に push・`gh pr create`・`gh pr merge`・issue の書き換えを打たせない。push・PR 作成・merge を打つのはこの段取りを回す側。issue の書き換えを打つのは issue-fixer だけ（`gh api`。`gh issue edit` は使わない）
 - main 向けの PR を merge しない。クッション向けだけ
-- `gh pr merge` は番号を付けて `--merge` で。`--delete-branch` を付けない
+- `gh pr merge` は番号を付けて `--merge` で。`--delete-branch` を付けない（衝突する、かつ guard-bash が止める）
 - git を含む複合コマンドを打たない（`for`・変数・`xargs`・heredoc と混ぜると worktree の柵が止める）。1 コマンドずつ
 - PR 本文の編集とコメントは `gh api`（REST）で、ファイルは `-F body=@path`（`gh pr edit`／`gh pr comment` は projectCards のエラーで落ちる）
 - レビューの返答は必ず PR コメントに残す。何を見て merge したかの跡

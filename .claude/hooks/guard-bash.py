@@ -38,6 +38,11 @@ GH_SHORT_BUNDLE = re.compile(r"^-[a-zA-Z]+$")
 DEADLINE = time.monotonic() + 8.0
 # REST で merge する形 `repos/o/r/pulls/12/merge`
 GH_API_MERGE = re.compile(r"(^|/)pulls/[0-9]+/merge$")
+# remote の branch を消す形。`-d` 単体と `-ud`・`-md` のような短縮フラグの束
+SHORT_WITH_D = re.compile(r"^-[a-zA-Z]*d[a-zA-Z]*$")
+# REST で branch の ref を消す先 `repos/o/r/git/refs/heads/x`
+GH_API_REF = re.compile(r"(^|/)git/refs/heads(/|%2F|$)", re.IGNORECASE)
+GH_API_DELETE_METHOD = re.compile(r"^(-X|--method)=?DELETE$", re.IGNORECASE)
 
 MSG_FORCE = (
     "force-push は禁止。レビュー済みコミットが消えるとレビューコメントが行を見失う。"
@@ -72,6 +77,11 @@ MSG_MERGE_UNRESOLVED = (
 MSG_MERGE_REBASE = "`gh pr merge --rebase` は履歴を書き換えるので止めている。`--merge` を使う。"
 MSG_GH_API_MERGE = (
     "REST で PR を merge する形は止めている。base の判定を通すため `gh pr merge <N> --merge` を使う。"
+)
+MSG_DELETE_BRANCH = (
+    "remote の branch を消す形は止めている。merge 後の head branch を消すのはリポジトリ設定"
+    "（Automatically delete head branches）が担うので、Claude が消す理由が無い。"
+    "設定が off なら CONTRIBUTING.md の手順で人が on にする。"
 )
 MSG_GH_RAW = (
     "`gh` の `-f` / `--raw-field` はファイルを読まず `@...` をそのまま文字列として送る（実際に事故った）。"
@@ -153,6 +163,12 @@ def check_git(tokens):
         for arg in args:
             if is_no_verify(arg):
                 return MSG_NO_VERIFY
+            # `--delete` と git が受ける一意な短縮（`--del` など）、`-d`、`-ud` の束
+            if (arg.startswith("--d") and "--delete".startswith(arg)) or SHORT_WITH_D.match(arg):
+                return MSG_DELETE_BRANCH
+            # 送り元が空の refspec `:branch` は remote の branch を消す
+            if arg.startswith(":") and len(arg) > 1:
+                return MSG_DELETE_BRANCH
             if FORCE_LONG.match(arg):
                 return MSG_FORCE
             if FORCE_SHORT.match(arg):
@@ -250,6 +266,8 @@ def check_gh_pr_merge(args, repo):
         if arg in GH_MERGE_TAKES_VALUE:
             i += 2
             continue
+        if arg == "--delete-branch" or arg.startswith("--delete-branch=") or SHORT_WITH_D.match(arg):
+            return MSG_DELETE_BRANCH
         if not arg.startswith("-") and number is None:
             number = arg
         i += 1
@@ -263,6 +281,19 @@ def check_gh_pr_merge(args, repo):
     return None
 
 
+def gh_api_deletes_ref(args):
+    """`gh api` が branch の ref を DELETE する形か。GraphQL の `deleteRef` は mutation 名を含む引数で拾う。"""
+    if any("deleteRef" in t for t in args):
+        return True
+    delete = False
+    for i, t in enumerate(args):
+        if GH_API_DELETE_METHOD.match(t):
+            delete = True
+        elif t in ("-X", "--method") and i + 1 < len(args) and args[i + 1].upper() == "DELETE":
+            delete = True
+    return delete and any(GH_API_REF.search(t) for t in args if not t.startswith("-"))
+
+
 def check_gh(tokens):
     words, args, repo = gh_subcommand(tokens)
     if words[:2] == ["pr", "merge"]:
@@ -272,6 +303,8 @@ def check_gh(tokens):
     if words[:1] == ["api"]:
         if any(GH_API_MERGE.search(t) for t in tokens[1:] if not t.startswith("-")):
             return MSG_GH_API_MERGE
+        if gh_api_deletes_ref(tokens[1:]):
+            return MSG_DELETE_BRANCH
     for i, token in enumerate(tokens):
         if GH_RAW_FIELD.match(token):
             nxt = tokens[i + 1] if i + 1 < len(tokens) else ""
