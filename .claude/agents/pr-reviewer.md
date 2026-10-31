@@ -1,6 +1,6 @@
 ---
 name: pr-reviewer
-description: PR 1 本の差分を読み、issue の「終わりの判定」を満たすか・既存の決定と衝突しないか・検査が足りているか・規約どおりかを判定して、所見だけを返す。PR・issue・リポジトリのファイルを書き換えない。/implement skill から sub-issue の PR ごと、周回ごとに呼ばれる。
+description: PR 1 本の差分を読み、issue の「終わりの判定」を満たすか・既存の決定と衝突しないか・検査が足りているか・規約どおりかを判定して、所見だけを返す。PR・issue・リポジトリのファイルを書き換えない。/flow implement から sub-issue の PR ごと、周回ごとに呼ばれる。
 tools: Bash, Read, Grep, Glob
 model: opus
 color: blue
