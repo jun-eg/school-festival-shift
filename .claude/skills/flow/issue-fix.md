@@ -18,12 +18,14 @@ bash .claude/skills/flow/fetch.sh <番号か URL>
 
 番号・タイトル・state・親・sub-issue が JSON で出る。URL なら owner/repo も URL から取る。
 
+役割は JSON から決める。`subIssues` があれば `親`、`parent` があれば `sub-issue`（所見なし入口の最初の判定では親まで遡らない）、どちらも無ければ `単独`。
+
 | 入口 | 条件 | 始める手 |
 | --- | --- | --- |
-| 所見あり | 所見が渡されている | issue-fixer から（手順 2） |
+| 所見あり | 所見が渡されている | issue-fixer から（手順 2）。渡された issue が CLOSED なら fixer を回さず、手順 3 の判定だけ |
 | 所見なし | 番号だけ。起票直後の点検 | issue-reviewer から（手順 3）。判定が妥当なら何も書き換えない |
 
-**state が CLOSED の issue は、役割が何でも判定だけして直さない。** 終わった物を書き換えない。判定は報告に残す。
+**state が CLOSED の issue は、役割が何でも（入口が何でも）判定だけして直さない。** 終わった物を書き換えない。判定は報告に残す。
 
 ### 2. issue-fixer を回す
 
@@ -33,6 +35,7 @@ Agent tool で `subagent_type: issue-fixer`。prompt には次を入れる。
 - 所見（所見なし入口の 2 周目以降は、直前の issue-reviewer の「直し方」）
 - 前の周で直した内容の要約
 - scratchpad の絶対パス
+- 「CLOSED の issue（配下・親を含む）は直さないこと。直す必要があれば『再判定に回す issue』に挙げて返すこと」
 
 返答の「段」で分ける。
 
