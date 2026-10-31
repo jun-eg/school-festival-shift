@@ -80,8 +80,11 @@ gh pr checks <PR 番号> --watch
 
 **2-6. issue-fix へ分岐する。** implementer の「終わりの判定を満たせない」と pr-reviewer の「issue から見直し」の入口。手順は [`issue-fix.md`](issue-fix.md) の「所見あり」入口（手順 2 から）に従い、渡す所見は上の返答をそのまま使う。
 
+**実装に戻る前に、対象の issue（sub-issue なら親も）の state をもう一度見る**（`bash .claude/skills/flow/fetch.sh <番号>`）。issue-fixer は close もするので、結果が「妥当」でも閉じていることがある。**表は上の行から当てる。**
+
 | issue-fix の結果 | すること |
 | --- | --- |
+| 実装中の issue（sub-issue なら親も）が CLOSED になった | **止めて人に返す。** PR があれば開いたまま、merge しない。報告の結果は `人に返す（閉じた）` にし、fixer の close の理由を載せる |
 | 全 issue が妥当になった | 実装に戻る。2-1 から来たなら implementer を再開して 2-2 へ。2-4 から来たなら、直った issue と fixer のコメントを implementer に渡して直させ、`git push` して 2-4 の 1 に戻る。**issue-fix に入っても PR レビューの周回数は進めない**（直した後の次のレビューで +1） |
 | 「人に聞く」「目的から見直し」で止まった | **止めて人に返す。** PR があれば開いたまま。subagent の文のまま報告に載せる |
 | 3 周に達しても「直しが要る」 | **止めて人に返す。** PR があれば開いたまま。残った所見を報告に載せる |
