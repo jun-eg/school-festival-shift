@@ -71,7 +71,7 @@ Status が「取り消し」の ADR も 1 本置き、何が取り消されて�
 
 #### issue 1 本の大きさ
 
-issue 1 本が PR 1 本の単位になる。単独 issue も sub-issue も同じ物差しで測る。物差しの原本はここである。
+issue 1 本が PR 1 本の単位になる。単独 issue も sub-issue も同じ物差しで測る。親 issue は sub-issue を束ねる物なので測らず、sub-issue を 1 本ずつ測る。物差しの原本はここである。
 issue-reviewer・雛形・起票 skill はここを指し、写さない。
 
 | 大きさ | 定義 |
