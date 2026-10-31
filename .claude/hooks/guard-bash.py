@@ -300,8 +300,29 @@ def gh_api_deletes_ref(args):
     return delete and any(GH_API_REF.search(t) for t in args if not t.startswith("-"))
 
 
+def check_gh_pr_close(args):
+    """`gh pr close` の `--delete-branch` / `-d` は local と remote の branch を消す。`-c` の値は飛ばす。"""
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in ("-c", "--comment"):
+            i += 2
+            continue
+        if arg == "--delete-branch=false":
+            i += 1
+            continue
+        if arg == "--delete-branch" or arg.startswith("--delete-branch=") or SHORT_WITH_D.match(arg):
+            return MSG_DELETE_BRANCH
+        i += 1
+    return None
+
+
 def check_gh(tokens):
     words, args, repo = gh_subcommand(tokens)
+    if words[:2] == ["pr", "close"]:
+        reason = check_gh_pr_close(args)
+        if reason:
+            return reason
     if words[:2] == ["pr", "merge"]:
         reason = check_gh_pr_merge(args, repo)
         if reason:
