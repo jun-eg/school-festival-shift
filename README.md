@@ -26,7 +26,7 @@
 | 2 | `/hmw` | `docs/agent/hmw.md` — 採用するソリューションと、採らなかった候補 |
 | 3 | `/design-doc` | `docs/agent/design-doc.md` — 作るものの確定 |
 | 4 | `/tech-requirements` | `docs/agent/tech-requirements.md` — 何で・どう作るか、完了の判定方法 |
-| ― | `/issue-check` | 起票した issue の解決策が目的に合っているかの判定（直しが要れば本文を直す） |
+| ― | `/flow issue-fix` | 起票した issue の解決策が目的に合っているかを判定し、直しが要れば issue-fixer が直して、配下と親を再判定する（上限 3 周） |
 | ― | `/flow implement` | issue 1 本（親なら sub-issue を順に）を実装して PR にする。`main` への merge は人がする |
 
 **何をどこに置くかの総目録は [`docs/agent/ADR/README.md`](docs/agent/ADR/README.md) の「器の一覧」にあります。**
