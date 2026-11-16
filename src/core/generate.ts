@@ -96,7 +96,7 @@ export const generationNotAimed = [
 
 /**
  * まとまりで置けない端 — 「連続して入る最小の長さ」に届かない塊が出る理由（→ 5-5 の「まとまり」・issue #215）。
- * 規則ではないので、違反にも未充足にも数えない。scripts/まとまりと散らし.mjs がこの名前をそのまま読む。
+ * 規則ではないので、違反にも未充足にも数えない。scripts/clustering-spread.mjs がこの名前をそのまま読む。
  */
 export const runExceptions = [
   {

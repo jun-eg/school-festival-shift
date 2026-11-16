@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 // まとまりと散らし — M2 と同じ入力で案を 1 つ組み、塊の長さと、1 日の中の散らしを数える。
 //
-//   使い方: node scripts/まとまりと散らし.mjs
-//   宣言:   scripts/まとまりと散らしの宣言.json（線と数え方の決めの原本）
-//   入力:   scripts/判定の入力.mjs（M2 と同じ置き方）
+//   使い方: node scripts/clustering-spread.mjs
+//   宣言:   scripts/clustering-spread-spec.json（線と数え方の決めの原本）
+//   入力:   scripts/verify-input.mjs（M2 と同じ置き方）
 //
 // 数えるのは 2 つ（→ issue #215）。
 //   塊   … 同じ人・同じ日で、隣り合う枠に同じ役割が続いた区間。1 件 = 1 つの持ち場
 //   散らし … その日に候補枠を持つ人のうち、何人が置かれ、1 人あたり何時間になったか
 //
-// 違反と未充足は scripts/M2の判定.mjs が判定する（同じ数を 2 か所で判定しない）。
+// 違反と未充足は scripts/m2-check.mjs が判定する（同じ数を 2 か所で判定しない）。
 // 例外の名前は src/core/generate.ts の runExceptions をそのまま読む（2 か所に持つと片方が古くなる）。
 // 読むだけ。合格の線を外したら終了コード 1。
 
-import { 読む, 実装の文脈, 取り出す, 判定の入力 } from './判定の入力.mjs'
+import { 読む, 実装の文脈, 取り出す, 判定の入力 } from './verify-input.mjs'
 
-const 宣言 = JSON.parse(読む('scripts/まとまりと散らしの宣言.json'))
+const 宣言 = JSON.parse(読む('scripts/clustering-spread-spec.json'))
 
 // ---- 実装を読む ------------------------------------------------------------
 
@@ -260,16 +260,16 @@ function 主処理() {
   console.log('')
   console.log('まとまりと散らし — M2 と同じ入力で案を 1 つ組み、塊の長さと 1 日の中の散らしを数える')
   console.log('')
-  console.log('合格の線（原本は scripts/まとまりと散らしの宣言.json。出どころは issue #215 の受け入れ条件）')
+  console.log('合格の線（原本は scripts/clustering-spread-spec.json。出どころは issue #215 の受け入れ条件）')
   console.log(`  例外に名前の付かない「最小の長さに届かない塊」 ${宣言.合格の線.名前が付かない短い塊} 件`)
   console.log(`  ${宣言.合格の線.違反と未充足}`)
   console.log('')
-  console.log('入力（置き方の原本は scripts/M2の宣言.json。この手は持たない）')
+  console.log('入力（置き方の原本は scripts/m2-spec.json。この手は持たない）')
   console.log(`  連続して入る最小の長さ: ${まとまりの枠} 枠（${時間で(まとまりの枠)} 時間）… 条件入力の「置き方のルール」から来る（→ 5-1 の #7）`)
   console.log(`  展開で止まった人: ${組んだ.止まる人.join(' / ')}（M2 と同じ扱いである）`)
 
   console.log('')
-  console.log('宣言（原本は scripts/まとまりと散らしの宣言.json）')
+  console.log('宣言（原本は scripts/clustering-spread-spec.json）')
   宣言.宣言.forEach((一つ) => {
     console.log(`  ・${一つ.何}: ${一つ.決め}`)
     console.log(`      なぜ宣言が要るか: ${一つ.なぜ宣言が要るか}`)
@@ -345,7 +345,7 @@ function 主処理() {
 
   console.log('')
   console.log(`結果: 最小の長さに届かない塊 ${短い塊の全部.length} 件` + `（うち例外に名前が付かない ${名前が付かない短い塊.length} 件・線 ${宣言.合格の線.名前が付かない短い塊}）` + ` ／ 塊 ${日ごと.reduce((合計, 一日) => 合計 + 一日.塊, 0)} 件` + ` ／ 割り当て ${出力['割り当て'].length} 行`)
-  console.log('      違反と未充足の合否はここで言わない（→ node scripts/M2の判定.mjs）')
+  console.log('      違反と未充足の合否はここで言わない（→ node scripts/m2-check.mjs）')
   console.log('')
 
   return 線を外した || 判定できない ? 1 : 0

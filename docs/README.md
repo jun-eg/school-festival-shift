@@ -104,7 +104,7 @@ source-hash: <git hash-object の値。ADR はフォルダなのでツリーハ�
 ---
 ```
 
-[`scripts/要約の検査.mjs`](../scripts/要約の検査.mjs) が原本の今のハッシュと比べ、違えば要約の名前を挙げて落ちる。長さの上限も同時に見る。
+[`scripts/check-summaries.mjs`](../scripts/check-summaries.mjs) が原本の今のハッシュと比べ、違えば要約の名前を挙げて落ちる。長さの上限も同時に見る。
 pre-commit（[`.githooks/pre-commit`](../.githooks/pre-commit)。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）は作業ツリーの原本と、
 GitHub Actions（[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)）は HEAD の原本と比べる。
 
@@ -118,7 +118,7 @@ typo の修正でも止まるが、「見直した」と宣言する 1 手なの
 3. 刻み直す。要約を名指しする
 
    ```
-   node scripts/要約の検査.mjs --stamp docs/design-doc.md
+   node scripts/check-summaries.mjs --stamp docs/design-doc.md
    ```
 
 4. 原本と要約を同じ commit に入れる。再生成は当面 Claude がセッションでやり、hook が忘れを止める

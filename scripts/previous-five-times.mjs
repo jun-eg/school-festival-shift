@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 前回の 5 時刻の算出 — 前回の確定シフトの行から、日ごとの 5 時刻を出す。
 //
-//   使い方: node scripts/前回の5時刻.mjs
-//   宣言:   scripts/前回の5時刻の宣言.json（算出の規則・期待値・食い違いの読みの原本）
+//   使い方: node scripts/previous-five-times.mjs
+//   宣言:   scripts/previous-five-times-spec.json（算出の規則・期待値・食い違いの読みの原本）
 //
 // 5 時刻は記録に行として無いが、確定シフトを日と役割で束ねると帯が読める（→ docs/agent/tech-requirements.md 7）。
 // M2の判定と生成の所要時間が「日ごとの営業時刻」としてこの値を読む。
@@ -17,7 +17,7 @@ const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 
-const 宣言 = JSON.parse(読む('scripts/前回の5時刻の宣言.json'))
+const 宣言 = JSON.parse(読む('scripts/previous-five-times-spec.json'))
 
 /** 5 時刻の並び。「日ごとの営業時刻」の列の順（→ 5-1 の #1）。 */
 export const 時刻の名 = ['準備開始', '調理開始', '調理終了', '片付け開始', '片付け終了']
@@ -267,7 +267,7 @@ function 主処理() {
   console.log(`  ${宣言.入力.読む項目}`)
 
   console.log('')
-  console.log('算出の規則（原本は scripts/前回の5時刻の宣言.json）')
+  console.log('算出の規則（原本は scripts/previous-five-times-spec.json）')
   宣言.算出の規則.forEach((一つ) => {
     console.log(`  ・${一つ.何}: ${一つ.どう取るか}`)
     console.log(`      なぜ: ${一つ.なぜ}`)
@@ -311,7 +311,7 @@ function 主処理() {
   }
 
   console.log('')
-  console.log('確かめること（原本は scripts/前回の5時刻の宣言.json）')
+  console.log('確かめること（原本は scripts/previous-five-times-spec.json）')
   見た.forEach((一つ) => {
     console.log(`  ${一つ.合否 ? 'OK ' : 'NG '}  ${一つ.何}`)
     console.log(`       ${一つ.内訳}`)

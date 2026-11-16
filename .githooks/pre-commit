@@ -4,15 +4,15 @@
 # 有効にする: git config core.hooksPath .githooks（手順は CONTRIBUTING.md）
 # 止まったときの直し方は docs/README.md の「古さの check」。
 # 秘密の検査は、トークン・鍵・E2E の ID の混ざりを止める（→ e2e/README.md）。
-# 型・lint・テスト・ビルドは CI の job code と同じ順（issue #310）。E2E と npm run 判定（約 7 秒）は CI だけで回す。
+# 型・lint・テスト・ビルドは CI の job code と同じ順（issue #310）。E2E と npm run verify（約 7 秒）は CI だけで回す。
 # npm test は pretest で型をもう一度回すので、型は上で 1 回だけ回し --ignore-scripts で重ねない。
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
-node scripts/秘密の検査.mjs
-node scripts/リンクの検査.mjs
-node scripts/要約の検査.mjs
+node scripts/check-secrets.mjs
+node scripts/check-links.mjs
+node scripts/check-summaries.mjs
 
 # hook は GIT_DIR・GIT_INDEX_FILE を子に渡す。npm test の中で git を呼ぶ検査（src/entry.test.ts は一時 repo を作る）が
 # この repo に commit・tag を書いてしまうので、npm を回す前に外す。

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // M4 の判定 — 希望を足してもう一度通す操作が、初回の 7〜9 と同じ手数で回り、手直しのセルが戻らないかを見る。
 //
-//   使い方: node scripts/M4の判定.mjs
-//   宣言:   scripts/M4の宣言.json（合格の線・周の切り方・手直しの選び方の原本）
+//   使い方: node scripts/m4-check.mjs
+//   宣言:   scripts/m4-spec.json（合格の線・周の切り方・手直しの選び方の原本）
 //
 // 数えるのは 3 つで、合格の線は 3 つとも 0（→ docs/agent/tech-requirements.md 7 の M4）。
 //   ① 再実行の手数 − 初回の 7〜9 の手数
@@ -13,10 +13,10 @@
 // 読むだけ。線を 1 つでも外したら終了コード 1。
 
 import path from 'node:path'
-import { 読む, 読み込む, 取り出す, 判定の入力, 宣言 as M2の宣言 } from './判定の入力.mjs'
+import { 読む, 読み込む, 取り出す, 判定の入力, 宣言 as M2の宣言 } from './verify-input.mjs'
 
-const 宣言 = JSON.parse(読む('scripts/M4の宣言.json'))
-const 境目 = JSON.parse(読む('scripts/件数の期待値.json')).境目
+const 宣言 = JSON.parse(読む('scripts/m4-spec.json'))
+const 境目 = JSON.parse(読む('scripts/count-expected.json')).境目
 
 // ---- 偽の器 ------------------------------------------------------------------
 // Google がやることのうち、この経路が通るところだけを真似る。

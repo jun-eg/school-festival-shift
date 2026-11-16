@@ -182,4 +182,4 @@ e2e の止まりではなく、検査・ビルドの git が外から渡され�
 ## 直したら
 
 - 実機で起こしたら、「推測」と書いた所を、見た status と本文に置き換える。人が見た画面は [`src/real-device-log.md`](../../src/real-device-log.md) に足し、表の行（#331）も動かす
-- この文書を直したら、[`docs/e2e-症状と対処.md`](../e2e-症状と対処.md) を書き直し、`node scripts/要約の検査.mjs --stamp docs/e2e-症状と対処.md` で刻み直す（→ [`docs/README.md`](../README.md)）
+- この文書を直したら、[`docs/e2e-症状と対処.md`](../e2e-症状と対処.md) を書き直し、`node scripts/check-summaries.mjs --stamp docs/e2e-症状と対処.md` で刻み直す（→ [`docs/README.md`](../README.md)）

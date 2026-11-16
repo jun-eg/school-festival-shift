@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // M1 ② の判定 — フォームを配ってから型が出てくるまでの経路に、担当者の手が入る箇所があるかを見る。
 //
-//   使い方: node scripts/M1②の判定.mjs
-//   宣言:   scripts/M1②の宣言.json（合格の線・経路・数えないものの原本）
+//   使い方: node scripts/m1-2-check.mjs
+//   宣言:   scripts/m1-2-spec.json（合格の線・経路・数えないものの原本）
 //
 // 数えるのは「変換の途中で人の手が入った箇所」で、合格の線は 0 箇所（→ docs/agent/tech-requirements.md 7 の M1 ②）。
 // メニューを押す操作と名簿の画像を選ぶ操作は入力なので数えない。
@@ -14,13 +14,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { 読み込む, 取り出す } from './判定の入力.mjs'
+import { 読み込む, 取り出す } from './verify-input.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 
-const 宣言 = JSON.parse(読む('scripts/M1②の宣言.json'))
+const 宣言 = JSON.parse(読む('scripts/m1-2-spec.json'))
 
 // ---- 偽の器 ------------------------------------------------------------------
 // Google がやることのうち、この経路が通るところだけを真似る。

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 前回の確定シフトを、従来のシフト表の形に敷き直す（issue #213）。
 //
-//   使い方: node scripts/前回のシフト表.mjs
-//   宣言:   scripts/前回のシフト表の宣言.json（決めと期待値の原本）
+//   使い方: node scripts/previous-shift-table.mjs
+//   宣言:   scripts/previous-shift-table-spec.json（決めと期待値の原本）
 //
 // 見るのは 2 つ。
 //   ① 記録（data/ の 4 本）が、行＝人・列＝30 分枠・セル＝役割名 1 つの形にそのまま載るか。
@@ -14,14 +14,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { 読み込む, 取り出す } from './判定の入力.mjs'
-import { 営業時刻の行 } from './前回の5時刻.mjs'
+import { 読み込む, 取り出す } from './verify-input.mjs'
+import { 営業時刻の行 } from './previous-five-times.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 
-const 宣言 = JSON.parse(読む('scripts/前回のシフト表の宣言.json'))
+const 宣言 = JSON.parse(読む('scripts/previous-shift-table-spec.json'))
 
 // ---- 実装を読む ------------------------------------------------------------
 

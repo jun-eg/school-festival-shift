@@ -12,7 +12,7 @@
 //   ⑥ 描けないものは名指しして止まる
 //   ⑦ 描画のために外から読み込むファイルが 0 個である
 //
-// 前回の記録から描いたときの粒度は scripts/前回のシフト表.mjs が見る。
+// 前回の記録から描いたときの粒度は scripts/previous-shift-table.mjs が見る。
 
 import { renderHtml } from '../../build.mjs'
 import { check } from '../../test/check.ts'

@@ -202,7 +202,7 @@ SETTINGS = os.path.join(HERE, "..", "settings.json")
 with open(SETTINGS, encoding="utf-8") as f:
     perms = json.load(f)["permissions"]
 for rule in ["Bash(npm test)", "Bash(npm run typecheck)", "Bash(npm run lint)", "Bash(npm run format)",
-             "Bash(npm run build)", "Bash(npm run e2e)", "Bash(npm run 判定)"]:
+             "Bash(npm run build)", "Bash(npm run e2e)", "Bash(npm run verify)"]:
     ok = rule in perms.get("allow", [])
     if not ok: fails.append(("settings.json allow に無い", rule))
     print(f"{'OK  ' if ok else 'FAIL'} allow-rule | {rule}")

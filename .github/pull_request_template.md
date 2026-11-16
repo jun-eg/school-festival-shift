@@ -16,6 +16,6 @@
 
 - [ ] **既存の PR 本文を書き換えたなら、何をどう変えたかを PR コメントに残した**（判断が動いたなら根拠も）
 - [ ] 履歴を書き換えていない（force-push / push 済みの rebase・amend をしていない）
-- [ ] `docs/agent/` の原本を直したなら、`docs/` 直下の要約も書き直してハッシュを刻み直した（`node scripts/要約の検査.mjs` が通る）
+- [ ] `docs/agent/` の原本を直したなら、`docs/` 直下の要約も書き直してハッシュを刻み直した（`node scripts/check-summaries.mjs` が通る）
 
 Closes #

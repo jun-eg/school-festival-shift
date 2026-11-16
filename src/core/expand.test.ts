@@ -210,7 +210,7 @@ check(
   [26, 24, 24, 14],
 )
 
-// 終端 ≤ 始端の区間を持つ人は、そこで止まる。記録では 39 人中 3 人である（→ scripts/件数の期待値.json）。
+// 終端 ≤ 始端の区間を持つ人は、そこで止まる。記録では 39 人中 3 人である（→ scripts/count-expected.json）。
 const stoppedPeople = mockWishes.filter((wish) => whyItStopped(() => expand([wish], lastYearDays)) !== null)
 
 check('③ 畳んだ 39 人のうち、終端 ≤ 始端の区間を書いた 3 人で止まる（残りは止まらない）', [mockWishes.length, stoppedPeople.length, stoppedPeople.map((wish) => wish.studentId)], [39, 3, ['EEE2659176', 'CSC2606801', 'ECK2647386']])

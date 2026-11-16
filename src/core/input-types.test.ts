@@ -10,7 +10,7 @@
 //   ④ data/ の希望データのモックが型 #6 に乗る
 //   ⑤ 条件入力の初期値（→ sheet-layout.ts の initialRows）が 6 区画の型に乗る（→ issue #240）
 //
-// 確定シフトのモックが型に乗るかは scripts/M1①の判定.mjs が数える。
+// 確定シフトのモックが型に乗るかは scripts/m1-1-check.mjs が数える。
 
 import fs from 'node:fs'
 import path from 'node:path'
