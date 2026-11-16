@@ -55,7 +55,7 @@ export function conditionInputs() {
 
 /**
  * 回答シートに置く行（見出しは除く）と、そこから外した人。
- * 終端 ≤ 始端の区間を書いた人は展開の段で止まり、生成が走らないので外す（scripts/生成の所要時間.mjs と同じ置き方）。
+ * 終端 ≤ 始端の区間を書いた人は展開の段で止まり、生成が走らないので外す（scripts/generation-time.mjs と同じ置き方）。
  */
 export function mockAnswers() {
   const all = readCsv(fs.readFileSync(path.join(root, 'data/前回の希望データ-モック.csv'), 'utf8'))

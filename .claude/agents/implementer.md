@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: issue 1 本（sub-issue か単独）を読み、その「やること」を実装し、検査を走らせ、commit する。レビューの所見を渡されたら同じ agent が直して commit する。push・PR 作成・merge・issue の書き換えは打たない。/implement skill から sub-issue ごとに呼ばれ、レビューの周回は SendMessage で続けられる。
+description: issue 1 本（sub-issue か単独）を読み、その「やること」を実装し、検査を走らせ、commit する。レビューの所見を渡されたら同じ agent が直して commit する。push・PR 作成・merge・issue の書き換えは打たない。/flow implement から sub-issue ごとに呼ばれ、レビューの周回は SendMessage で続けられる。
 tools: Bash, Read, Edit, Write, Grep, Glob
 model: sonnet
 color: green
@@ -37,7 +37,7 @@ color: green
 2. 実装する。既存の書き方（命名・ファイルの置き場・検査の形）に合わせる
 3. 検査を書く。変えた振る舞いに、通る形と止まる形の両方。既存の検査の器（`guard-bash.test.py`、`scripts/*.mjs`、`src/` の検査）に足す
 4. 検査を走らせる。`src/README.md` と `scripts/README.md` に書いてある確かめ方のとおりに。**落ちたまま commit しない**
-5. `docs/agent/` の原本を直したら、`docs/` 直下の要約も書き直し、`node scripts/要約の検査.mjs --stamp <要約>` で刻み直す（規約は `docs/README.md`）
+5. `docs/agent/` の原本を直したら、`docs/` 直下の要約も書き直し、`node scripts/check-summaries.mjs --stamp <要約>` で刻み直す（規約は `docs/README.md`）
 6. commit する。メッセージはファイルに書いて `git commit -F <絶対パス>`。1 行目に「何をどうした（#issue 番号）」、本文に判断が動いた理由。末尾に呼び出しの文で渡された Claude-Session 行
 
 ## 守ること

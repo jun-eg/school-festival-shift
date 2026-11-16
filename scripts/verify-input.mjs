@@ -1,11 +1,11 @@
 // 判定の入力 — M2 と同じ入力を 1 か所で組む（使う側: M2の判定 ／ まとまりと散らし ／ M4の判定）。
-// 置き方の原本は scripts/M2の宣言.json で、このファイルは値も合格の線も持たない。
+// 置き方の原本は scripts/m2-spec.json で、このファイルは値も合格の線も持たない。
 // 別々に組むと片方が古くなるので、ここに 1 本にしてある。読むだけで何も書き換えない。
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { 営業時刻の行 } from './前回の5時刻.mjs'
+import { 営業時刻の行 } from './previous-five-times.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
@@ -16,7 +16,7 @@ export function 読む(相対) {
 }
 
 /** M2 の宣言。入力の置き方の原本である。 */
-export const 宣言 = JSON.parse(読む('scripts/M2の宣言.json'))
+export const 宣言 = JSON.parse(読む('scripts/m2-spec.json'))
 
 /**
  * 実装（宣言の「実装」の .ts）を import して、名前の入れ物を作る（SpreadsheetApp は置かない）。
@@ -74,7 +74,7 @@ export function CSVを読む(文) {
 
 /**
  * 判定に食わせる入力の一式を組む（→ 宣言の「入力」）。
- * 「日ごとの営業時刻」だけは前回の確定シフトから毎回算出し（→ scripts/前回の5時刻.mjs）、残りは宣言のまま。
+ * 「日ごとの営業時刻」だけは前回の確定シフトから毎回算出し（→ scripts/previous-five-times.mjs）、残りは宣言のまま。
  * 展開の段で止まる人（終端 ≤ 始端の区間を書いた人）の行は外し、誰を外したかを返す。
  */
 export function 判定の入力(文脈) {

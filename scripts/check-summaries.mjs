@@ -11,10 +11,10 @@
 // 拾うのは「原本を直して要約を見直していない」だけで、中身が追いついているかは人が読む側で見る。
 //
 // 使い方
-//   node scripts/要約の検査.mjs              作業ツリーの原本と比べる（pre-commit 向け）
-//   node scripts/要約の検査.mjs --head       HEAD の原本と比べる（CI 向け）
-//   node scripts/要約の検査.mjs --stamp      要約を見直したあと、ハッシュを刻み直す（全部）
-//   node scripts/要約の検査.mjs --stamp docs/design-doc.md   名指しで刻み直す
+//   node scripts/check-summaries.mjs              作業ツリーの原本と比べる（pre-commit 向け）
+//   node scripts/check-summaries.mjs --head       HEAD の原本と比べる（CI 向け）
+//   node scripts/check-summaries.mjs --stamp      要約を見直したあと、ハッシュを刻み直す（全部）
+//   node scripts/check-summaries.mjs --stamp docs/design-doc.md   名指しで刻み直す
 //
 // 長さの上限（docs/README.md の「要約の書き方」）も同時に見る。
 // 規約の原本は docs/README.md。起こした経緯は issue #316。
@@ -141,5 +141,5 @@ if (外れ.length === 0) {
 }
 console.log(`NG   要約 ${外れ.length} 件が外れた`)
 for (const 一つ of 外れ) console.log(`  ${一つ}`)
-console.log('直し方: 原本の差分と古い要約を読んで要約を書き直し、`node scripts/要約の検査.mjs --stamp <要約>` で刻み直す（→ docs/README.md）')
+console.log('直し方: 原本の差分と古い要約を読んで要約を書き直し、`node scripts/check-summaries.mjs --stamp <要約>` で刻み直す（→ docs/README.md）')
 process.exit(1)

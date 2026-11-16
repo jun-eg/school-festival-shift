@@ -15,7 +15,7 @@
 //   ⑨ 友達欄は回答に書かれたとおりに並ぶが、戻すときには読まない
 //   ⑩ 氏名から学籍番号を引ける（表記の完全一致。同姓同名は 2 つ返り、出し直しは 1 つに数える → issue #271）
 //
-// 前回の確定シフトが本当にこの形に敷けるかは scripts/前回のシフト表.mjs が見る。
+// 前回の確定シフトが本当にこの形に敷けるかは scripts/previous-shift-table.mjs が見る。
 
 import { check } from '../../test/check.ts'
 import { conflictNote, fixedFromAssignmentGrid, fixedNote, friendsFromAnswers, fromAssignmentGrid, gridBackgrounds, gridNotes, isFixedNote, namesFromAnswers, roleColorOf, roleColors, studentIdsFromAnswers, toAssignmentGrid, violationCells } from './assignment-grid.ts'

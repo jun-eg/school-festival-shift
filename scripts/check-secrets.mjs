@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 秘密の検査 — commit しようとしている物に、トークン・OAuth の鍵・E2E の ID が混ざっていないかを見る（→ e2e/README.md）。
 //
-//   使い方: node scripts/秘密の検査.mjs        （ステージされた物を見る。.githooks/pre-commit が回す）
+//   使い方: node scripts/check-secrets.mjs        （ステージされた物を見る。.githooks/pre-commit が回す）
 //
 // 見るものは 2 つある。
 //   ① 名前 — .env ・ .clasprc.json ・ creds.json ・ *-creds.json ・ client_secret*.json（.env.example は空の雛形なので通す）。

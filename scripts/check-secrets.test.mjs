@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { knownValues, scan } from './秘密の検査.mjs'
+import { knownValues, scan } from './check-secrets.mjs'
 
 const filler = 'abcdefghijklmnopqrstuvwxyz0123456789'
 const accessToken = `${'ya'}29.${filler}`

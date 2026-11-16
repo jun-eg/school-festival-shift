@@ -70,6 +70,23 @@ Status が「取り消し」の ADR も 1 本置き、何が取り消されて�
 進捗の checkbox は上段に置いてよい。人が読むのは進捗だからである。
 起票は今までどおり先にやる。番号を worktree 名と PR に引く。
 
+#### issue 1 本の大きさ
+
+issue 1 本が PR 1 本の単位になる。単独 issue も sub-issue も同じ物差しで測る。親 issue は sub-issue を束ねる物なので測らず、sub-issue を 1 本ずつ測る。物差しの原本はここである。
+issue-reviewer・雛形・起票 skill はここを指し、写さない。
+
+| 大きさ | 定義 |
+| --- | --- |
+| 大きすぎる | 別々に merge しても成り立つ変更が 2 つ以上入っている。「やること」が切れ目で 2 本に分けられる |
+| 小さすぎる | 単独では終わりの判定が立たない。前か後の issue と合わせないと、何が良くなったか言えない |
+| 適切 | どちらでもない |
+
+- 行数・ファイル数の数値は置かない。起票の時点では見積もりしかできず、判定がぶれる
+- 「妥当・直しが要る・目的から見直し」の判定とは別の軸で、並べて報告する（例: 妥当・大きすぎ）
+- 起票時（`/flow issue-create`・issue-reviewer 単独）に大きすぎる・小さすぎるが出たら、本文を直さず、分ける・まとめる案を人に返す。sub-issue を足す・外すは人がやる
+- 実装中の周回で issue-fixer が食い違いを直すときだけは、sub-issue の追加（親に結ぶ）と close を issue-fixer に許す。close は理由をコメントで残し、親の「やること」の行も直す。design-doc の段の食い違いは書き換えず人に返す
+- 単独 issue が大きすぎるときは、親と sub-issue に分ける案になる
+
 ### PR 本文
 
 何に困って・何をして・どう確かめたか、の 3 つを本文に書く。困りごとを issue へのリンクだけにしない。
@@ -87,7 +104,7 @@ source-hash: <git hash-object の値。ADR はフォルダなのでツリーハ�
 ---
 ```
 
-[`scripts/要約の検査.mjs`](../scripts/要約の検査.mjs) が原本の今のハッシュと比べ、違えば要約の名前を挙げて落ちる。長さの上限も同時に見る。
+[`scripts/check-summaries.mjs`](../scripts/check-summaries.mjs) が原本の今のハッシュと比べ、違えば要約の名前を挙げて落ちる。長さの上限も同時に見る。
 pre-commit（[`.githooks/pre-commit`](../.githooks/pre-commit)。有効にする手順は [`CONTRIBUTING.md`](../CONTRIBUTING.md)）は作業ツリーの原本と、
 GitHub Actions（[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)）は HEAD の原本と比べる。
 
@@ -101,7 +118,7 @@ typo の修正でも止まるが、「見直した」と宣言する 1 手なの
 3. 刻み直す。要約を名指しする
 
    ```
-   node scripts/要約の検査.mjs --stamp docs/design-doc.md
+   node scripts/check-summaries.mjs --stamp docs/design-doc.md
    ```
 
 4. 原本と要約を同じ commit に入れる。再生成は当面 Claude がセッションでやり、hook が忘れを止める

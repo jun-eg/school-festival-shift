@@ -7,7 +7,7 @@
       "data/前回の確定シフト-モック-03.json",
       "data/前回の確定シフト-モック-04.json"
     ],
-    "枠": "scripts/前回の5時刻.mjs が算出する 5 時刻から刻む（→ 規則 1 の ①）。ここで刻み方を書き直さない",
+    "枠": "scripts/previous-five-times.mjs が算出する 5 時刻から刻む（→ 規則 1 の ①）。ここで刻み方を書き直さない",
     "読む項目": ["date", "start", "end", "role", "memberId", "name"]
   },
   "決め": {

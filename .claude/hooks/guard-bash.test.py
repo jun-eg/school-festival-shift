@@ -83,6 +83,34 @@ DENY = [
     "gh pr --repo=o/r merge 12 --merge",
     "gh pr -R x/y merge 34 --merge",
     "gh pr merge 34 --rebase=true",
+    # remote の branch を消す形（削除はリポジトリ設定が担う）
+    "git push origin --delete x",
+    "git push --delete origin x",
+    "git push origin x --delete",
+    "git push --del origin x",
+    "git push --prune origin 'refs/heads/*:refs/heads/*'",
+    "git push --mirror origin",
+    "git push --mir origin",
+    "gh api graphql -f query='mutation { updateRefs(input: {}) { clientMutationId } }'",
+    "git push -d origin x",
+    "git push origin :x",
+    "git push origin :refs/heads/x",
+    "git -C /tmp/x push origin :x",
+    "cd /tmp && git push origin --delete x",
+    "gh pr merge 34 -md",
+    "gh pr close 34 -d",
+    "gh pr close 34 --delete-branch",
+    "gh pr close 34 --comment x --delete-branch",
+    "gh pr merge 34 --merge --delete-branch",
+    "gh pr merge 34 --merge -d",
+    "gh pr merge --delete-branch 34 --merge",
+    "gh pr merge 34 --delete-branch=true --merge",
+    "gh api -X DELETE repos/o/r/git/refs/heads/x",
+    "gh api repos/o/r/git/refs/heads/x -X DELETE",
+    "gh api --method DELETE repos/o/r/git/refs/heads/x",
+    "gh api --method=DELETE repos/o/r/git/refs/heads/x",
+    "gh api -XDELETE repos/o/r/git/refs/heads/x",
+    "gh api graphql -f query='mutation { deleteRef(input: {refId: \"x\"}) { clientMutationId } }'",
 ]
 
 # 通ってほしい形（止めすぎていないか）
@@ -99,8 +127,16 @@ ALLOW = [
     "gh pr merge 34 --merge --repo o/r",
     "gh -R o/r pr merge 34 --merge",
     "gh pr merge -m 34",
-    "gh pr merge 34 -md",
     "gh pr merge -Ro/r 34 --merge",
+    "git push -u origin worktree-377-x",
+    "git push origin worktree-377-x",
+    "git push --dry-run origin foo",
+    "gh pr close 34",
+    "gh pr close 34 -c '-d'",
+    "gh pr close 34 --delete-branch=false",
+    "gh pr merge 34 --merge --delete-branch=false",
+    "gh api repos/o/r/git/refs/heads/x",
+    "gh api -X DELETE repos/o/r/issues/comments/5",
     "gh pr -R o/r merge 34 --merge",
     "gh pr view 12 --json baseRefName",
     "gh api repos/o/r/pulls/12",
@@ -166,7 +202,7 @@ SETTINGS = os.path.join(HERE, "..", "settings.json")
 with open(SETTINGS, encoding="utf-8") as f:
     perms = json.load(f)["permissions"]
 for rule in ["Bash(npm test)", "Bash(npm run typecheck)", "Bash(npm run lint)", "Bash(npm run format)",
-             "Bash(npm run build)", "Bash(npm run e2e)", "Bash(npm run 判定)"]:
+             "Bash(npm run build)", "Bash(npm run e2e)", "Bash(npm run verify)"]:
     ok = rule in perms.get("allow", [])
     if not ok: fails.append(("settings.json allow に無い", rule))
     print(f"{'OK  ' if ok else 'FAIL'} allow-rule | {rule}")

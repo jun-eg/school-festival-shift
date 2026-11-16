@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # issue 番号か URL を 1 つ受け取り、番号・タイトル・state・親・sub-issue（親に並んだ順）を JSON で出す。
 # 読むだけ。何も書き換えない。
-#   bash .claude/skills/issue-check/fetch.sh 312
-#   bash .claude/skills/issue-check/fetch.sh https://github.com/OWNER/REPO/issues/312
+#   bash .claude/skills/flow/fetch.sh 312
+#   bash .claude/skills/flow/fetch.sh https://github.com/OWNER/REPO/issues/312
 set -euo pipefail
 
 arg="${1:-}"

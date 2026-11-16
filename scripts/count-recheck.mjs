@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 件数の検算 — data/ の 5 本だけを入力に件数を数え直し、期待値と突き合わせる。
 //
-//   使い方: node scripts/件数の検算.mjs
-//   期待値: scripts/件数の期待値.json（期待値と数え方の原本）
+//   使い方: node scripts/count-recheck.mjs
+//   期待値: scripts/count-expected.json（期待値と数え方の原本）
 //
 // 見るものは 3 つ。
 //   ① 数え直した値が期待値と一致するか
@@ -19,7 +19,7 @@ const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 
-const 期待 = JSON.parse(読む('scripts/件数の期待値.json'))
+const 期待 = JSON.parse(読む('scripts/count-expected.json'))
 
 // ---- 入力を読む ------------------------------------------------------------
 
@@ -389,7 +389,7 @@ function 主処理() {
 
   console.log('件数の検算 — data/ の 5 本から数え直し、期待値と本文に突き合わせる')
   console.log('')
-  console.log('数え方（宣言。原本は scripts/件数の期待値.json）')
+  console.log('数え方（宣言。原本は scripts/count-expected.json）')
   for (const d of 期待.数え方) {
     console.log(`  ・${d.何}: ${d.決め}`)
     console.log(`      なぜ宣言が要るか: ${d.なぜ宣言が要るか}`)

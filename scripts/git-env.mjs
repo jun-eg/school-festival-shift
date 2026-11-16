@@ -5,7 +5,7 @@
 // 本物の .git/config に `bare = true` を書き、メインの checkout が「must be run in a work tree」で止まる。
 //
 // 使い分け: 一時 repo を作る所・cwd の repo を読むだけの所（build.mjs の resolveVersion、src/entry.test.ts）はこれを env に渡す。
-// 本物の repo を読むのが目的の所（scripts/要約の検査.mjs・scripts/秘密の検査.mjs・.githooks/pre-push）は渡さない
+// 本物の repo を読むのが目的の所（scripts/check-summaries.mjs・scripts/check-secrets.mjs・.githooks/pre-push）は渡さない
 // （hook が渡す GIT_INDEX_FILE などを、意図して使う）。
 
 /** env から GIT_ で始まるものを落とした写し。足したいものは呼び出し側が後から足す。 */

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 生成の所要時間の実測 — コアを 1 周させて、スクリプトの実行時間の上限の中で終わるかを見る。
 //
-//   使い方: node scripts/生成の所要時間.mjs
-//   宣言:   scripts/生成の所要時間の宣言.json（上限の秒と入力の置き方の原本）
+//   使い方: node scripts/generation-time.mjs
+//   宣言:   scripts/generation-time-spec.json（上限の秒と入力の置き方の原本）
 //
 // 測るのは src/core/core.ts の build を 1 周する秒で、合格の線は 360 秒（Apps Script の上限 6 分 → 6-1 の #2）。
 // src/ をそのまま走らせる（書き直したコードが速くても、実機で走るコードの答えにならない）。
@@ -12,14 +12,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { 読み込む, 取り出す } from './判定の入力.mjs'
-import { 営業時刻の行, 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
+import { 読み込む, 取り出す } from './verify-input.mjs'
+import { 営業時刻の行, 検める as 前回の5時刻を検める } from './previous-five-times.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 
-const 宣言 = JSON.parse(読む('scripts/生成の所要時間の宣言.json'))
+const 宣言 = JSON.parse(読む('scripts/generation-time-spec.json'))
 
 // ---- 実装を読む ------------------------------------------------------------
 // SpreadsheetApp は置かない（置かずに通ることは src/core/core.test.ts が見ている）。
@@ -59,7 +59,7 @@ function 回答シートの行にする(行) {
   return [formatDateTime(new Date(年, 月 - 1, 日, 時, 分, 秒))].concat(行.slice(1))
 }
 
-// 「日ごとの営業時刻」は前回の確定シフトから毎回算出する（→ scripts/前回の5時刻.mjs）。
+// 「日ごとの営業時刻」は前回の確定シフトから毎回算出する（→ scripts/previous-five-times.mjs）。
 const 時刻の検め = 前回の5時刻を検める()
 
 /** 回答の行から、コアに渡す入力の一式を組む。回答以外は宣言のまま。 */
@@ -217,9 +217,9 @@ console.log(`         展開で止まった人: ${止まる人.join(' / ')}（�
 const 内訳 = Object.keys(期待.需要のべの内訳)
   .map((もと) => `${もと} ${期待.需要のべの内訳[もと]}`)
   .join(' ＋ ')
-console.log(`         需要のべ: ${期待.需要のべ}（${内訳} → 6 の #3 の理由 ②。数え直すのは scripts/M2の判定.mjs）`)
+console.log(`         需要のべ: ${期待.需要のべ}（${内訳} → 6 の #3 の理由 ②。数え直すのは scripts/m2-check.mjs）`)
 
-console.log('\n  日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/前回の5時刻.mjs）')
+console.log('\n  日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/previous-five-times.mjs）')
 時刻の検め.算出.forEach((一日) => {
   const 帯 = `準備 ${一日.帯の枠['準備']} ／ 調理 ${一日.帯の枠['調理']} ／ 片付け ${一日.帯の枠['片付け']}`
   console.log(`         ${一日.日}  ${一日.時刻.join(' ')}  全 ${一日.全枠} 枠 = ${帯}`)
@@ -228,7 +228,7 @@ console.log('\n  日ごとの 5 時刻（data/ の前回の確定シフトから
   console.log(`    ${一つ.合否 ? 'OK  ' : 'NG  '} ${一つ.何}`)
 })
 if (時刻の検め.外れ.length === 0) {
-  console.log('    OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
+  console.log('    OK   算出した値が、scripts/previous-five-times-spec.json の期待値と 1 つも違わない')
 } else {
   時刻の検め.外れ.forEach((一つ) => {
     console.log(`    NG   5 時刻が期待と違う: ${一つ}`)
@@ -264,7 +264,7 @@ if (外れた入力.length > 0) {
 }
 
 if (時刻の検め.落ちた) {
-  console.log('  算出した 5 時刻が検めを落ちた（詳細は node scripts/前回の5時刻.mjs）')
+  console.log('  算出した 5 時刻が検めを落ちた（詳細は node scripts/previous-five-times.mjs）')
   console.log(`  ${時刻の検め.ここが外れたら}\n`)
 }
 

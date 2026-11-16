@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // M1 ① の判定 — 前回の確定シフトのモック 4 本が、5-1 の型に乗るかを見る。
 //
-//   使い方: node scripts/M1①の判定.mjs
-//   宣言:   scripts/M1①の宣言.json（合格の線と営業時刻の置き方の原本）
+//   使い方: node scripts/m1-1-check.mjs
+//   宣言:   scripts/m1-1-spec.json（合格の線と営業時刻の置き方の原本）
 //
 // 数えるのは「型に乗らなかった行」で、合格の線は 0 行（→ docs/agent/tech-requirements.md 7 の M1 ①）。
 // 型は src/core/input-types.ts をそのまま走らせる（書き直した型に乗っても答えにならない）。
@@ -12,13 +12,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { 読み込む, 取り出す } from './判定の入力.mjs'
+import { 読み込む, 取り出す } from './verify-input.mjs'
 
 const ここ = path.dirname(fileURLToPath(import.meta.url))
 const 根 = path.dirname(ここ)
 const 読む = (相対) => fs.readFileSync(path.join(根, 相対), 'utf8')
 
-const 宣言 = JSON.parse(読む('scripts/M1①の宣言.json'))
+const 宣言 = JSON.parse(読む('scripts/m1-1-spec.json'))
 
 // ---- 型を読む --------------------------------------------------------------
 // SpreadsheetApp は置かない（置かずに通ることは src/core/input-types.test.ts が見ている）。
@@ -77,7 +77,7 @@ function 日ごとの枠() {
 
 const 分 = (時刻) => Number(時刻.slice(0, 2)) * 60 + Number(時刻.slice(3, 5))
 
-/** 端が接するだけは重なりに数えない（scripts/件数の検算.mjs と同じ向き）。 */
+/** 端が接するだけは重なりに数えない（scripts/count-recheck.mjs と同じ向き）。 */
 const 重なる = (枠, 区間) => 分(枠.start) < 分(区間.end) && 分(区間.start) < 分(枠.end)
 
 /** 確定シフトの 1 行を 5-1 の 3 つに当てる（→ 宣言の「当て方」）。乗れば null、乗らなければ理由を返す。 */
@@ -140,7 +140,7 @@ function 主処理() {
   console.log('型（判定の側で書き直さない。SpreadsheetApp を置かずにそのまま走らせる）')
   console.log(`  ${宣言.入力.型.join(' / ')}`)
   console.log('')
-  console.log('宣言（原本は scripts/M1①の宣言.json）')
+  console.log('宣言（原本は scripts/m1-1-spec.json）')
   for (const d of 宣言.宣言) {
     console.log(`  ・${d.何}: ${d.決め}`)
     console.log(`      なぜ宣言が要るか: ${d.なぜ宣言が要るか}`)

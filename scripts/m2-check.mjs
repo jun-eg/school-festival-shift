@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 // M2 の判定 — 前回の希望データのモックから案を 1 つ組み、違反と、名指しされていない未充足を数える。
 //
-//   使い方: node scripts/M2の判定.mjs
-//   宣言:   scripts/M2の宣言.json（合格の線と入力の置き方の原本）
+//   使い方: node scripts/m2-check.mjs
+//   宣言:   scripts/m2-spec.json（合格の線と入力の置き方の原本）
 //
 // 数えるのは 2 つ（→ docs/agent/tech-requirements.md 7 の M2）。
 //   違反                   … 置いた人が条件を破っている件数。合格の線は 0 件
 //   名指しされていない未充足 … 案の側の不足のうち、検証結果に出ていない件数。合格の線は 0 件
 // 未充足そのものは 0 でなくてよい。
 //
-// 1 周の秒も残すが、上限（360 秒）との突き合わせは scripts/生成の所要時間.mjs が持つ。
+// 1 周の秒も残すが、上限（360 秒）との突き合わせは scripts/generation-time.mjs が持つ。
 // 規則も数え方も src/ をそのまま走らせる（書き直した規則で 0 件になっても答えにならない）。
 // 未充足の行をそのまま数えると名指しした側に採点させることになるので、不足を案から数え直して両方向で突き合わせる。
 // 規則 3 の ⑥（複数日で偏らせない）は数えに入らないことを出力に出す。
 // 読むだけ。合格の線を 1 つでも外したら終了コード 1。
 
-import { 検める as 前回の5時刻を検める } from './前回の5時刻.mjs'
-import { 読む, 宣言, 実装の文脈, 取り出す, 判定の入力 } from './判定の入力.mjs'
+import { 検める as 前回の5時刻を検める } from './previous-five-times.mjs'
+import { 読む, 宣言, 実装の文脈, 取り出す, 判定の入力 } from './verify-input.mjs'
 
 // ---- 実装を読む ------------------------------------------------------------
-// 文脈と入力は scripts/判定の入力.mjs が組む（まとまりと散らし.mjs と同じ案の上で読むため）。
+// 文脈と入力は scripts/verify-input.mjs が組む（clustering-spread.mjs と同じ案の上で読むため）。
 
 const 文脈 = await 実装の文脈()
 const { build, builtInSteps, coreSteps, takeConditions, readAssignments, allNeeds, requiredAt, rolesInOrder, sheetColumns, checkKind, violationRules, violationsNotCounted, ruleRoles } = 取り出す(文脈, [
@@ -39,7 +39,7 @@ const { build, builtInSteps, coreSteps, takeConditions, readAssignments, allNeed
 ])
 
 // ---- 入力を組む ------------------------------------------------------------
-// 枠も需要も刻み直さない。「日ごとの営業時刻」は前回の確定シフトから毎回算出する（→ scripts/前回の5時刻.mjs）。
+// 枠も需要も刻み直さない。「日ごとの営業時刻」は前回の確定シフトから毎回算出する（→ scripts/previous-five-times.mjs）。
 const 時刻の検め = 前回の5時刻を検める()
 
 // 終端 ≤ 始端の区間を書いた人は展開の段で止まり案が出ないので、外して組む（誰を外したかは出す）。
@@ -240,7 +240,7 @@ function 主処理() {
   console.log('')
   console.log('M2 の判定 — 前回の希望データのモックから案を 1 つ組み、違反と、名指しされていない未充足を数える')
   console.log('')
-  console.log('合格の線（原本は scripts/M2の宣言.json。出どころは docs/agent/tech-requirements.md 7 の M2）')
+  console.log('合格の線（原本は scripts/m2-spec.json。出どころは docs/agent/tech-requirements.md 7 の M2）')
   console.log(`  違反 ${宣言.合格の線.違反} 件 ／ 名指しされていない未充足 ${宣言.合格の線.名指しされていない未充足} 件`)
   console.log(`  未充足そのもの: ${宣言.合格の線.未充足そのもの}`)
   console.log(`  所要時間: ${宣言.合格の線.所要時間}`)
@@ -248,7 +248,7 @@ function 主処理() {
   console.log('実装（判定の側で書き直さない。SpreadsheetApp を置かずにそのまま走らせる）')
   console.log(`  ${宣言.入力.実装.join(' / ')}`)
   console.log('')
-  console.log('宣言（原本は scripts/M2の宣言.json）')
+  console.log('宣言（原本は scripts/m2-spec.json）')
   宣言.宣言.forEach((一つ) => {
     console.log(`  ・${一つ.何}: ${一つ.決め}`)
     console.log(`      なぜ宣言が要るか: ${一つ.なぜ宣言が要るか}`)
@@ -264,7 +264,7 @@ function 主処理() {
   console.log(`      展開で止まった人: ${止まる人.join(' / ')}（終端 ≤ 始端。外してから組んだ → 宣言）`)
 
   console.log('')
-  console.log('日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/前回の5時刻.mjs）')
+  console.log('日ごとの 5 時刻（data/ の前回の確定シフトから算出した値である → scripts/previous-five-times.mjs）')
   時刻の検め.算出.forEach((一日) => {
     const 帯 = `準備 ${一日.帯の枠['準備']} ／ 調理 ${一日.帯の枠['調理']} ／ 片付け ${一日.帯の枠['片付け']}`
     console.log(`      ${一日.日}  ${一日.時刻.join(' ')}  全 ${一日.全枠} 枠 = ${帯}`)
@@ -273,13 +273,13 @@ function 主処理() {
     console.log(`  ${一つ.合否 ? 'OK ' : 'NG '}  ${一つ.何}`)
   })
   if (時刻の検め.外れ.length === 0) {
-    console.log('  OK   算出した値が、scripts/前回の5時刻の宣言.json の期待値と 1 つも違わない')
+    console.log('  OK   算出した値が、scripts/previous-five-times-spec.json の期待値と 1 つも違わない')
   } else {
     時刻の検め.外れ.forEach((一つ) => {
       console.log(`  NG   5 時刻が期待と違う: ${一つ}`)
     })
   }
-  console.log('       値の出どころ（どの行から出たか）は node scripts/前回の5時刻.mjs が出す')
+  console.log('       値の出どころ（どの行から出たか）は node scripts/previous-five-times.mjs が出す')
 
   console.log('')
   console.log('数えに入らないもの（入っていないことを隠さない → docs/agent/tech-requirements.md 5-4 の但し書き）')
@@ -357,7 +357,7 @@ function 主処理() {
     console.log(`  ${段.name.padEnd(12, '　')} ${秒で(一周.段の秒[段.name])}`)
   })
   console.log(`  ${'コアを 1 周'.padEnd(12, '　')} ${秒で(一周.全体の秒)}`)
-  console.log(`      上限（360 秒）との突き合わせはここが持たない（→ scripts/生成の所要時間.mjs ／ 6-1 の #2）`)
+  console.log(`      上限（360 秒）との突き合わせはここが持たない（→ scripts/generation-time.mjs ／ 6-1 の #2）`)
 
   console.log('')
   console.log('本文（宣言が写した言葉が載っているかだけを見る。本文は解析しない）')
@@ -374,7 +374,7 @@ function 主処理() {
     console.log('')
     console.log('判定できない（件数の合否より先に、入力と突き合わせを見る → 宣言）')
     if (外れた入力.length > 0) console.log(`  ・入力が期待と違う: ${外れた入力.join(' / ')} — ${期待.ここが外れたら}`)
-    if (時刻の検め.落ちた) console.log(`  ・算出した 5 時刻が検めを落ちた（詳細は node scripts/前回の5時刻.mjs）— ${時刻の検め.ここが外れたら}`)
+    if (時刻の検め.落ちた) console.log(`  ・算出した 5 時刻が検めを落ちた（詳細は node scripts/previous-five-times.mjs）— ${時刻の検め.ここが外れたら}`)
     if (揃わなかった突き合わせ.length > 0) console.log(`  ・突き合わせが揃わない: ${揃わなかった突き合わせ.map((一つ) => 一つ.何).join(' / ')} — ${宣言.突き合わせ.揃わなかったら}`)
     if (本文に無い言葉.length > 0) console.log(`  ・本文に載っていない言葉: ${本文に無い言葉.join(' / ')}`)
   }

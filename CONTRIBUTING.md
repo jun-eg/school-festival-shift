@@ -27,7 +27,7 @@
 | | |
 | --- | --- |
 | 誰の | 毎年入れ替わる模擬店のシフト担当者。引き継ぎは前年の表 1 枚と LINE の短い説明だけ |
-| 何を | 検便・学年・時間の条件と、準備・片付けのルールを満たす割り当て。3〜6 時間かけ、20 回ほどやり直していた |
+| 何を | 検便・学年・時間の条件と、準備・片付けのルールを満たす割り当て。5〜6 時間かけ、20 回ほどやり直していた |
 | どうする | 条件と希望をデータとして外に出し、条件を満たす仮完成を 1 案つくる。担当者は「白紙から組む人」から「例外だけ直す人」になり、手作業を 5〜15 分にする |
 
 ### なぜこの方法・この技術スタックか
@@ -46,6 +46,7 @@
 - **誰も保守しなくても動き続ける**: スクリプトはテンプレートのコピーで担当者に渡り、外部のサーバ・API・課金に頼らない。年の切り替えもメニュー 1 つで済む
 - **何年か空いても、いつか来たエンジニアが再開発できる**: 決めた理由は issue と ADR に、仕様は型と検査に残し、文書が古くなれば機械が止める
 
+作った経緯と、今年の学祭で使った結果は記事 [作るから直す人へ 学祭のシフト作りを5時間から1時間にした話](https://zenn.dev/jun_eg/articles/school-festival-shift-apps-script) にまとめた。
 背景と決めたことは [ジャーニーマップ](docs/journey/作る側.md) → [HMW](docs/hmw.md) → [Design Doc](docs/design-doc.md) → [技術の要件定義](docs/tech-requirements.md) の要約で辿れる（一覧は [`docs/README.md`](docs/README.md)）。
 
 ## 構成
@@ -86,17 +87,23 @@ flowchart LR
     subgraph IDEA["何を作るか決める"]
         UJM["/user-journey-map"] --> HMW["/hmw"] --> DD["/design-doc"] --> TR["/tech-requirements"]
     end
-    TR --> ISSUE[issue を起票]
-    ISSUE --> CHECK["/issue-check<br/>(issue-reviewer)"]
-    subgraph IMPLEMENT["/implement"]
+    TR --> CREATE["/flow issue-create<br/>issue を起票"]
+    subgraph FIX["/flow issue-fix"]
+        IR{{issue-reviewer}} -->|"直しが要る（3 周まで）"| IF["issue-fixer<br/>issue を直す"]
+        IF --> IR
+    end
+    CREATE --> IR
+    subgraph IMPLEMENT["/flow implement"]
         IMPL["implementer<br/>実装・commit"] --> PW["pr-writer<br/>PR 本文"] --> PRV{{pr-reviewer}}
         PRV -->|"直しが要る（3 周まで）"| IMPL
     end
-    CHECK --> IMPL
-    PRV -->|merge してよい| HUMAN[人がレビューして main へ merge]
+    IR -->|妥当| IMPL
+    IMPL -.->|issue の穴| IR
+    PRV -.->|issue から見直し| IR
+    PRV -->|"merge してよい<br/>（sub-issue はクッション branch へ）"| HUMAN[人がレビューして main へ merge]
 ```
 
-定義は [`.claude/skills/`](.claude/skills/) と [`.claude/agents/`](.claude/agents/) にある。
+段取りは [`.claude/skills/flow/`](.claude/skills/flow/)、agent の定義は [`.claude/agents/`](.claude/agents/) にある。きっかけから引く索引は [`.claude/README.md`](.claude/README.md)。
 
 ## 開発環境
 
@@ -165,7 +172,7 @@ GCP プロジェクトと clasp が要るので任意で、CI では回さない
 | `npm run typecheck` | 型だけを検査する |
 | `npm run lint` / `format` | Biome で検査する / 書式を直す |
 | `npm run build` | 貼る物を `dist/` に出す |
-| `npm run 判定` | M1〜M4 の判定と検算を回す |
+| `npm run verify` | M1〜M4 の判定と検算を回す |
 | `npm run e2e` | 実機の E2E を回す（任意） |
 
 ## 環境構築
