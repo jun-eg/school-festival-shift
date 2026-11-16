@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: issue 1 本（sub-issue か単独）を読み、その「やること」を実装し、検査を走らせ、commit する。レビューの所見を渡されたら同じ agent が直して commit する。push・PR 作成・merge・issue の書き換えは打たない。/implement skill から sub-issue ごとに呼ばれ、レビューの周回は SendMessage で続けられる。
+description: issue 1 本（sub-issue か単独）を読み、その「やること」を実装し、検査を走らせ、commit する。レビューの所見を渡されたら同じ agent が直して commit する。push・PR 作成・merge・issue の書き換えは打たない。/flow implement から sub-issue ごとに呼ばれ、レビューの周回は SendMessage で続けられる。
 tools: Bash, Read, Edit, Write, Grep, Glob
 model: sonnet
 color: green
